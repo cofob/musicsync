@@ -24,7 +24,7 @@ struct RootView: View {
                             }
                             // Hiding the window toolbar for Now Playing can leave the root page drawn over
                             // a pushed one; a new stack (same path) shows only the top page.
-                            .id(model.showNowPlaying)
+                            .id(model.showNowPlaying && !model.path.isEmpty)
                             .softTopEdge()
                         }
                     }
