@@ -82,17 +82,26 @@ struct TopSongsGrid: View {
     }
 }
 
-/// Text cut to three lines with a "More" button that shows all of it.
+/// Text cut to three lines with a "More" button that shows all of it; the button is there only when the text is cut.
 struct ExpandableText: View {
     let text: String
     @State private var expanded = false
+    /// Heights of the text as shown and in full, at the same width.
+    @State private var heights = (shown: 0.0, full: 0.0)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(text).lineLimit(expanded ? nil : 3).foregroundStyle(.secondary).textSelection(.enabled)
                 .frame(maxWidth: 720, alignment: .leading)
-            Button(expanded ? "Less" : "More") { withAnimation(.smooth) { expanded.toggle() } }
-                .buttonStyle(HitAreaButtonStyle()).font(.callout.weight(.semibold)).foregroundStyle(Color.musicAccent)
+                .onGeometryChange(for: Double.self) { $0.size.height } action: { heights.shown = $0 }
+                .background {
+                    Text(text).fixedSize(horizontal: false, vertical: true).hidden()
+                        .onGeometryChange(for: Double.self) { $0.size.height } action: { heights.full = $0 }
+                }
+            if expanded || heights.full > heights.shown + 1 {
+                Button(expanded ? "Less" : "More") { withAnimation(.smooth) { expanded.toggle() } }
+                    .buttonStyle(HitAreaButtonStyle()).font(.callout.weight(.semibold)).foregroundStyle(Color.musicAccent)
+            }
         }
     }
 }

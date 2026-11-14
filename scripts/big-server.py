@@ -80,7 +80,7 @@ channels, episodes = [], []
 for c, (title, _, _) in enumerate(PODCASTS):
     channels.append({"id": f"ch-{c}", "url": f"https://example.com/{c}/feed.xml", "title": title, "coverArt": f"pod-{c}",
                      "status": "completed", "description": f"<p>Weekly conversations from <b>{title}</b> &amp; friends.</p>"
-                                                           "<p>New episodes every Monday.</p>"})
+                                                           "<p>New episodes every Monday.</p>" * (1 if c < 2 else 12)})
     for e in range(6):
         on_server = e < 4
         episodes.append({"id": f"ep-{c}-{e}", "channelId": f"ch-{c}", "title": TITLES[(c * 6 + e) % len(TITLES)],

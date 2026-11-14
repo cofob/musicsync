@@ -351,11 +351,12 @@ import SwiftUI
             for end in parts[2].indices { model.searchText = String(parts[2][...end]); try? await Task.sleep(for: .milliseconds(700)) }
         case "radio-editor":
             open(StationEditor(station: RadioStation(id: "1", name: "Groove Salad", streamUrl: "https://ice1.somafm.com/groovesalad-128-mp3")), "Station", model)
-        case "podcasts", "podcast", "podcast-add":
-            // Needs `scripts/big-server.py` (`MUSICSYNC_DEMO_SERVER`): the public demo has no podcasts.
-            guard let channel = await first({ model.podcasts.channels.first { $0.id == "ch-0" } ?? model.podcasts.channels.first }) else { break }
+        case "podcasts", "podcast", "podcast-long", "podcast-add":
+            // Needs `scripts/big-server.py` (`MUSICSYNC_DEMO_SERVER`): the public demo has no podcasts. ch-2 has a long description.
+            let id = scene == "podcast-long" ? "ch-2" : "ch-0"
+            guard let channel = await first({ model.podcasts.channels.first { $0.id == id } ?? model.podcasts.channels.first }) else { break }
             await select(.podcasts, model)
-            if scene == "podcast" { model.show(.podcast(channel)) }
+            if scene != "podcasts" && scene != "podcast-add" { model.show(.podcast(channel)) }
             if scene == "podcast-add" { open(AddPodcastSheet(), "Add Podcast", model) }
         case "jukebox", "jukebox-nowplaying", "jukebox-menu":
             // Needs `scripts/big-server.py`: an album plays (without sound) on the stub's jukebox.
