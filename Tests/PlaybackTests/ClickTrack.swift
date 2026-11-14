@@ -11,6 +11,8 @@ struct ClickTrack {
     var firstBeat = 0.0
     /// Clicks before the first beat one.
     var pickup = 0
+    /// Hz of the steady tone; two songs with different tones do not cancel out when mixed.
+    var tone = 220.0
 
     var period: Double { 60 / bpm }
     var introEnd: Double { lead + intro }
@@ -24,7 +26,7 @@ struct ClickTrack {
             let t = Double(i) / rate
             guard t >= lead, t < soundEnd else { return 0 }
             let level = t >= introEnd && t < outroStart ? 1.0 : 0.25
-            var x = 0.15 * level * sin(2 * .pi * 220 * t)
+            var x = 0.15 * level * sin(2 * .pi * tone * t)
             let beat = t - lead - firstBeat
             if beat >= 0 {
                 let k = Int(beat / period), dt = beat - Double(k) * period
