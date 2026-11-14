@@ -3,8 +3,11 @@
 set -eu
 cd "$(dirname "$0")/.."
 CONFIG="${CONFIG:-release}"
-swift build -c "$CONFIG" --product MusicSyncApp
-BIN="$(swift build -c "$CONFIG" --show-bin-path)"
+# ARCHS="arm64 x86_64" makes a universal app.
+FLAGS="-c $CONFIG"
+for a in ${ARCHS:-}; do FLAGS="$FLAGS --arch $a"; done
+swift build $FLAGS --product MusicSyncApp
+BIN="$(swift build $FLAGS --show-bin-path)"
 APP=build/MusicSync.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"

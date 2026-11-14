@@ -31,14 +31,18 @@ swift test
 ./scripts/bundle.sh
 ```
 
-`bundle.sh` makes a release build at `build/MusicSync.app` with an ad-hoc signature.
+`bundle.sh` makes a release build at `build/MusicSync.app` with an ad-hoc signature. `ARCHS="arm64 x86_64" ./scripts/bundle.sh` makes a universal app.
 
 ## Install
+
+Download `MusicSync.zip` from [Releases](https://github.com/cofob/musicsync/releases), or install your own build:
 
 ```sh
 cp -R build/MusicSync.app /Applications/
 open /Applications/MusicSync.app
 ```
+
+The app is not notarized. If macOS blocks a downloaded copy, run `xattr -dr com.apple.quarantine /Applications/MusicSync.app`.
 
 Open Settings, enter your server address, user name and password, and click Save. The password is kept in the Keychain.
 
