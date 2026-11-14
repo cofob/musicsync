@@ -38,7 +38,7 @@ public actor SelectionExpander {
         var albumIDs = selection.albums.sorted()
         let artists = try await fetchAll(selection.artists.sorted()) { try await self.client.getArtist(id: $0) }
         for (id, artist) in artists {
-            if let artist { albumIDs += (artist.album ?? []).map(\.id) } else { result.missing.append(id) }
+            if let artist { albumIDs += (artist.album ?? []).map(\.id).filter { !selection.excludedAlbums.contains($0) } } else { result.missing.append(id) }
         }
         let lists = try await fetchAll(selection.playlists.sorted()) { try await self.client.getPlaylist(id: $0) }
         var listed: [(Playlist, [Song])] = []

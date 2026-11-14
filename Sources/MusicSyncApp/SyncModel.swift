@@ -154,7 +154,7 @@ final class SyncModel {
 
     func isSelected(_ album: Album) -> Bool { selection.selects(album) }
     /// Selected through its artist: only the artist toggle removes it.
-    func isSelectedByArtist(_ album: Album) -> Bool { album.artistId.map(selection.artists.contains) == true }
+    func isSelectedByArtist(_ album: Album) -> Bool { !selection.excludedAlbums.contains(album.id) && album.artistId.map(selection.artists.contains) == true }
     func isArtistSelected(_ id: String) -> Bool { selection.artists.contains(id) }
     func isPlaylistSelected(_ id: String) -> Bool { selection.playlists.contains(id) }
 
@@ -162,7 +162,7 @@ final class SyncModel {
     func toggle(_ album: Album, confirmed: Bool = false) {
         let on = !isSelected(album)
         if on, !confirmed, status(of: album) == .foreign { foreignAlbum = album; return }
-        update { if on { $0.albums.insert(album.id) } else { $0.albums.remove(album.id) } }
+        update { if on { $0.albums.insert(album.id); $0.excludedAlbums.remove(album.id) } else { $0.albums.remove(album.id) } }
     }
 
     func toggleArtist(_ id: String) {
@@ -246,7 +246,7 @@ final class SyncModel {
         tracksToDelete = []
         guard !dbids.isEmpty else { return }
         let albums = Set(context?.manifest.entries.values.filter { dbids.contains($0.dbid) }.map(\.albumID) ?? [])
-        if !albums.isDisjoint(with: selection.albums) { update { $0.albums.subtract(albums) } }
+        update { $0.albums.subtract(albums); $0.excludedAlbums.formUnion(albums) }
         var plan = SyncPlan()
         plan.deleteTracks = dbids
         plan.reserveBytes = 0

@@ -46,6 +46,17 @@ import Testing
         #expect(result.playlists == [DesiredPlaylist(id: "pl-1", name: "Mix", songIDs: ["c1", "a1"])])
     }
 
+    @Test func excludedAlbumsAreSkippedForSelectedArtists() async throws {
+        var selection = Selection()
+        selection.artists = ["ar-1"]
+        selection.excludedAlbums = ["al-3"]
+        let result = try await SelectionExpander(client: server().client).expand(selection, defaultPresetID: "stock-aac", soundCheck: .off)
+        #expect(result.songs.map(\.id) == ["b1"])
+        selection.albums = ["al-3"]  // an explicit album still wins
+        let explicit = try await SelectionExpander(client: server().client).expand(selection, defaultPresetID: "stock-aac", soundCheck: .off)
+        #expect(explicit.songs.map(\.id) == ["b1", "c1"])
+    }
+
     @Test func fullAlbumsModeBringsWholeAlbumsOfPlaylistSongs() async throws {
         var selection = Selection()
         selection.playlists = ["pl-1"]

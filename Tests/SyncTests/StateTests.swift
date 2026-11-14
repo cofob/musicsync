@@ -13,6 +13,7 @@ import Testing
         var selection = Selection()
         selection.albums = ["a"]; selection.artists = ["x"]; selection.playlists = ["p"]
         selection.albumPresets = ["a": "rockbox-flac"]
+        selection.excludedAlbums = ["gone"]
         try store.save(selection, deviceKey: "KEY")
         #expect(store.load(deviceKey: "KEY") == selection)
         #expect(store.load(deviceKey: "OTHER").isEmpty)
