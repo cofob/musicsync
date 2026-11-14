@@ -215,19 +215,23 @@ import SwiftUI
         try? await Task.sleep(for: .seconds(3))
         await tap(window, row: 1, top: 414, height: 54)
         guard model.config?.baseURL.host == "127.0.0.1" else {
-            let second = try? await model.playlist(playlist.id)?.entry?[1].id
-            await send(key(36, "\r", window), window)
-            check(await wait { model.player.current?.id == second }, "Return plays the playlist from the clicked row")
             let ids = (try? await model.playlist(playlist.id)?.entry?.map(\.id)) ?? []
-            check(selectAll(window), "⌘A goes to the playlist list")
-            try? await Task.sleep(for: .milliseconds(300))
             await send(key(36, "\r", window), window)
-            check(await wait { model.player.queue.map(\.id) == ids && model.player.current?.id == ids.first }, "⌘A, Return plays all rows")
+            check(await wait { model.player.current?.id == ids[1] }, "Return plays the playlist from the clicked row")
+            await commandA(window)
+            await send(key(36, "\r", window), window)
+            check(await wait { model.player.queue.map(\.id) == ids && model.player.current?.id == ids.first }, "⌘A, Return plays all rows: queue \(model.player.queue.count) of \(ids.count), at \(model.player.current.flatMap { ids.firstIndex(of: $0.id) } ?? -1)")
+            model.player.next()
+            await send(key(53, "\u{1b}", window), window)
+            await send(key(36, "\r", window), window)
+            try? await Task.sleep(for: .seconds(2))
+            check(model.player.current?.id == ids[1], "Escape clears: Return then plays nothing \(model.player.current.flatMap { ids.firstIndex(of: $0.id) } ?? -1)")
             if model.player.isPlaying { model.player.toggle() }
             return
         }
-        let before = playlist.songCount ?? 0
+        // The count the server has now; earlier runs changed the stub playlist.
         let count = { model.playlists.first { $0.id == playlist.id }?.songCount }
+        guard let before = (try? await model.playlist(playlist.id))?.entry?.count else { return check(false, "playlist entries") }
         await send(key(51, "\u{7f}", window), window)
         check(await wait { count() == before - 1 }, "Delete removes the clicked row from \(playlist.name) (\(before))")
         await tap(window, row: 1, top: 414, height: 54)
@@ -313,6 +317,15 @@ import SwiftUI
         return item?.action.map { menuAction($0, window) } ?? false
     }
 
+    /// ⌘A in the order of `NSApplication.sendEvent`: the window's key equivalents, the Edit menu item when a
+    /// responder takes its action, else a key down for the first responder.
+    private static func commandA(_ window: NSWindow) async {
+        guard let event = key(0, "a", window, .command) else { return }
+        let taken = window.performKeyEquivalent(with: event) || selectAll(window)
+        if !taken { window.sendEvent(event) }
+        try? await Task.sleep(for: .milliseconds(300))
+    }
+
     /// A menu action as `NSApp.sendAction(_:to: nil)` sends it in a key window: up the responder chain,
     /// where SwiftUI hosting views answer through `supplementalTarget`.
     private static func menuAction(_ action: Selector, _ window: NSWindow) -> Bool {
@@ -384,8 +397,8 @@ import SwiftUI
                            windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: clicks, pressure: 1)
     }
 
-    private static func key(_ code: UInt16, _ characters: String, _ window: NSWindow) -> NSEvent? {
-        NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+    private static func key(_ code: UInt16, _ characters: String, _ window: NSWindow, _ flags: NSEvent.ModifierFlags = []) -> NSEvent? {
+        NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
                          windowNumber: window.windowNumber, context: nil, characters: characters,
                          charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code)
     }
