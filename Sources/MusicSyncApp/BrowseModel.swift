@@ -93,7 +93,7 @@ final class BrowseModel {
         return songs
     }
 
-    private static func newestFirst(_ albums: [Album]) -> [Album] {
+    nonisolated private static func newestFirst(_ albums: [Album]) -> [Album] {
         albums.sorted { ($0.year ?? 0, $0.name) > ($1.year ?? 0, $1.name) }
     }
 
@@ -103,10 +103,13 @@ final class BrowseModel {
     func genres() async throws -> [GenreSummary] {
         if app.usesLocalLibrary, let db = app.library?.database { return await db.genres() }
         guard let client = app.client else { return [] }
-        let covers = app.albums.sorted { ($0.playCount ?? 0) > ($1.playCount ?? 0) }.map { (genre: $0.genre ?? "", cover: $0.coverArt, count: 0) }
+        let albums = app.albums
         let server = try await client.getGenres()
-        return GenreSummary.grouped(albums: server.map { ($0.value, nil, $0.albumCount ?? 0) } + covers,
-                                    songs: server.map { ($0.value, $0.songCount ?? 0) })
+        return await Task.detached {  // thousands of albums: grouped off the main thread
+            let covers = albums.sorted { ($0.playCount ?? 0) > ($1.playCount ?? 0) }.map { (genre: $0.genre ?? "", cover: $0.coverArt, count: 0) }
+            return GenreSummary.grouped(albums: server.map { ($0.value, nil, $0.albumCount ?? 0) } + covers,
+                                        songs: server.map { ($0.value, $0.songCount ?? 0) })
+        }.value
     }
 
     func genrePage(_ name: String) async throws -> GenrePage {
@@ -115,7 +118,8 @@ final class BrowseModel {
         }
         // The server matches one exact tag, so ask for each spelling of the genre among the albums.
         let key = GenreName.key(name)
-        let albums = Self.newestFirst(app.albums.filter { GenreName.split($0.genre).contains { GenreName.key($0) == key } })
+        let all = app.albums
+        let albums = await Task.detached { Self.newestFirst(all.filter { GenreName.split($0.genre).contains { GenreName.key($0) == key } }) }.value
         let tags = Set([name] + albums.flatMap { GenreName.split($0.genre).filter { GenreName.key($0) == key } })
         var songs: [Song] = []
         for tag in tags.sorted() { songs += try await app.client?.getSongsByGenre(tag, count: 500) ?? [] }

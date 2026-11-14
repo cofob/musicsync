@@ -23,7 +23,8 @@ extension AppModel {
         return list
     }
 
-    func albumPages(sort: AlbumSort, query: String, inMemory: () -> [Album]) async -> PagedList<Album> {
+    /// `inMemory` sorts thousands of albums, so it runs off the main thread.
+    func albumPages(sort: AlbumSort, query: String, inMemory: @escaping @Sendable () -> [Album]) async -> PagedList<Album> {
         if usesLocalLibrary, let db = library?.database {
             let list = PagedList<Album>(total: await db.albumCount(matching: query)) { offset, limit in
                 await db.albums(sort: sort, matching: query, limit: limit, offset: offset)
@@ -31,7 +32,7 @@ extension AppModel {
             await list.load(page: 0)
             return list
         }
-        return await Self.slices(inMemory())
+        return await Self.slices(await Task.detached(operation: inMemory).value)
     }
 
     func artistPages(query: String) async -> PagedList<Artist> {
@@ -42,8 +43,12 @@ extension AppModel {
             await list.load(page: 0)
             return list
         }
-        let sorted = artists.sorted { ($0.sortName ?? $0.name).localizedStandardCompare($1.sortName ?? $1.name) == .orderedAscending }
-        return await Self.slices(query.isEmpty ? sorted : sorted.filter { $0.name.localizedCaseInsensitiveContains(query) })
+        let artists = artists
+        let found = await Task.detached {  // thousands of names: sorted off the main thread
+            let sorted = artists.sorted { ($0.sortName ?? $0.name).localizedStandardCompare($1.sortName ?? $1.name) == .orderedAscending }
+            return query.isEmpty ? sorted : sorted.filter { $0.name.localizedCaseInsensitiveContains(query) }
+        }.value
+        return await Self.slices(found)
     }
 
     /// Pages over a list already in memory (iPod contents, albums before the local library is ready).
