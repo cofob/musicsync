@@ -157,6 +157,13 @@ import Subsonic
             #expect(ascending.count == 20_000 && descending == ascending.reversed())
         }
         #expect(await db.albums(sort: .name, matching: "album 7", limit: 5, offset: 0).map(\.name) == ["Album 7", "Album 70", "Album 700", "Album 701", "Album 702"])
+        // The Songs filter while typing: a count and a sorted page of the matches, both ways.
+        let typed = ContinuousClock.now
+        #expect(await db.songCount(matching: "song 199") == 110)  // 199, 1990–1999
+        let matches = await db.songs(sort: .artist, matching: "song 199", limit: 200, offset: 0).map(\.id)
+        #expect(ContinuousClock.now - typed < .milliseconds(300))
+        #expect(matches.count == 110 && matches.allSatisfy { $0.hasPrefix("s-199") })
+        #expect(await db.songs(sort: .artist, descending: true, matching: "song 199", limit: 200, offset: 0).map(\.id) == matches.reversed())
     }
 }
 
