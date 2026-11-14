@@ -236,6 +236,18 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
         #expect(try await c.createPlaylist(name: "Old") == nil)
     }
 
+    @Test func similarAndTopSongs() async throws {
+        StubProtocol.replies = [
+            "getSimilarSongs2": #"{"subsonic-response":{"status":"ok","version":"1.16.1","similarSongs2":{"song":[{"id":"s-2","title":"Near"}]}}}"#,
+            "getTopSongs": #"{"subsonic-response":{"status":"ok","version":"1.16.1","topSongs":{}}}"#,
+        ]
+        StubProtocol.log = []
+        let c = stubbed()
+        #expect(try await c.getSimilarSongs2(id: "s-1", count: 20).map(\.id) == ["s-2"])
+        #expect(try await c.getTopSongs(artist: "Björk").isEmpty)  // no Last.fm on the server
+        #expect(query(StubProtocol.log[0])["count"] == "20" && query(StubProtocol.log[1])["artist"] == "Björk")
+    }
+
     @Test func publicURLCarriesParameters() {
         let q = query(client().url("star", [("id", "s-1"), ("albumId", "al-1")]))
         #expect(q["id"] == "s-1" && q["albumId"] == "al-1" && q["f"] == "json" && q["t"] != nil)
