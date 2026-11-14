@@ -34,6 +34,7 @@ public struct RadioStation: Codable, Hashable, Sendable, Identifiable {
 public struct User: Codable, Hashable, Sendable {
     public let username: String
     public let adminRole: Bool?
+    public let podcastRole: Bool?
 }
 
 struct GenresBody: Decodable, Sendable { let genre: [Genre]? }

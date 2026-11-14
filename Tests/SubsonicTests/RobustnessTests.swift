@@ -25,6 +25,11 @@ extension ClientTests {
         ok(#""lyricsList":{"structuredLyrics":[{"synced":true,"line":[{"start":-1e3,"value":""}]}]}"#),
         ok(#""playQueue":{"entry":[{"id":"s","title":"t"}],"position":-9223372036854775808,"changed":"never"}"#),
         ok(#""genres":{"genre":[{"value":null}]}"#), ok(#""openSubsonicExtensions":[{"name":"x","versions":["1"]}]"#),
+        ok(#""podcasts":{"channel":[{"id":"c","episode":[{"id":"e","streamId":"","duration":-1,"publishDate":"soon"}]}]}"#),
+        ok(#""podcasts":{"channel":{"id":"c"}}"#), ok(#""podcasts":{"channel":[{"title":"no id"}]}"#),
+        ok(#""newestPodcasts":{"episode":[null]}"#), ok(#""newestPodcasts":[]"#),
+        ok(#""bookmarks":{"bookmark":[{"position":1e300,"entry":{"id":"s","title":"t"}}]}"#),
+        ok(#""bookmarks":{"bookmark":[{"position":5,"entry":null}]}"#), ok(#""bookmarks":{"bookmark":[{"position":"5","entry":{"id":"s","title":"t"}}]}"#),
     ]
 
     private func everyCall(_ c: SubsonicClient) async {
@@ -42,6 +47,9 @@ extension ClientTests {
         _ = try? await c.getPlayQueue()
         _ = try? await c.getGenres()
         _ = try? await c.getOpenSubsonicExtensions()
+        if let channels = try? await c.getPodcasts() { _ = channels.flatMap(\.episodes).map { ($0.song, $0.date) } }
+        _ = try? await c.getNewestPodcasts()
+        _ = try? await c.getBookmarks()
         if let song = try? JSONDecoder().decode(Song.self, from: Data(#"{"id":"s","title":"t","artist":"a"}"#.utf8)) {
             _ = await c.plainLyrics(for: song)
         }
@@ -61,7 +69,8 @@ extension ClientTests {
             StubProtocol.replies = Dictionary(uniqueKeysWithValues: ["ping", "getAlbum", "getAlbumList2", "getArtists", "getArtist", "search3",
                                                                     "getPlaylist", "getPlaylists", "getScanStatus", "getLyricsBySongId",
                                                                     "getLyrics", "getStarred2", "getPlayQueue", "getGenres",
-                                                                    "getOpenSubsonicExtensions"].map { ($0, body) })
+                                                                    "getOpenSubsonicExtensions", "getPodcasts", "getNewestPodcasts",
+                                                                    "getBookmarks"].map { ($0, body) })
             await everyCall(c)
         }
     }
