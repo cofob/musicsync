@@ -108,6 +108,9 @@ import SwiftUI
             model.system.hotKeys.assign(KeyCombo(keyCode: UInt32(kVK_RightArrow), modifiers: UInt32(controlKey | optionKey), key: "→"), to: .next)
             open(ShortcutsSettingsView(recording: scene.hasSuffix("recording") ? .favorite : nil), "Shortcuts", model)
         case "settings-sharing": open(SharesSettingsView(), "Sharing", model)
+        case "settings-remote", "settings-remote-off":
+            if scene.hasSuffix("off") { model.remote.isEnabled = false } else { await remoteScene(model) }
+            open(RemoteSettingsView(), "Remote", model)
         case "share-menu":
             guard let album = await first({ model.albums.first }), let song = try? await model.album(album.id)?.song?.first else { break }
             open(VStack(alignment: .leading) { SongMenuItems(song: song) }.buttonStyle(.borderless).padding(20).frame(width: 280), "Song Menu", model)
@@ -149,6 +152,16 @@ import SwiftUI
             }
         }
         await model.mixes.load(refresh: true)
+    }
+
+    /// Demo only: the remote on (port from `MUSICSYNC_REMOTE_PORT`), two paired devices and an open pairing code.
+    private static func remoteScene(_ model: AppModel) async {
+        model.remote.isEnabled = true
+        _ = model.remote.newToken(name: "iPhone")
+        _ = model.remote.newToken(name: "Apple Watch")
+        model.remote.openPairing()
+        // `MUSICSYNC_REMOTE_CODE_FILE=<path>` gets the code, so a script can pair while the scene stays open.
+        if let file = env["MUSICSYNC_REMOTE_CODE_FILE"] { try? model.remote.pairingCode?.write(toFile: file, atomically: true, encoding: .utf8) }
     }
 
     /// Loads the first album, paused: a scene needs a song, not sound.

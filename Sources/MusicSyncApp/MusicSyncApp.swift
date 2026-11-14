@@ -12,6 +12,7 @@ import SwiftUI
         if Shot.output == nil { NSApp.activate(ignoringOtherApps: true) }
         Shot.start(model)
         model.system.start()
+        model.remote.start()
         // SIGTERM (`kill`, `pkill`) quits like ⌘Q instead of killing the process mid-sync.
         signal(SIGTERM, SIG_IGN)
         sigterm = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)

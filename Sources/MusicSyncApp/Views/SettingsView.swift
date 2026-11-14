@@ -12,6 +12,7 @@ struct SettingsView: View {
             DownloadSettingsView().tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
             SyncSettingsView().tabItem { Label("Sync", systemImage: "arrow.triangle.2.circlepath") }
             ShortcutsSettingsView().tabItem { Label("Shortcuts", systemImage: "keyboard") }
+            RemoteSettingsView().tabItem { Label("Remote", systemImage: "iphone.radiowaves.left.and.right") }
             if model.system.sharesSupported { SharesSettingsView().tabItem { Label("Sharing", systemImage: "square.and.arrow.up") } }
         }
     }
