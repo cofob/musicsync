@@ -59,6 +59,7 @@ final class SystemServices {
             Watcher({ [app] in app.player.current?.id }) { [weak self] _ in self?.trackChanged() },
         ]
         applyHotKeys()
+        IntentHost.system = self
     }
 
     private func serverChanged() {
