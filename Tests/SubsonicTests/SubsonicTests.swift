@@ -136,7 +136,8 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
     override func startLoading() {
         let name = request.url!.lastPathComponent.replacingOccurrences(of: ".view", with: "")
         let body = Self.replies[name] ?? "{}"
-        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                                       headerFields: body.hasPrefix("<") ? ["Content-Type": "text/xml"] : nil)!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Data(body.utf8))
         client?.urlProtocolDidFinishLoading(self)
@@ -163,6 +164,10 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
         let c = stubbed()
         StubProtocol.replies = ["getCoverArt": "PNGDATA"]
         #expect(try await c.coverArt(id: "al-1", size: 320) == Data("PNGDATA".utf8))
+        StubProtocol.replies = ["getCoverArt": #"<subsonic-response status="failed"/>"#]
+        await #expect(throws: SubsonicError.badResponse(#"<subsonic-response status="failed"/>"#)) {
+            try await c.coverArt(id: "al-1", size: 320)
+        }
     }
 
     @Test func fetchesLyricsAndStarred() async throws {

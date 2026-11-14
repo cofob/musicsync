@@ -150,8 +150,16 @@ public struct SubsonicClient: Sendable {
     /// Cover art bytes (square, `size` px).
     public func coverArt(id: String, size: Int) async throws -> Data {
         let (data, response) = try await session.data(from: coverArtURL(id: id, size: size))
-        if let status = (response as? HTTPURLResponse)?.statusCode, status != 200 { throw SubsonicError.badStatus(status) }
+        try Self.check(response, body: data)
         return data
+    }
+
+    /// Binary endpoints send a Subsonic error body (XML/JSON) with HTTP 200.
+    private static func check(_ response: URLResponse?, body: @autoclosure () -> Data?) throws {
+        if let status = (response as? HTTPURLResponse)?.statusCode, status != 200 { throw SubsonicError.badStatus(status) }
+        if let type = response?.mimeType, ["text/xml", "application/xml", "application/json"].contains(type) {
+            throw SubsonicError.badResponse(String(decoding: (body() ?? Data()).prefix(500), as: UTF8.self))
+        }
     }
 
     /// Downloads the original file to a temp file. The caller moves or deletes it.
@@ -168,8 +176,8 @@ public struct SubsonicClient: Sendable {
                 let task = session.downloadTask(with: url) { tmp, response, error in
                     // `tmp` is deleted when this returns, so it is moved here.
                     if let error { return continuation.resume(throwing: error) }
-                    if let status = (response as? HTTPURLResponse)?.statusCode, status != 200 {
-                        return continuation.resume(throwing: SubsonicError.badStatus(status))
+                    do { try Self.check(response, body: tmp.flatMap { try? Data(contentsOf: $0) }) } catch {
+                        return continuation.resume(throwing: error)
                     }
                     guard let tmp else { return continuation.resume(throwing: URLError(.cannotCreateFile)) }
                     continuation.resume(with: Result { try FileManager.default.moveItem(at: tmp, to: dest); return dest })
@@ -182,17 +190,33 @@ public struct SubsonicClient: Sendable {
                         if last.tick() { progress(t.countOfBytesReceived, t.countOfBytesExpectedToReceive) }
                     }
                 }
-                box.task = task
-                task.resume()
+                box.start(task)
             }
-        } onCancel: { box.task?.cancel() }
+        } onCancel: { box.cancel() }
     }
 }
 
-/// Holds a running download task and its progress observation.
+/// Holds a running download task and its progress observation. A cancel before `start` is kept.
 private final class TaskBox: @unchecked Sendable {
-    var task: URLSessionDownloadTask?
+    private let lock = NSLock()
+    private var task: URLSessionDownloadTask?
+    private var cancelled = false
     var observation: NSKeyValueObservation?
+
+    func start(_ t: URLSessionDownloadTask) {
+        lock.withLock {
+            task = t
+            t.resume()
+            if cancelled { t.cancel() }
+        }
+    }
+
+    func cancel() {
+        lock.withLock {
+            cancelled = true
+            task?.cancel()
+        }
+    }
 
     /// True at most every 0.2 s.
     final class Clock: @unchecked Sendable {
