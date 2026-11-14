@@ -48,7 +48,6 @@ final class SearchModel {
     private(set) var result: SearchResult3?
     private(set) var deviceResult = DeviceResult()
     private(set) var error: String?
-    private(set) var isLoading = false
 
     @ObservationIgnored private weak var app: AppModel?
     @ObservationIgnored private var resultTask: Task<Void, Never>?
@@ -80,19 +79,18 @@ final class SearchModel {
         guard !text.isEmpty, let app else { result = nil; deviceResult = DeviceResult(); return }
         if scope == .ipod { deviceResult = Self.deviceSearch(text, in: app.ipod.snapshot); return }
         result = nil
-        isLoading = true
         resultTask = Task {
             let found = await lookup(text, limit: 40, debounce: nil)
             guard !Task.isCancelled else { return }
             result = found
-            isLoading = false
+            if found == nil, error == nil { error = "No server is connected." }
         }
     }
 
     func clear() {
         resultTask?.cancel()
         query = ""; result = nil; deviceResult = DeviceResult(); suggestions = Suggestions()
-        error = nil; isLoading = false; showsSuggestions = false; highlighted = nil
+        error = nil; showsSuggestions = false; highlighted = nil
     }
 
     /// Re-runs the shown query (scope changed, retry).
@@ -141,11 +139,9 @@ final class SearchModel {
         if let debounce { try? await Task.sleep(for: debounce) }
         guard !Task.isCancelled, let client = app.client else { return nil }
         do {
-            let found = try await client.search3(text, artistCount: min(limit, 20), albumCount: limit, songCount: limit)
-            error = nil
-            return found
+            return try await client.search3(text, artistCount: min(limit, 20), albumCount: limit, songCount: limit)
         } catch where !error.isCancellation && !Task.isCancelled {
-            if debounce == nil { self.error = error.localizedDescription; isLoading = false }
+            if debounce == nil { self.error = error.localizedDescription }
         } catch {}
         return nil
     }

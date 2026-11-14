@@ -57,6 +57,7 @@ final class PagedList<Item: Sendable> {
             while recent.count > maxPages { pages[recent.removeFirst()] = nil }
         } catch where !error.isCancellation {
             self.error = error.localizedDescription
+            if total == nil, pages.isEmpty { count = 0 }
         } catch {}
     }
 
