@@ -67,11 +67,11 @@ struct UpNextPanel: View {
 
     @ViewBuilder
     private func section(_ title: String, _ slots: [PlayQueue<PlayItem>.Slot], from: String? = nil, clear: Bool) -> some View {
-        let player = model.player
+        let player = model.player, queue = player.queue  // read once: each read of `player.queue` is tracked
         header(title, from: from, clear: clear)
         // The item goes with its slot: a row may draw once more after the queue got shorter. An `if` in the row
         // instead makes the list resolve every row of a long queue to count its views, and Up Next opens late.
-        ForEach(slots.filter { player.queue.indices.contains($0.index) }.map { ($0, player.queue[$0.index]) }, id: \.0.id) { slot, item in
+        ForEach(slots.filter { queue.indices.contains($0.index) }.map { ($0, queue[$0.index]) }, id: \.0.id) { slot, item in
             QueueRow(item: item, selected: selected == slot.id) { menu(slot, item) }
                 .onTapGesture(count: 2) { player.play(at: slot.index) }
                 .onTapGesture { selected = slot.id }
@@ -143,8 +143,10 @@ struct UpNextPanel: View {
     /// The album every song of `slots` comes from, for "From <album>"; nil when they mix albums.
     private func album(of slots: [PlayQueue<PlayItem>.Slot]) -> String? {
         let queue = model.player.queue
-        let albums = Set(slots.map { queue.indices.contains($0.index) ? queue[$0.index].album : nil })
-        return albums.count == 1 ? albums.first ?? nil : nil
+        // Stops at the first other album: a long mixed queue costs only a few rows.
+        let albums = slots.lazy.map { queue.indices.contains($0.index) ? queue[$0.index].album : nil }
+        guard let first = albums.first, albums.allSatisfy({ $0 == first }) else { return nil }
+        return first
     }
 }
 
