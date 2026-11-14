@@ -1,12 +1,13 @@
 #!/bin/sh
 # Saves a PNG of one app scene from the demo instance: scripts/shot.sh <scene> <out.png>
-# Scenes: see `Shot.show` in Sources/MusicSyncApp/Shot.swift. Env: MUSICSYNC_SHOT_DELAY, MUSICSYNC_VOLUMES, TIMEOUT.
+# Scenes: see `Shot.show` in Sources/MusicSyncApp/Shot.swift. Env: MUSICSYNC_SHOT_DELAY, MUSICSYNC_VOLUMES, TIMEOUT,
+# CONFIG (debug or release).
 set -eu
 [ $# -eq 2 ] || { echo "usage: $0 <scene> <out.png>" >&2; exit 2; }
 OUT="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
 cd "$(dirname "$0")/.."
-swift build --product MusicSyncApp >&2
-BIN="$(swift build --show-bin-path)"
+swift build -c "${CONFIG:-debug}" --product MusicSyncApp >&2
+BIN="$(swift build -c "${CONFIG:-debug}" --show-bin-path)"
 # A copy stamped with the real SDK version, so AppKit uses the current look (see bundle.sh).
 vtool -set-build-version macos 15.0 "$(xcrun --show-sdk-version)" -replace -output "$BIN/MusicSyncApp-shot" "$BIN/MusicSyncApp" 2>/dev/null
 codesign --force --sign - "$BIN/MusicSyncApp-shot" 2>/dev/null
