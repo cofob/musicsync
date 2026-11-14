@@ -9,6 +9,9 @@ struct UpNextPanel: View {
     @Environment(AppModel.self) private var model
     /// Key of the selected entry; ⌫ removes it.
     @State private var selected: Int?
+    /// `player.history` one run loop turn late: History rows that change in the same update as the rows
+    /// below them make AppKit warn of a reentrant table operation.
+    @State private var history: [PlayItem] = []
 
     var body: some View {
         let player = model.player
@@ -24,9 +27,9 @@ struct UpNextPanel: View {
             }
             ScrollViewReader { proxy in
                 List {
-                    if !player.history.isEmpty {
+                    if !history.isEmpty {
                         header("History")
-                        ForEach(Array(player.history.enumerated()), id: \.offset) { _, item in
+                        ForEach(Array(history.enumerated()), id: \.offset) { _, item in
                             row(item).opacity(0.6)
                                 .onTapGesture(count: 2) { player.playAgain(item) }
                                 .contextMenu { historyMenu(item) }
@@ -43,6 +46,7 @@ struct UpNextPanel: View {
                         Text("Nothing up next").foregroundStyle(.white.opacity(0.6)).listRowBackground(Color.clear)
                     }
                 }
+                .onChange(of: player.history.map(\.id), initial: true) { Task { history = player.history } }
                 .scrollContentBackground(.hidden)
                 .listStyle(.plain)
                 .focusable().focusEffectDisabled()
