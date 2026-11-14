@@ -52,7 +52,6 @@ extension ITunesDB {
         let count = try r.int(start + 8)
         var offset = start + (try r.int(start + 4))
         var tracks: [Track] = []
-        tracks.reserveCapacity(count)
         for _ in 0..<count {
             try r.expectTag("mhit", at: offset)
             let hl = try r.int(offset + 4), total = try r.int(offset + 8), mhodCount = try r.int(offset + 12)

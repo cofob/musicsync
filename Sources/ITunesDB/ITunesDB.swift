@@ -50,7 +50,7 @@ public struct ITunesDB: Sendable, Equatable {
 
     /// Next free track id; stable across writes (`max(52, max + 1)`).
     public mutating func nextTrackID() -> UInt32 {
-        issuedID = max(Layout.firstTrackID, (tracks.map(\.id).max() ?? 0) + 1, issuedID + 1)
+        issuedID = max(Layout.firstTrackID, (tracks.map(\.id).max() ?? 0) &+ 1, issuedID &+ 1)
         return issuedID
     }
 
