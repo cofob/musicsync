@@ -36,16 +36,13 @@ import SwiftUI
             await select(.artists, model)
             if let artist = await first({ model.artists.first }) { model.show(.artist(artist.id)) }
         case "nowplaying":
-            guard let album = await first({ model.albums.first }) else { break }
-            model.play(album)
-            _ = await first({ model.player.current })
-            model.player.toggle()  // paused: the scene needs a song, not sound
+            await playPaused(model)
             model.showNowPlaying = true
-        case "settings":
-            let window = NSWindow(contentViewController: NSHostingController(rootView: SettingsView().environment(model)))
-            window.title = "Settings"
-            window.orderFront(nil)
-            extraWindow = window
+        case "settings": open(SettingsView(), "Settings", model)
+        case "menubar":
+            await playPaused(model)
+            open(MenuBarPlayer(), "Menu Bar", model)
+        case "menubar-empty": open(MenuBarPlayer(), "Menu Bar", model)
         case let s where s.hasPrefix("search:"):
             await select(.search, model)
             model.searchText = String(s.dropFirst(7))
@@ -54,6 +51,22 @@ import SwiftUI
             print("Unknown scene: \(scene)")
             exit(2)
         }
+    }
+
+    /// Loads the first album, paused: a scene needs a song, not sound.
+    private static func playPaused(_ model: AppModel) async {
+        guard let album = await first({ model.albums.first }) else { return }
+        model.play(album)
+        _ = await first({ model.player.current })
+        model.player.toggle()
+    }
+
+    /// Shows `view` in its own window, for views that are not part of the main window.
+    private static func open(_ view: some View, _ title: String, _ model: AppModel) {
+        let window = NSWindow(contentViewController: NSHostingController(rootView: view.environment(model)))
+        window.title = title
+        window.orderFront(nil)
+        extraWindow = window
     }
 
     /// A new selection clears the path and the search text a moment later, so wait for that first.

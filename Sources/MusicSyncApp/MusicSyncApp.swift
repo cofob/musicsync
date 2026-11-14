@@ -1,4 +1,5 @@
 import AppKit
+import Support
 import SwiftUI
 
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -27,15 +28,18 @@ import SwiftUI
         }
         return .terminateLater
     }
+
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? { DockMenu.make(model.player) }
 }
 
 @main
 struct MusicSyncApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     private var model: AppModel { delegate.model }
+    @AppStorage(MenuBarPlayer.shownKey, store: .app) private var showsMenuBarItem = true
 
     var body: some Scene {
-        WindowGroup("MusicSync") {
+        WindowGroup("MusicSync", id: MainWindow.id) {
             RootView().environment(model)
         }
         .commands {
@@ -90,5 +94,12 @@ struct MusicSyncApp: App {
         Settings {
             SettingsView().environment(model)
         }
+
+        MenuBarExtra(isInserted: $showsMenuBarItem) {
+            MenuBarPlayer().environment(model)
+        } label: {
+            MenuBarLabel(player: model.player)
+        }
+        .menuBarExtraStyle(.window)
     }
 }
