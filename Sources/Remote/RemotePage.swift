@@ -72,6 +72,7 @@ public enum RemotePage {
     .row b{font-weight:500}.row span{font-size:14px;color:var(--fg2)}
     .empty{color:var(--fg2);text-align:center;padding:40px 0}
     #q{flex:1;font:inherit;color:inherit;background:var(--fill);border:0;border-radius:10px;padding:9px 12px;outline:none;-webkit-user-select:text;user-select:text}
+    #q::-webkit-search-cancel-button{filter:grayscale(1);opacity:.6}
     #pair{position:fixed;inset:0;z-index:3;background:var(--bg);display:none;flex-direction:column;align-items:center;justify-content:center;
       gap:14px;padding:24px;text-align:center}
     body.unpaired #pair{display:flex}
@@ -81,7 +82,7 @@ public enum RemotePage {
       border:0;background:var(--fill);color:inherit;outline:none;-webkit-user-select:text;user-select:text}
     #go{background:var(--accent);color:#fff;font-weight:600;border-radius:12px;padding:12px 40px}
     #msg{color:var(--accent);min-height:1.2em}
-    .off .ctl,.off .bar,.off .vol,.off #seek,.off .times{opacity:.35;pointer-events:none}
+    .off .ctl,.off .bar>:not(#opens),.off .vol,.off #seek,.off .times{opacity:.35;pointer-events:none}
     @media (max-width:260px){
       main{padding:4px 6px;justify-content:center}
       #art,.vol,.bar,.times,#star{display:none}
