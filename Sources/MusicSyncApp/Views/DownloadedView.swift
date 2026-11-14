@@ -153,6 +153,7 @@ private struct PlaylistCard: View {
                 Text(playlist.name).lineLimit(2)
                 Text(formatSongs(model.downloads.groups[.playlist(playlist.id)]?.ids.count ?? 0)).foregroundStyle(.secondary)
             }
+            .fixedSize(horizontal: false, vertical: true)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

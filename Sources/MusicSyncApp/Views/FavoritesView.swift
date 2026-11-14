@@ -99,6 +99,7 @@ private struct ArtistCard: View {
                     .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
                 Text(artist.name).lineLimit(2).multilineTextAlignment(.center)
             }
+            .fixedSize(horizontal: false, vertical: true)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

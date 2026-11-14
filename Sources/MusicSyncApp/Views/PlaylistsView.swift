@@ -20,6 +20,7 @@ struct PlaylistsView: View {
                             Text(playlist.name).lineLimit(2)
                             Text(playlist.songCount.map(formatSongs) ?? "").foregroundStyle(.secondary)
                         }
+                        .fixedSize(horizontal: false, vertical: true)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)

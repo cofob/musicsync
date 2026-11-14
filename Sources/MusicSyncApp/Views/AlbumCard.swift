@@ -21,6 +21,8 @@ struct AlbumCard<Badge: View>: View {
                 Text(album.name).lineLimit(2)
                 Text(album.artistName ?? "").foregroundStyle(.secondary).lineLimit(1)
             }
+            // Height from the width: a grid row taller than this card must not shrink its cover.
+            .fixedSize(horizontal: false, vertical: true)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

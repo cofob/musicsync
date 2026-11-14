@@ -37,6 +37,7 @@ struct DeviceCard: View {
                 Text(title).font(.callout.weight(.semibold)).lineLimit(2)
                 Text(subtitle).font(.callout).foregroundStyle(.secondary).lineLimit(1)
             }
+            .fixedSize(horizontal: false, vertical: true)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
