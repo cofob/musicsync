@@ -121,10 +121,52 @@ import SwiftUI
                                              "song": .show(.song, id: song.id), "search": .search(album.name)]
             await select(.home, model)
             links[String(s.dropFirst(5))].flatMap { DeepLink(url: $0.url) }.map(model.system.open)
+        case let s where s.hasPrefix("artist:"):
+            await mirrored(model)
+            if let artist = model.artists.first(where: { $0.name == s.dropFirst(7) }) { model.show(.artist(artist.id)) }
+        case let s where s.hasPrefix("album:"):
+            await mirrored(model)
+            if let album = model.albums.first(where: { $0.name == s.dropFirst(6) }) { model.show(.album(album)) }
+        case "genres":
+            await mirrored(model)
+            model.selection = .genres
+        case let s where s.hasPrefix("genre:"):
+            await mirrored(model)
+            model.show(.genre(String(s.dropFirst(6))))
+        case "stats":
+            await seedHistory(model)
+            model.show(.stats)
+        case "stats-server":
+            // A fresh demo folder: no history, so the server's play counts are shown.
+            await mirrored(model)
+            model.show(.stats)
+        case "radio", "radio-empty", "radio-playing", "radio-nowplaying":
+            // The demo server has no stations and its user is no admin, so the scene brings its own.
+            _ = await first({ model.radio.isLoaded ? true : nil })
+            model.radio.stations = scene == "radio-empty" ? [] : [
+                RadioStation(id: "1", name: "Groove Salad", streamUrl: "https://ice1.somafm.com/groovesalad-128-mp3", homePageUrl: "https://somafm.com"),
+                RadioStation(id: "2", name: "Drone Zone", streamUrl: "https://ice1.somafm.com/dronezone-128-mp3", homePageUrl: "https://somafm.com"),
+                RadioStation(id: "3", name: "Radio Paradise", streamUrl: "https://stream.radioparadise.com/aac-128"),
+            ]
+            model.radio.canEdit = true
+            await select(.radio, model)
+            if scene.hasSuffix("playing") {
+                model.radio.play(model.radio.stations[0])
+                try? await Task.sleep(for: .seconds(1))
+                if model.player.isPlaying { model.player.toggle() }
+                model.showNowPlaying = scene == "radio-nowplaying"
+            }
+        case "radio-editor":
+            open(StationEditor(station: RadioStation(id: "1", name: "Groove Salad", streamUrl: "https://ice1.somafm.com/groovesalad-128-mp3")), "Station", model)
         default:
             print("Unknown scene: \(scene)")
             exit(2)
         }
+    }
+
+    /// Waits until the lists come from the local mirror, which takes a few minutes on the first run.
+    private static func mirrored(_ model: AppModel) async {
+        for _ in 0..<3000 where !model.usesLocalLibrary { try? await Task.sleep(for: .milliseconds(100)) }
     }
 
     /// Demo only: a month of made-up listening (favorite albums, some skips), so the mixes have a history.
