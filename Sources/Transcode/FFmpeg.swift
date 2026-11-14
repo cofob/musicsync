@@ -102,6 +102,7 @@ public struct FFmpeg: Sendable {
             a += ["-af", "aresample=\(preset.sampleRate):filter_size=64:phase_shift=10:cutoff=0.97:dither_method=triangular_hp"]
         }
         if depth == 16 { a += ["-sample_fmt", "s16"] }
+        if source.channels > 2 { a += ["-ac", "2"] }
         a += preset.codec.encoderArguments
         for (key, value) in tags.metadata(vorbis: !preset.format.hasPrefix("ipod")) { a += ["-metadata", "\(key)=\(value)"] }
         if let lyrics { a += ["-metadata", "lyrics=\(lyrics)"] }
@@ -112,7 +113,7 @@ public struct FFmpeg: Sendable {
 
     /// Copies the audio unchanged into an iPod m4a (also from ADTS AAC), optionally with the lyrics tag (`©lyr`).
     public func remux(input: URL, output: URL, lyrics: String? = nil) async throws {
-        let args = ["-y", "-nostdin", "-hide_banner", "-v", "error", "-i", input.path, "-map", "0", "-c", "copy"]
+        let args = ["-y", "-nostdin", "-hide_banner", "-v", "error", "-i", input.path, "-map", "0:a:0", "-c", "copy"]
             + (lyrics.map { ["-metadata", "lyrics=\($0)"] } ?? []) + ["-movflags", "+faststart", "-f", "ipod", output.path]
         let result = try await runProcess(ffmpeg, args)
         guard result.status == 0 else {

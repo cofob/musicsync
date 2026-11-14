@@ -35,6 +35,14 @@ private let resample = "aresample=44100:filter_size=64:phase_shift=10:cutoff=0.9
     #expect(args(.stockAAC, flac24x44).contains(resample))  // 24 -> 16 bit needs dither
     #expect(args(.stockAAC, flac24x96).contains(resample))
     #expect(args(.rockboxFLAC, flac16x44).contains("-af") == false)
+    var surround = flac16x44
+    surround.channels = 6
+    #expect(args(.stockAAC, flac16x44).contains("-ac") == false)
+    #expect(args(.stockAAC, surround).joined(separator: " ").contains("-ac 2"))
+    var aac = MediaInfo(codec: "aac", profile: "LC", sampleRate: 44100, channels: 2, bitRate: 256000, durationSeconds: 1, container: "mp4")
+    #expect(Preset.stockAAC.accepts(aac))
+    aac.channels = 6
+    #expect(Preset.stockAAC.accepts(aac) == false)
 }
 
 @Test func tvbrAAC() {

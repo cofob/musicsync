@@ -85,9 +85,9 @@ public struct Preset: Codable, Identifiable, Hashable, Sendable {
 
     public static let builtIns: [Preset] = [stockAAC, rockboxFLAC, rockboxOpus]
 
-    /// True when `source` can be copied without re-encoding.
+    /// True when `source` can be copied without re-encoding (never more than stereo).
     public func accepts(_ source: MediaInfo) -> Bool {
-        passthrough.contains { rule in
+        source.channels <= 2 && passthrough.contains { rule in
             source.codec == rule.codec
                 && rule.profile.map { $0 == source.profile } ?? true
                 && rule.container.map { source.container.contains($0) } ?? true
