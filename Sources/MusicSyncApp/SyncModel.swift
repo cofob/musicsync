@@ -211,7 +211,7 @@ final class SyncModel {
         let needsGuid = app.ipod.snapshot?.guid == nil
         let rename = app.deviceRename
         // The mirror answers in milliseconds; the server is asked only for albums it lacks.
-        let expander = expander ?? SelectionExpander(client: client, local: app.usesLocalLibrary ? app.library?.database.local : nil)
+        let expander = expander ?? SelectionExpander(client: client, local: app.usesLocalLibrary ? app.syncLibrary : nil)
         self.expander = expander
         planTask = Task { [planID] in
             do {

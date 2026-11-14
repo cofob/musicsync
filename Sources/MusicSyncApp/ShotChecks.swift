@@ -36,6 +36,7 @@ import SwiftUI
         case "soak": await soak(model)
         case "quality": await quality(model)
         case "downloads": await downloads(model)
+        case "smart": await smart(model)
         default: check(false, "known check \(name)")
         }
     }

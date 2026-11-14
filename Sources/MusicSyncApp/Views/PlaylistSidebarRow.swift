@@ -39,6 +39,7 @@ struct PlaylistSidebarRow: View {
                 Button("Delete Playlist…", systemImage: "trash") { model.playlistPrompt = .delete(playlist) }
             }
             Button("New Playlist…", systemImage: "plus") { model.playlistPrompt = .create(songIds: []) }
+            if model.smartPlaylists.isAvailable { Button("New Smart Playlist…", systemImage: "gearshape") { model.smartPlaylists.create() } }
         }
         .dropDestination(for: String.self) { items, _ in
             let payloads = items.compactMap(DragPayload.init)

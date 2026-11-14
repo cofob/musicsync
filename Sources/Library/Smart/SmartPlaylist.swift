@@ -167,7 +167,8 @@ public struct SmartPlaylistList: Codable, Equatable, Sendable {
     public var version = Self.currentVersion
     public var playlists: [SmartPlaylist] = []
 
-    public init(playlists: [SmartPlaylist] = []) { self.playlists = playlists }
+    public init() {}
+    public init(playlists: [SmartPlaylist]) { self.playlists = playlists }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)

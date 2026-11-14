@@ -1,3 +1,4 @@
+import Library
 import SwiftUI
 import Subsonic
 
@@ -40,7 +41,11 @@ struct PlaylistDetailView: View {
     }
 
     private func header(_ current: Playlist, editable: Bool, songs: [Song]) -> some View {
-        MediaHeader(cover: { CoverImage(id: current.coverArt, size: 600, cornerRadius: 10, symbol: "music.note.list") },
+        MediaHeader(cover: {
+                        if SmartPlaylist.isSmart(current.id) { SmartPlaylistCover(playlist: current) } else {
+                            CoverImage(id: current.coverArt, size: 600, cornerRadius: 10, symbol: "music.note.list")
+                        }
+                    },
                     title: current.name, canPlay: !songs.isEmpty,
                     onRename: editable ? { model.rename(current, to: $0, comment: current.comment) } : nil,
                     onPlay: { model.mixes.play(songs, from: .playlist, shuffled: false) },
@@ -60,6 +65,7 @@ struct PlaylistDetailView: View {
             DownloadButton(reason: .playlist(playlist.id)) { model.download(playlist) }
             SyncButton(isOn: model.sync.isPlaylistSelected(playlist.id)) { model.sync.togglePlaylist(playlist.id) }
             if editable { PlaylistHeaderMenu(playlist: current) }
+            if SmartPlaylist.isSmart(current.id) { SmartPlaylistHeaderButtons(id: current.id) }
         }
     }
 

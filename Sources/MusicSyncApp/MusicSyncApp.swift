@@ -58,6 +58,9 @@ struct MusicSyncApp: App {
                 Button("New Playlist") { model.playlistPrompt = .create(songIds: []) }
                     .keyboardShortcut("n")
                     .disabled(model.client == nil)
+                Button("New Smart Playlist…") { model.smartPlaylists.create() }
+                    .keyboardShortcut("n", modifiers: [.command, .option])
+                    .disabled(model.library == nil)
             }
             CommandGroup(replacing: .help) {
                 Button("Getting Started") { model.showGuide = true }

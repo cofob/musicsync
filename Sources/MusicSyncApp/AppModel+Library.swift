@@ -69,8 +69,9 @@ extension AppModel {
         return try await store?.album(id)
     }
 
-    /// Playlist with entries: local database, else server.
+    /// Playlist with entries: a smart playlist from its rules, else local database, else server.
     func playlist(_ id: String) async throws -> Playlist? {
+        if SmartPlaylist.isSmart(id) { return await smartPlaylists.full(id) }
         if let local = await library?.database.playlist(id: id) { return local }
         if downloads.isOffline, let saved = downloads.savedPlaylist(id) { return saved }
         return try await store?.playlist(id)

@@ -93,6 +93,7 @@ struct RootView: View {
         .onChange(of: model.ipod.version) { model.sync.deviceUpdated() }
         .sheet(item: $model.infoSong) { SongInfoView(song: $0) }
         .modifier(PlaylistDialogs())
+        .modifier(SmartPlaylistDialogs())
         .sheet(isPresented: $model.showGuide) { GuideView() }
         .task { if !model.demo, !UserDefaults.app.bool(forKey: GuideView.shownKey) { model.showGuide = true } }
         .sheet(isPresented: $sync.showSheet) { SyncSheet() }
@@ -138,7 +139,7 @@ struct RootView: View {
         case .downloaded: DownloadedView()
         case .playlists: PlaylistsView()
         case .playlist(let id):
-            if let playlist = model.playlists.first(where: { $0.id == id }) {
+            if let playlist = model.playlists.first(where: { $0.id == id }) ?? model.smartPlaylists.playlist(id) {
                 PlaylistDetailView(playlist: playlist).id(id)
             } else {
                 ContentUnavailableView("Playlist Not Found", systemImage: "music.note.list")

@@ -1,4 +1,5 @@
 import Integration
+import Library
 import SwiftUI
 import Subsonic
 
@@ -8,14 +9,19 @@ struct PlaylistsView: View {
 
     var body: some View {
         let query = model.query
-        let playlists = query.isEmpty ? model.playlists : model.playlists.filter { $0.name.localizedCaseInsensitiveContains(query) }
+        let all = model.smartPlaylists.playlists + model.playlists
+        let playlists = query.isEmpty ? all : all.filter { $0.name.localizedCaseInsensitiveContains(query) }
         ScrollView {
             LazyVGrid(columns: albumGridColumns, spacing: 28) {
                 ForEach(playlists) { playlist in
                     NavigationLink(value: Route.playlist(playlist)) {
                         VStack(alignment: .leading, spacing: 2) {
-                            CoverImage(id: playlist.coverArt, size: 400, cornerRadius: 10, symbol: "music.note.list")
-                                .playlistHoverActions(playlist)
+                            Group {
+                                if SmartPlaylist.isSmart(playlist.id) { SmartPlaylistCover(playlist: playlist, size: 400) } else {
+                                    CoverImage(id: playlist.coverArt, size: 400, cornerRadius: 10, symbol: "music.note.list")
+                                }
+                            }
+                            .playlistHoverActions(playlist)
                                 .shadow(color: .black.opacity(0.12), radius: 4, y: 2).padding(.bottom, 6)
                             Text(playlist.name).lineLimit(2)
                             Text(playlist.songCount.map(formatSongs) ?? "").foregroundStyle(.secondary)
@@ -30,7 +36,7 @@ struct PlaylistsView: View {
                         PinMenuItem(reason: .playlist(playlist.id)) { model.download(playlist) }
                         StationButton(seed: .playlist(playlist))
                         SyncMenuItem(isOn: model.sync.isPlaylistSelected(playlist.id)) { model.sync.togglePlaylist(playlist.id) }
-                        ShareMenuItems(target: ShareTarget(playlist: playlist))
+                        if !SmartPlaylist.isSmart(playlist.id) { ShareMenuItems(target: ShareTarget(playlist: playlist)) }
                         if model.canEdit(playlist) {
                             Divider()
                             Button("Delete Playlist…", systemImage: "trash") { model.playlistPrompt = .delete(playlist) }

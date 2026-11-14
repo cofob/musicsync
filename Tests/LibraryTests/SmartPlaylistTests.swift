@@ -207,6 +207,24 @@ import Testing
         #expect(decoded.playlists == [p] && decoded.version == SmartPlaylistList.currentVersion)
     }
 
+    @Test func editingByID() {
+        let a = P.Rule(field: .title, op: .contains), b = P.Rule(field: .year, op: .is), c = P.Rule(field: .genre, op: .is)
+        let inner = P.Group(match: .any, items: [.rule(b)])
+        var root = P.Group(match: .all, items: [.rule(a), .group(inner)])
+        root[rule: b.id]?.number = 1999
+        #expect(root[group: inner.id]?.items.first.flatMap { if case .rule(let r) = $0 { r.number } else { nil } } == 1999)
+        root.insert(.rule(c), after: b.id)  // into the nested group
+        #expect(root[group: inner.id]?.items.map(\.id) == [b.id, c.id])
+        root.insert(.rule(c), after: a.id)
+        #expect(root.items.map(\.id) == [a.id, c.id, inner.id])
+        root[group: inner.id]?.match = .all
+        #expect(root[group: inner.id]?.match == .all)
+        root.remove(c.id)  // both copies
+        root.remove(b.id)  // the nested group is empty now and goes too
+        #expect(root.items.map(\.id) == [a.id])
+        #expect(root[rule: UUID()] == nil)
+    }
+
     @Test func changingTheFieldKeepsAFittingOperator() {
         var r = P.Rule(field: .title, op: .startsWith, text: "x")
         r.setField(.artist)

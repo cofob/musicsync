@@ -80,6 +80,7 @@ final class AppModel {
     @ObservationIgnored private(set) lazy var podcasts = PodcastsModel(app: self)
     @ObservationIgnored private(set) lazy var bookmarks = BookmarkKeeper(app: self)
     @ObservationIgnored private(set) lazy var smartDownloads = SmartDownloads(app: self)
+    @ObservationIgnored private(set) lazy var smartPlaylists = SmartPlaylistsModel(app: self)
     /// Sharing, deep links, Spotlight, global shortcuts, notifications.
     @ObservationIgnored private(set) lazy var system = SystemServices(app: self)
     /// The web remote for iPhone, iPad and Apple Watch (Settings > Remote).

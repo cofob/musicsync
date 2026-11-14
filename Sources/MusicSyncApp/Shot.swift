@@ -108,6 +108,23 @@ import SwiftUI
         case "playlist":
             let editable = { model.editablePlaylists.first { ($0.songCount ?? 0) > 2 } }
             if let playlist = await first(editable) { await select(.playlist(playlist.id), model) }
+        case "smart-editor", "smart-playlist":
+            // A sample smart playlist: in the editor, or saved and open. Waits for the local mirror.
+            await mirrored(model)
+            var sample = SmartPlaylist(name: "Long Songs")
+            sample.rules = .init(match: .all, items: [
+                .rule(.init(field: .duration, op: .greater, number: 240)),
+                .group(.init(match: .any, items: [.rule(.init(field: .genre, op: .contains, text: "rock")), .rule(.init(field: .year, op: .greater, number: 2000))])),
+                .rule(.init(field: .dateAdded, op: .inLast, number: 3650)),
+            ])
+            sample.limit.isOn = true
+            sample.limit.by = .mostPlayed
+            if scene == "smart-editor" {
+                await select(.home, model)
+                model.smartPlaylists.editing = sample
+            } else {
+                await model.smartPlaylists.save(sample)
+            }
         case "newplaylist":
             await select(.playlists, model)
             model.playlistPrompt = .create(songIds: [])

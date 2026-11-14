@@ -107,6 +107,10 @@ private struct PlaylistRows: View {
     let selected: String?
 
     var body: some View {
+        ForEach(model.smartPlaylists.playlists) { playlist in
+            SmartPlaylistSidebarRow(playlist: playlist, isSelected: selected == playlist.id)
+                .modifier(Pick(item: .playlist(playlist.id), isSelected: selected == playlist.id))
+        }
         ForEach(model.playlists) { playlist in
             PlaylistSidebarRow(playlist: playlist, isSelected: selected == playlist.id)
                 .modifier(Pick(item: .playlist(playlist.id), isSelected: selected == playlist.id))

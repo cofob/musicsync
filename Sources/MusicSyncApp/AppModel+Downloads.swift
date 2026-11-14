@@ -50,6 +50,7 @@ extension AppModel {
             await manager.refreshPins { pin in
                 switch pin {
                 case .album(let album): await db.album(id: album.id)?.song
+                case .playlist(let playlist) where SmartPlaylist.isSmart(playlist.id): await self.smartPlaylists.full(playlist.id)?.entry
                 case .playlist(let playlist): await db.playlist(id: playlist.id)?.entry
                 }
             }
