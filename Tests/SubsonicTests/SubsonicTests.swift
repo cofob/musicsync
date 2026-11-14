@@ -166,6 +166,12 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
         #expect(try await c.ping().openSubsonic == true)
     }
 
+    @Test func brokenReplyGivesAShortMessage() async throws {
+        StubProtocol.replies = ["getAlbum": #"{"subsonic-response": {"status": "ok", "#]
+        let message = await #expect(throws: SubsonicError.self) { try await stubbed().getAlbum(id: "al-1") }?.localizedDescription ?? ""
+        #expect(message.hasPrefix("Unexpected server reply: getAlbum: ") && !message.contains("DecodingError") && message.count < 120, "\(message)")
+    }
+
     @Test func fetchesCoverArtBytes() async throws {
         let c = stubbed()
         StubProtocol.replies = ["getCoverArt": "PNGDATA"]

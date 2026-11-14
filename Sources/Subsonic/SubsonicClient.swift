@@ -77,8 +77,9 @@ public struct SubsonicClient: Sendable {
         let decoder = JSONDecoder()
         decoder.userInfo[Reply<Body>.bodyKey] = key
         let reply: Reply<Body>
+        // The short system text: the full `DecodingError` dump is not a message for an alert.
         do { reply = try decoder.decode(Reply<Body>.self, from: data) } catch {
-            throw SubsonicError.badResponse("\(method): \(error)")
+            throw SubsonicError.badResponse("\(method): \(error.localizedDescription)")
         }
         guard reply.head.status == "ok" else {
             throw SubsonicError.api(code: reply.head.error?.code ?? 0, message: reply.head.error?.message ?? "Unknown error")
