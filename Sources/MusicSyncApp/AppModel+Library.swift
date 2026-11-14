@@ -41,6 +41,8 @@ extension AppModel {
                     if await self.reloadFromDatabase(library) { await self.loadHome() }
                     self.refreshDownloadPins()
                 }
+                // At most 10 updates a second; the stream keeps only the newest status meanwhile.
+                try? await Task.sleep(for: .milliseconds(100))
             }
         }
     }
@@ -105,8 +107,6 @@ extension AppModel {
     }
 
     // MARK: Controls
-
-    var isMirrorRunning: Bool { mirrorStatus.state == .running }
 
     func syncLibraryNow() {
         guard let library else { return }

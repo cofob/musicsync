@@ -30,7 +30,11 @@ final class AppModel {
     /// Local mirror of the server library; nil without a server.
     var library: Library?
     /// Latest mirror progress, for the sidebar and Settings.
-    var mirrorStatus = MirrorStatus()
+    var mirrorStatus = MirrorStatus() {
+        // Stored, so the menus (the whole App body) do not rebuild on every progress step.
+        didSet { if isMirrorRunning != (mirrorStatus.state == .running) { isMirrorRunning.toggle() } }
+    }
+    private(set) var isMirrorRunning = false
     /// End of the last complete listing (survives restarts, unlike `mirrorStatus.lastSuccess`).
     var lastLibrarySync: Date?
     /// True when lists come from the local database instead of the network.
