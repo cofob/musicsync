@@ -109,6 +109,7 @@ private struct Pick: ViewModifier {
             // Grows into the row insets, so the whole gray shape takes clicks, not only the label.
             .contentShape(Rectangle().inset(by: -10))
             .onTapGesture { selection = item }
+            .accessibilityAddTraits(selection == item ? [.isButton, .isSelected] : .isButton)
             .listRowBackground(RoundedRectangle(cornerRadius: 8)
                 .fill(selection == item ? Color.primary.opacity(0.1) : .clear)
                 .padding(.horizontal, 10))
