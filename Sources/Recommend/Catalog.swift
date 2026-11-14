@@ -31,10 +31,17 @@ public struct Catalog: Sendable {
     /// Completed plays, newest first, each song once.
     let lastListened: [String]
     let maxPlays: Int
+    /// At most this many plays is "rarely played": the least played tenth of the library, and at least 1.
+    let rarePlays: Int
+    /// Played in the last 12 hours, skips included; mixes put them last.
+    let justHeard: Set<String>
+    let feedback: Feedback
+    let context: ListeningContext
 
     /// `playlists`: song ids of each playlist. `similar`: server similar songs by song id.
+    /// `dislikes`: songs marked "Not for Me". `calendar` gives the part of the day and the weekend.
     public init(tracks list: [Track], playlists: [[String]] = [], history: [PlayEvent] = [], stats: [String: SongStats] = [:],
-                similar: [String: [String]] = [:], now: Date = Date()) {
+                similar: [String: [String]] = [:], dislikes: Set<String> = [], now: Date = Date(), calendar: Calendar = .current) {
         var tracks: [String: Track] = [:]
         for track in list { tracks[track.id] = track }
         self.tracks = tracks
@@ -66,6 +73,10 @@ public struct Catalog: Sendable {
         var seen = Set<String>()
         lastListened = events.reversed().filter(\.completed).map(\.songId).filter { seen.insert($0).inserted }
         maxPlays = tracks.values.map { max($0.serverPlays, stats[$0.id]?.plays ?? 0) }.max() ?? 0
+        rarePlays = max(1, Self.quantile(tracks.values.map { max($0.serverPlays, stats[$0.id]?.plays ?? 0) }, 0.1))
+        justHeard = Set(events.filter { now.timeIntervalSince($0.startedAt) < 12 * 3600 }.map(\.songId))
+        feedback = Feedback(events, tracks: tracks, dislikes: dislikes, now: now)
+        context = ListeningContext(events, now: now, calendar: calendar)
     }
 
     /// The same catalog with more server similar songs (fetched for a station seed).
@@ -73,6 +84,12 @@ public struct Catalog: Sendable {
         var copy = self
         for (id, list) in more { copy.similar[id, default: []].formUnion(list) }
         return copy
+    }
+
+    /// The value `share` of the way up the sorted `values`; 0 for none.
+    static func quantile(_ values: [Int], _ share: Double) -> Int {
+        let sorted = values.sorted()
+        return sorted.isEmpty ? 0 : sorted[Int(Double(sorted.count - 1) * share)]
     }
 
     /// 1 for up to 20 songs, then less: a 40-song playlist 0.5, an 80-song one 0.33.
@@ -104,7 +121,8 @@ public struct Catalog: Sendable {
 
     // MARK: Scores
 
-    /// How much the listener likes a track: stars, rating and plays raise it; skips and early stops lower it.
+    /// How much the listener likes a track: stars, rating, plays and full listens raise it; skips, early stops and
+    /// "Not for Me" lower it, a little also for the other songs of the artist.
     func affinity(_ id: String) -> Double {
         guard let t = tracks[id] else { return 0 }
         let s = stats[id]
@@ -113,7 +131,7 @@ public struct Catalog: Sendable {
         let plays = max(t.serverPlays, s?.plays ?? 0)
         if maxPlays > 0 { a += 0.3 * log1p(Double(plays)) / log1p(Double(maxPlays)) }
         if let s { a -= 0.5 * s.skipRatio + (s.plays > 0 ? 0.2 * (1 - s.completion) : 0) }
-        return a
+        return a + 0.3 * feedback.song(id) + 0.15 * feedback.artist(Track.key(t.artist))
     }
 
     /// Track-to-track similarity, about 0...2. Shared playlists and sessions weigh most.
@@ -131,6 +149,12 @@ public struct Catalog: Sendable {
         s += 0.5 * min(1, overlap(sessionsOf[a], sessionsOf[b], sessions) / 2)
         if similar[a]?.contains(b) == true || similar[b]?.contains(a) == true { s += 0.5 }
         return s
+    }
+
+    /// In one playlist or listening session, or similar by the server.
+    func together(_ a: String, _ b: String) -> Bool {
+        overlap(playlistsOf[a], playlistsOf[b], playlists) > 0 || overlap(sessionsOf[a], sessionsOf[b], sessions) > 0
+            || similar[a]?.contains(b) == true || similar[b]?.contains(a) == true
     }
 
     private func overlap(_ a: [Int]?, _ b: [Int]?, _ groups: [Group]) -> Double {
@@ -175,14 +199,53 @@ public struct Catalog: Sendable {
             || last.artistKeys.isDisjoint(with: before.artistKeys)
     }
 
-    /// The first `limit` songs of `ids`, skipping ahead past songs that would break the spacing rule.
-    /// When none of the next 30 fits, the next song is taken anyway; callers pass spare songs to avoid that.
+    /// `ids` with the songs over the caps of a list of `size` (`Caps`) moved to the end, so they come only when
+    /// nothing else is left; `strict` leaves them out.
+    func capped(_ ids: [String], size: Int, strict: Bool = false) -> [String] {
+        var caps = Caps(self, size), within: [String] = [], over: [String] = []
+        for id in ids {
+            if caps.allows(id) { caps.add(id); within.append(id) } else { over.append(id) }
+        }
+        return strict ? within : within + over
+    }
+
+    /// The first `limit` songs of `ids`, skipping ahead past songs that would break the spacing rule or, with a
+    /// `limit`, the artist and album caps (`Caps`). When none of the next 30 fits, the next song is taken anyway;
+    /// callers pass spare songs to avoid that.
     public func spaced(_ ids: [String], limit: Int? = nil) -> [String] {
         var rest = limit.map { Array(ids.prefix($0 * 3)) } ?? ids, out: [String] = []
+        var caps = Caps(self, limit ?? .max / 5)
         while !rest.isEmpty, out.count < limit ?? .max {
-            let i = rest.prefix(30).firstIndex { fits($0, after: out) } ?? rest.startIndex
+            let window = rest.prefix(30)
+            let i = window.firstIndex { fits($0, after: out) && caps.allows($0) } ?? window.firstIndex { fits($0, after: out) } ?? rest.startIndex
+            caps.add(rest[i])
             out.append(rest.remove(at: i))
         }
         return out
+    }
+}
+
+/// Songs per artist and per album in a list being built. A list of `size` takes at most `max(3, size / 5)` songs
+/// of one artist and `max(2, size / 10)` of one album: 10 and 5 of 50, 3 and 2 of 15.
+struct Caps {
+    let catalog: Catalog
+    let artistCap: Int, albumCap: Int
+    private var artists: [String: Int] = [:], albums: [String: Int] = [:]
+
+    init(_ catalog: Catalog, _ size: Int) {
+        self.catalog = catalog
+        artistCap = max(3, size / 5)
+        albumCap = max(2, size / 10)
+    }
+
+    func allows(_ id: String) -> Bool {
+        guard let t = catalog.tracks[id] else { return true }
+        return artists[Track.key(t.artist), default: 0] < artistCap && t.albumId.map { albums[$0, default: 0] < albumCap } ?? true
+    }
+
+    mutating func add(_ id: String) {
+        guard let t = catalog.tracks[id] else { return }
+        if !t.artist.isEmpty { artists[Track.key(t.artist), default: 0] += 1 }
+        if let album = t.albumId { albums[album, default: 0] += 1 }
     }
 }

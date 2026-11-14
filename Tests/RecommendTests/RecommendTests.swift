@@ -2,11 +2,11 @@ import Foundation
 import Testing
 @testable import Recommend
 
-private let now = Date(timeIntervalSince1970: 1_800_000_000)
-private let day = 86400.0
+let now = Date(timeIntervalSince1970: 1_800_000_000)
+let day = 86400.0
 
 /// 6 artists × 3 albums × 8 songs. Artists 0–2 play rock, 3–5 jazz. Ids look like "a1-b2-3".
-private func library(starred: Set<String> = [], plays: [String: Int] = [:], rating: [String: Int] = [:],
+func library(starred: Set<String> = [], plays: [String: Int] = [:], rating: [String: Int] = [:],
                      created: (String) -> Date? = { _ in now.addingTimeInterval(-400 * day) }) -> [Track] {
     (0..<6).flatMap { a in (0..<3).flatMap { b in (0..<8).map { n in
         let id = "a\(a)-b\(b)-\(n)"
@@ -16,15 +16,15 @@ private func library(starred: Set<String> = [], plays: [String: Int] = [:], rati
     } } }
 }
 
-private func play(_ id: String, _ ago: Double, played: Double = 200, source: PlaySource = .album) -> PlayEvent {
+func play(_ id: String, _ ago: Double, played: Double = 200, source: PlaySource = .album) -> PlayEvent {
     PlayEvent(songId: id, startedAt: now.addingTimeInterval(-ago), played: played, duration: 200, source: source)
 }
 
-private func artist(_ id: String) -> String { String(id.prefix(2)) }
-private func album(_ id: String) -> String { String(id.prefix(5)) }
+func artist(_ id: String) -> String { String(id.prefix(2)) }
+func album(_ id: String) -> String { String(id.prefix(5)) }
 
 /// Fails when three songs in a row share an artist or two in a row share an album.
-private func isSpaced(_ ids: [String]) -> Bool {
+func isSpaced(_ ids: [String]) -> Bool {
     for i in ids.indices.dropFirst() where album(ids[i]) == album(ids[i - 1]) { return false }
     for i in ids.indices.dropFirst(2) where Set(ids[i - 2...i].map(artist)).count == 1 { return false }
     return true
@@ -187,7 +187,7 @@ private func isSpaced(_ ids: [String]) -> Bool {
         let heavy = try #require(mixes.first { $0.kind == .heavyRotation })
         #expect(heavy.trackIds.allSatisfy { $0.contains("-b1-") && ($0.hasPrefix("a0") || $0.hasPrefix("a3")) })
         let fresh = try #require(catalog.madeForYou(day: "2026-11-14", size: 30).first { $0.kind == .fresh })
-        #expect(fresh.trackIds.first?.hasPrefix("a5-b2") == true && fresh.trackIds.prefix(16).filter { $0.hasPrefix("a5-b2") }.count == 8)
+        #expect(fresh.trackIds.first?.hasPrefix("a5-b2") == true && fresh.trackIds.filter { $0.hasPrefix("a5-b2") }.count == 3)  // album cap
         let deep = try #require(mixes.first { $0.kind == .deepCuts })
         #expect(deep.trackIds.allSatisfy { ($0.hasPrefix("a0") || $0.hasPrefix("a3")) && !$0.contains("-b1-") })
         #expect(Set(mixes.filter { $0.kind == .daily }.map { $0.subtitle.prefix(7) }) == ["Rock · ", "Jazz · "])

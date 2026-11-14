@@ -26,6 +26,20 @@ public actor PlayHistory {
         try open().run("DELETE FROM plays", [])
     }
 
+    /// "Not for Me": mixes, stations and AutoPlay leave the song out. Clearing the history keeps these.
+    public func setDisliked(_ songId: String, _ disliked: Bool) throws {
+        let db = try open()
+        if disliked {
+            try db.run("INSERT OR REPLACE INTO dislikes(songId, at) VALUES(?, ?)", [songId, Date().timeIntervalSince1970])
+        } else {
+            try db.run("DELETE FROM dislikes WHERE songId = ?", [songId])
+        }
+    }
+
+    public func dislikes() -> Set<String> {
+        read([]) { db in Set(try db.rows("SELECT songId FROM dislikes") { $0.text(0) ?? "" }) }
+    }
+
     /// The newest `limit` events, oldest first.
     public func events(limit: Int = 5000) -> [PlayEvent] {
         read([]) { db in
@@ -69,6 +83,8 @@ public actor PlayHistory {
               duration REAL NOT NULL, completed INTEGER NOT NULL, source TEXT NOT NULL)
             """)
         try db.exec("CREATE INDEX IF NOT EXISTS plays_song ON plays(songId)")
+        // Added later: older files get it on open.
+        try db.exec("CREATE TABLE IF NOT EXISTS dislikes(songId TEXT PRIMARY KEY, at REAL NOT NULL)")
         connection = db
         return db
     }

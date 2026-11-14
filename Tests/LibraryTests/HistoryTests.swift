@@ -43,6 +43,24 @@ import Testing
         #expect(await history.events().map(\.songId) == ["s9"])
     }
 
+    @Test func dislikesStayAndSurviveClear() async throws {
+        let dir = TempDir()
+        let history = PlayHistory(serverKey: "k", directory: dir.url)
+        try await history.record(event("s1", 1))
+        // A file from before the dislikes table: it gets the table on open and keeps its plays.
+        let old = try SQLiteConnection(path: history.fileURL.path)
+        try old.exec("DROP TABLE dislikes")
+        let reopened = PlayHistory(serverKey: "k", directory: dir.url)
+        #expect(await reopened.dislikes().isEmpty)
+        #expect(await reopened.events().count == 1)
+        try await reopened.setDisliked("s1", true)
+        try await reopened.setDisliked("s2", true)
+        try await reopened.setDisliked("s2", true)
+        try await reopened.setDisliked("s1", false)
+        try await reopened.clear()
+        #expect(await PlayHistory(serverKey: "k", directory: dir.url).dislikes() == ["s2"])
+    }
+
     @Test func keepsOnlyTheNewestEvents() async throws {
         let dir = TempDir()
         let history = PlayHistory(serverKey: "k", directory: dir.url, limit: 3)

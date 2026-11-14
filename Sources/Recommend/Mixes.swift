@@ -13,6 +13,8 @@ public struct Mix: Sendable, Hashable, Identifiable {
     public let trackIds: [String]
     /// For `because`: the song the shelf is built from.
     public let seedId: String?
+    /// For `because`: why these songs, e.g. "Similar artists · Rock" (`Catalog.reason`).
+    public var reason = ""
 }
 
 public extension Catalog {
@@ -37,13 +39,14 @@ public extension Catalog {
     func becauseYouListened(day: String, shelves: Int = 3, size: Int = 15) -> [Mix] {
         var rng = SeededRandom("\(day)|because")
         var albums = Set<String>()
-        let recentSeeds = lastListened.filter { id in tracks[id]?.albumId.map { albums.insert($0).inserted } ?? true }
+        let recentSeeds = lastListened.filter { id in !feedback.rejected.contains(id) && tracks[id]?.albumId.map { albums.insert($0).inserted } ?? true }
         let favorites = rng.weightedShuffle(ids.filter { tracks[$0]?.starred == true || plays($0) > 0 }) { affinity($0) + 0.6 }
         let seeds = (recentSeeds.isEmpty ? favorites : recentSeeds).prefix(shelves)
         return seeds.compactMap { id in
             guard let t = tracks[id] else { return nil }
             let list = radio(seeds: [id], count: size, seed: rng.next(), exclude: [id], includeSeed: false)
-            return list.count < Self.minimumMix ? nil : Mix(id: "because-\(id)", kind: .because, title: t.title, subtitle: t.artist, trackIds: list, seedId: id)
+            return list.count < Self.minimumMix ? nil : Mix(id: "because-\(id)", kind: .because, title: t.title, subtitle: t.artist, trackIds: list,
+                                                            seedId: id, reason: reason(seeds: [id], picks: list))
         }
     }
 
@@ -51,7 +54,15 @@ public extension Catalog {
 
     private func loved(_ id: String) -> Bool { (tracks[id]?.starred ?? false) || (tracks[id]?.rating ?? 0) >= 4 }
 
-    private func finish(_ ids: [String], _ size: Int) -> [String] { spaced(ids, limit: size) }
+    /// Leaves out rejected songs, puts the ones heard in the last hours last, and keeps the spacing and the artist and
+    /// album caps: a shorter mix is better than one artist filling it, but too few songs for a mix take the caps loosely.
+    private func finish(_ ids: [String], _ size: Int) -> [String] {
+        let kept = ids.filter { !feedback.rejected.contains($0) }
+        let ordered = kept.filter { !justHeard.contains($0) } + kept.filter(justHeard.contains)
+        let strict = spaced(capped(ordered, size: size, strict: true), limit: size)
+        let spacedWell = strict.indices.allSatisfy { fits(strict[$0], after: Array(strict[..<$0])) }
+        return strict.count >= Self.minimumMix && spacedWell ? strict : spaced(capped(ordered, size: size), limit: size)
+    }
 
     private func favorites(_ size: Int, _ rng: SeededRandom) -> [String] {
         var rng = rng
@@ -65,8 +76,8 @@ public extension Catalog {
     private func heavyRotation(_ size: Int, _ rng: SeededRandom) -> [String] {
         var rng = rng
         let count: (String) -> Int = recentPlays.isEmpty ? { tracks[$0]?.serverPlays ?? 0 } : { recentPlays[$0] ?? 0 }
-        let top = ids.filter { count($0) > 0 && !(stats[$0].map { $0.skipRatio > 0.5 } ?? false) }
-            .sorted { (count($0), $1) > (count($1), $0) }.prefix(size * 2)
+        let played = ids.filter { count($0) > 0 && !(stats[$0].map { $0.skipRatio > 0.5 } ?? false) }
+        let top = capped(played.sorted { (count($0), $1) > (count($1), $0) }, size: size).prefix(size * 2)
         return finish(rng.weightedShuffle(Array(top)) { Double(count($0)) }, size)
     }
 
@@ -115,8 +126,9 @@ public extension Catalog {
             // A genre mostly inside an earlier one (e.g. "alt rock" inside "rock") would repeat that mix.
             guard members.count >= 20, !chosen.contains(where: { Double($0.intersection(set).count) > 0.7 * Double(set.count) }) else { continue }
             chosen.append(set)
-            let known = rng.weightedShuffle(members.filter { plays($0) > 0 || loved($0) }) { affinity($0) + 0.6 }
-            let new = rng.weightedShuffle(members.filter { plays($0) == 0 && !loved($0) }) { _ in 1 }
+            // Capped first, so the spare songs taken below do not come mostly from one artist.
+            let known = capped(rng.weightedShuffle(members.filter { plays($0) > 0 || loved($0) }) { affinity($0) + 0.6 }, size: size)
+            let new = capped(rng.weightedShuffle(members.filter { plays($0) == 0 && !loved($0) }) { _ in 1 }, size: size)
             let room = size * 2  // spare songs, so spacing can skip some
             var list = Array(known.prefix(room * 3 / 5))
             let usedKnown = list.count
