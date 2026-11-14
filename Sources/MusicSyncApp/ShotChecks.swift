@@ -173,7 +173,10 @@ import SwiftUI
         check(ids == [1, 2, 3].compactMap { list.item(at: $0)?.id }, "drag carries the 3 song ids")
         let before = playlist.songCount ?? 0
         model.add(ids, to: playlist)
-        check(await wait { model.playlists.first { $0.id == playlist.id }?.songCount == before + 3 }, "drop adds 3 songs to \(playlist.name) (\(before))")
+        // A second run finds the songs there already: then the drop asks first.
+        let asks = { if case .duplicates(ids, _, 3)? = model.playlistPrompt { true } else { false } }
+        check(await wait { model.playlists.first { $0.id == playlist.id }?.songCount == before + 3 || asks() },
+              "drop adds 3 songs to \(playlist.name) (\(before)), or asks about duplicates: \(asks())")
     }
 
     // MARK: Album and playlist lists
