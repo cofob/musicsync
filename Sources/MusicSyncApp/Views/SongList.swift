@@ -58,25 +58,31 @@ struct SongList: View {
     /// Row keys, not indexes: the selection stays on its songs after the list changes.
     @State private var selection = ListSelection<RowKey>()
     @State private var dropTarget: Int?
+    /// The row an arrow key moved to, scrolled into view.
+    @State private var moved: RowKey?
     @FocusState private var focused: Bool
 
     var body: some View {
         let keys = rowKeys
         let picked = selectedRows(keys)
-        LazyVStack(spacing: 0) {
-            ForEach(Array(songs.enumerated()), id: \.offset) { index, song in
-                row(song, index, keys: keys, picked: picked)
-                    .overlay(alignment: .bottom) {
-                        if index < songs.count - 1, !picked.contains(index), !picked.contains(index + 1) { Divider().padding(.leading, leading == .cover ? 64 : 50).padding(.trailing, 10) }
-                    }
-                    .overlay { if dropTarget == index { RoundedRectangle(cornerRadius: 8).strokeBorder(Color.musicAccent, lineWidth: 2) } }
-                    .draggable(dragPayload(index, picked).text)
-                    .dropDestination(for: String.self) { items, _ in
-                        guard let onMove, case .songs(_, let from?)? = items.first.flatMap(DragPayload.init) else { return false }
-                        onMove(from, index)
-                        return true
-                    } isTargeted: { dropTarget = $0 && onMove != nil ? index : (dropTarget == index ? nil : dropTarget) }
+        // The page's scroll view moves only as far as needed (anchor nil) to show the row an arrow key moved to.
+        ScrollViewReader { proxy in
+            LazyVStack(spacing: 0) {
+                ForEach(Array(songs.enumerated()), id: \.offset) { index, song in
+                    row(song, index, keys: keys, picked: picked).id(keys[index])
+                        .overlay(alignment: .bottom) {
+                            if index < songs.count - 1, !picked.contains(index), !picked.contains(index + 1) { Divider().padding(.leading, leading == .cover ? 64 : 50).padding(.trailing, 10) }
+                        }
+                        .overlay { if dropTarget == index { RoundedRectangle(cornerRadius: 8).strokeBorder(Color.musicAccent, lineWidth: 2) } }
+                        .draggable(dragPayload(index, picked).text)
+                        .dropDestination(for: String.self) { items, _ in
+                            guard let onMove, case .songs(_, let from?)? = items.first.flatMap(DragPayload.init) else { return false }
+                            onMove(from, index)
+                            return true
+                        } isTargeted: { dropTarget = $0 && onMove != nil ? index : (dropTarget == index ? nil : dropTarget) }
+                }
             }
+            .onChange(of: moved) { proxy.scrollTo($1) }
         }
         .focusable().focusEffectDisabled().focused($focused)
         .onCommand(#selector(NSResponder.selectAll(_:))) { selection.selectAll(keys) }
@@ -94,6 +100,7 @@ struct SongList: View {
     private func move(_ offset: Int, _ keys: [RowKey]) -> KeyPress.Result {
         guard !keys.isEmpty else { return .ignored }
         selection.move(offset, in: keys)
+        moved = selection.anchor
         return .handled
     }
 

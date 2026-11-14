@@ -218,6 +218,27 @@ import SwiftUI
         if player.isPlaying { player.toggle() }
     }
 
+    /// Click on the first row, ↓ to row `rows - 1` and ↑ back: the page scrolls each one into view, only as far as
+    /// needed (the row stays in the near half of the page), and the first row ends below the 52 pt toolbar.
+    /// `top` and `height` are as for `tap`; a row's top edge is 20 pt above its click point.
+    private static func arrowScroll(_ window: NSWindow, rows: Int, top: Double, height: Double) async {
+        guard let content = window.contentView,
+              let scroll = views(content, of: NSScrollView.self).max(by: { ($0.documentView?.frame.height ?? 0) < ($1.documentView?.frame.height ?? 0) })
+        else { return check(false, "page scroll view") }
+        let viewport = scroll.contentView.bounds.height, start = scroll.contentView.bounds.minY
+        let firstTop = top - 20 + start, lastBottom = firstTop + Double(rows) * height  // in the page
+        guard lastBottom - start > viewport else { return check(false, "\(rows) rows fit on the page: pick a longer list") }
+        await tap(window, row: 0, top: top, height: height)
+        for _ in 1..<rows { await send(key(125, arrowKey(NSDownArrowFunctionKey), window), window) }
+        try? await Task.sleep(for: .milliseconds(500))
+        let down = scroll.contentView.bounds.minY
+        check(lastBottom <= down + viewport && lastBottom > down + viewport / 2, "↓ scrolls the last row just into view: offset \(down), row ends at \(lastBottom)")
+        for _ in 1..<rows { await send(key(126, arrowKey(NSUpArrowFunctionKey), window), window) }
+        try? await Task.sleep(for: .milliseconds(500))
+        let up = scroll.contentView.bounds.minY
+        check(firstTop >= up + 52 && firstTop < up + viewport / 2, "↑ scrolls the first row just into view below the toolbar: offset \(up), row at \(firstTop)")
+    }
+
     /// Return and ⌘A on an own playlist, opened from the sidebar or pushed from Playlists; Delete and Edit > Delete
     /// instead against the local stub server, which has no audio.
     private static func playlistKeys(_ model: AppModel, pushed: Bool) async {
@@ -243,6 +264,8 @@ import SwiftUI
         // The count the server has now; earlier runs changed the stub playlist.
         let count = { model.playlists.first { $0.id == playlist.id }?.songCount }
         guard let before = (try? await model.playlist(playlist.id))?.entry?.count else { return check(false, "playlist entries") }
+        await arrowScroll(window, rows: min(before, 20), top: 414, height: 54)
+        await tap(window, row: 1, top: 414, height: 54)
         await send(key(51, "\u{7f}", window), window)
         check(await wait { count() == before - 1 }, "Delete removes the clicked row from \(playlist.name) (\(before))")
         await tap(window, row: 1, top: 414, height: 54)
