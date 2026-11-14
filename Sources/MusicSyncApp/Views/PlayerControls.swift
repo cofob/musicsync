@@ -20,7 +20,7 @@ struct TransportControls: View {
             toggle("Repeat", player.repeatMode.symbol, isOn: player.repeatMode != .off) { player.repeatMode = player.repeatMode.next }
         }
         .labelStyle(.iconOnly)
-        .buttonStyle(.plain)
+        .buttonStyle(HitAreaButtonStyle())
     }
 
     private func toggle(_ title: String, _ symbol: String, isOn: Bool, action: @escaping () -> Void) -> some View {
@@ -139,8 +139,7 @@ struct VolumeButton: View {
             Button("Volume", systemImage: volumeSymbol(model.player.volume)) {
                 withAnimation(.snappy) { expanded.toggle() }
             }
-            .labelStyle(.iconOnly).buttonStyle(.plain).font(.system(size: 17))
-            .frame(width: 24)
+            .labelStyle(.iconOnly).buttonStyle(HitAreaButtonStyle(width: 24, height: 24)).font(.system(size: 17))
         }
         .padding(.horizontal, expanded ? 12 : 0).padding(.vertical, expanded ? 6 : 0)
         .background { if expanded { Capsule().fill(.primary.opacity(0.08)) } }

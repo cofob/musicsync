@@ -293,3 +293,17 @@ struct PlaceholderRows: View {
         .shimmering()
     }
 }
+
+/// Plain button that takes clicks in its whole frame. `.plain` takes them only on the drawn icon or text,
+/// so a frame or background set outside the button is not clickable.
+struct HitAreaButtonStyle: ButtonStyle {
+    var width: CGFloat?
+    var height: CGFloat?
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .frame(width: width, height: height)
+            .contentShape(Rectangle())
+            .opacity(configuration.isPressed ? 0.6 : 1)
+    }
+}

@@ -250,9 +250,9 @@ private struct ArtistsRow: View {
 
     private func pager(_ symbol: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: symbol).font(.title2.weight(.semibold)).frame(width: 36, height: 60)
+            Image(systemName: symbol).font(.title2.weight(.semibold))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(HitAreaButtonStyle(width: 36, height: 60))
         .glass(in: Capsule(), interactive: true)
     }
 

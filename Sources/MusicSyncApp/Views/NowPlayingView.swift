@@ -32,8 +32,8 @@ struct NowPlayingView: View {
         .overlay(alignment: .topLeading) {
             Button("Close", systemImage: "xmark") { model.showNowPlaying = false }
                 .keyboardShortcut(.cancelAction)
-                .labelStyle(.iconOnly).buttonStyle(.plain).font(.system(size: 15, weight: .semibold))
-                .frame(width: 44, height: 32).glass(in: Capsule(), interactive: true)
+                .labelStyle(.iconOnly).buttonStyle(HitAreaButtonStyle(width: 44, height: 32)).font(.system(size: 15, weight: .semibold))
+                .glass(in: Capsule(), interactive: true)
                 // The window buttons hide with the toolbar, so the close button takes their corner.
                 .padding(.leading, 16).padding(.top, 12)
         }
@@ -73,9 +73,8 @@ struct NowPlayingView: View {
     private func panelToggle(_ title: String, _ symbol: String, _ panel: NowPlayingPanel) -> some View {
         let on = model.nowPlayingPanel == panel
         return Button(title, systemImage: symbol) { model.nowPlayingPanel = on ? .none : panel }
-            .labelStyle(.iconOnly).buttonStyle(.plain).font(.system(size: 15, weight: .semibold))
+            .labelStyle(.iconOnly).buttonStyle(HitAreaButtonStyle(width: 34, height: 30)).font(.system(size: 15, weight: .semibold))
             .foregroundStyle(on ? Color.black : .white)
-            .frame(width: 34, height: 30)
             .background(on ? Color.white.opacity(0.9) : .clear, in: Capsule())
             .help(title)
     }
