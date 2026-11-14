@@ -1,4 +1,6 @@
 import AppKit
+import Library
+import Recommend
 import Subsonic
 import SwiftUI
 
@@ -78,6 +80,21 @@ import SwiftUI
             guard let album = await first({ model.albums.first }) else { break }
             model.downloads.isOffline = true
             model.show(.album(album))
+        case "mixes":
+            await seedHistory(model)
+            model.selection = .home
+        case "mix":
+            await seedHistory(model)
+            if let mix = await first({ model.mixes.mixes.first }) { model.show(.mix(mix.id)) }
+        case "autoplay":
+            await seedHistory(model)
+            model.mixes.autoPlay = true
+            guard let mix = await first({ model.mixes.mixes.first }) else { break }
+            model.mixes.play(mix, startAt: mix.trackIds.count - 1)  // the last song: AutoPlay fills the queue
+            _ = await first({ model.player.current })
+            model.player.toggle()
+            model.nowPlayingPanel = .queue
+            model.showNowPlaying = true
         case let s where s.hasPrefix("search:"):
             await select(.search, model)
             model.searchText = String(s.dropFirst(7))
@@ -86,6 +103,33 @@ import SwiftUI
             print("Unknown scene: \(scene)")
             exit(2)
         }
+    }
+
+    /// Demo only: a month of made-up listening (favorite albums, some skips), so the mixes have a history.
+    /// Waits for the local mirror, which takes a few minutes on the first run.
+    private static func seedHistory(_ model: AppModel) async {
+        var library: Library?
+        for _ in 0..<3000 where library == nil {
+            library = model.usesLocalLibrary ? model.library : nil
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        guard model.demo, let library, await library.history.events(limit: 1).isEmpty else { return }
+        let albums = await library.database.albums(sort: .name, limit: 12)
+        var songs: [[Song]] = []
+        for album in albums { songs.append(await library.database.album(id: album.id)?.song ?? []) }
+        let now = Date()
+        for day in 0..<30 {
+            let start = now.addingTimeInterval(-Double(day) * 86400 - 3600)
+            // Albums 0–5 are favorites, played in turn; albums 6–11 get skipped after a few seconds.
+            let session = songs[day % 6].prefix(6) + songs[(day + 3) % 6].prefix(4) + songs[6 + day % 6].prefix(2)
+            for (i, song) in session.enumerated() {
+                let skipped = i >= 10
+                let length = Double(song.duration ?? 200)
+                try? await library.history.record(PlayEvent(songId: song.id, startedAt: start.addingTimeInterval(Double(i) * 240),
+                                                             played: skipped ? 8 : length, duration: length, source: .album))
+            }
+        }
+        await model.mixes.load(refresh: true)
     }
 
     /// Loads the first album, paused: a scene needs a song, not sound.
