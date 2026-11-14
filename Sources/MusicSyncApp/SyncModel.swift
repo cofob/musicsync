@@ -48,6 +48,11 @@ final class SyncModel {
     private(set) var preview: Preview?
     private(set) var previewError: String?
     private(set) var isPlanning = false
+    /// Albums resolved while planning, for "Checking 40 of 120 albums…".
+    private(set) var checked: (done: Int, total: Int)?
+    /// Nil until there is more than one album to check.
+    var checkingText: String? { checked.flatMap { $0.total > 1 ? "Checking \($0.done) of \($0.total) albums…" : nil } }
+    @ObservationIgnored private var planID = 0
     private(set) var run: Run?
     var showSheet = false
     /// Album the user asked to sync that iTunes already put on the iPod; waits for confirmation.
@@ -193,15 +198,24 @@ final class SyncModel {
         }
         previewError = nil
         isPlanning = true
+        checked = nil
+        planID += 1
         let selection = selection, settings = app.syncSettings
         let needsGuid = app.ipod.snapshot?.guid == nil
-        let expander = expander ?? SelectionExpander(client: client)
+        // The mirror answers in milliseconds; the server is asked only for albums it lacks.
+        let local: SelectionExpander.LocalAlbum? = app.usesLocalLibrary ? app.library.map { library in { await library.database.album(id: $0) } } : nil
+        let expander = expander ?? SelectionExpander(client: client, local: local)
         self.expander = expander
-        planTask = Task {
+        planTask = Task { [planID] in
             do {
                 try await Task.sleep(for: .milliseconds(500))
                 let expansion = try await expander.expand(selection, defaultPresetID: settings.presetID, soundCheck: settings.soundCheck,
-                                                              fullAlbums: settings.fullAlbums)
+                                                              fullAlbums: settings.fullAlbums) { done, total in
+                    Task { @MainActor in
+                        guard self.planID == planID, self.isPlanning, done > self.checked?.done ?? 0 else { return }
+                        self.checked = (done, total)
+                    }
+                }
                 let songs = expansion.songs, playlists = expansion.playlists
                 // The iPod disk can be slow or busy: read it off the main thread.
                 let (plan, hasPlayCounts) = await Task.detached(priority: .userInitiated) {

@@ -122,7 +122,7 @@ struct SyncStatusRow: View {
         }
         if sync.previewError != nil { return "Cannot prepare sync" }
         if model.client == nil { return "No server connected" }
-        guard let plan = sync.preview?.plan else { return "Checking…" }
+        guard let plan = sync.preview?.plan else { return sync.checkingText ?? "Checking…" }
         if plan.isEmpty { return "Up to date" }
         let parts = [(plan.add.count, "to add"), (plan.reencode.count + plan.retag.count, "to update"), (plan.remove.count, "to remove")]
             .filter { $0.0 > 0 }.map { "\($0.0) \($0.1)" }
@@ -220,7 +220,7 @@ struct SyncSheet: View {
             Text("Connect to a server to sync.").foregroundStyle(.secondary)
             buttons { Button("Sync") {}.buttonStyle(.borderedProminent).disabled(true) }
         } else {
-            HStack { ProgressView().controlSize(.small); Text("Preparing…").foregroundStyle(.secondary) }
+            HStack { ProgressView().controlSize(.small); Text(sync.checkingText ?? "Preparing…").foregroundStyle(.secondary) }
             buttons { Button("Sync") {}.buttonStyle(.borderedProminent).disabled(true) }
         }
     }
