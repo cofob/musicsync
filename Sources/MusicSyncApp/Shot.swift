@@ -128,7 +128,7 @@ import SwiftUI
             await playPaused(model)
             menuPath = s.dropFirst(5).split(separator: "/").map(String.init)
         case "settings-playback":
-            model.player.settings.crossfade = true
+            model.player.settings.transitions = .crossfade
             model.player.settings.soundCheck = .album
             model.player.settings.quality = .aac
             PlaybackSettings().save()  // the demo defaults stay unchanged

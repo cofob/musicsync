@@ -7,8 +7,12 @@ public struct PlaybackSettings: Codable, Equatable, Sendable {
         case off, track, album
     }
 
-    /// Off plays songs gapless.
-    public var crossfade = false
+    /// How one song goes into the next. Off plays songs gapless; AutoMix blends them on the beat.
+    public enum Transitions: String, Codable, CaseIterable, Sendable {
+        case off, crossfade, autoMix
+    }
+
+    public var transitions = Transitions.off
     /// Length of the crossfade, 1–12 s.
     public var crossfadeSeconds = 6.0
     public var soundCheck = SoundCheck.off
@@ -26,11 +30,16 @@ public struct PlaybackSettings: Codable, Equatable, Sendable {
 
     public init() {}
 
+    /// Before AutoMix, transitions were a crossfade switch.
+    private enum OldKeys: CodingKey { case crossfade }
+
     /// Missing keys keep their defaults, so settings saved by an older version still load.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = PlaybackSettings()
-        crossfade = try c.decodeIfPresent(Bool.self, forKey: .crossfade) ?? d.crossfade
+        let crossfade = try decoder.container(keyedBy: OldKeys.self).decodeIfPresent(Bool.self, forKey: .crossfade)
+        transitions = try c.decodeIfPresent(Transitions.self, forKey: .transitions)
+            ?? crossfade.map { $0 ? .crossfade : .off } ?? d.transitions
         crossfadeSeconds = try c.decodeIfPresent(Double.self, forKey: .crossfadeSeconds) ?? d.crossfadeSeconds
         soundCheck = try c.decodeIfPresent(SoundCheck.self, forKey: .soundCheck) ?? d.soundCheck
         preAmp = try c.decodeIfPresent(Double.self, forKey: .preAmp) ?? d.preAmp

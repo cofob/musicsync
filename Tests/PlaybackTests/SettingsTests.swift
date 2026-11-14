@@ -22,7 +22,7 @@ func song(_ id: String, album: String? = "al-1", track: Int? = 1, disc: Int? = n
         let defaults = try #require(UserDefaults(suiteName: "playback-test-\(UUID().uuidString)"))
         #expect(PlaybackSettings.load(from: defaults) == PlaybackSettings())
         var settings = PlaybackSettings()
-        settings.crossfade = true
+        settings.transitions = .autoMix
         settings.crossfadeSeconds = 9
         settings.soundCheck = .album
         settings.speed = 1.5
@@ -32,7 +32,8 @@ func song(_ id: String, album: String? = "al-1", track: Int? = 1, disc: Int? = n
 
     @Test func oldSettingsKeepDefaults() throws {
         let settings = try JSONDecoder().decode(PlaybackSettings.self, from: Data(#"{"crossfade":true}"#.utf8))
-        #expect(settings.crossfade)
+        #expect(settings.transitions == .crossfade)
+        #expect(try JSONDecoder().decode(PlaybackSettings.self, from: Data(#"{"crossfade":false}"#.utf8)).transitions == .off)
         #expect(settings.crossfadeSeconds == 6)
         #expect(settings.soundCheck == .off)
     }

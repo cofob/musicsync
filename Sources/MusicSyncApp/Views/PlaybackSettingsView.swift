@@ -9,13 +9,18 @@ struct PlaybackSettingsView: View {
         @Bindable var player = model.player
         Form {
             Section {
-                Toggle("Crossfade songs", isOn: $player.settings.crossfade)
-                Slider(value: $player.settings.crossfadeSeconds, in: 1...12, step: 1) {
-                    Text("\(Int(player.settings.crossfadeSeconds)) seconds").monospacedDigit()
-                } minimumValueLabel: { Text("1 s") } maximumValueLabel: { Text("12 s") }
-                    .disabled(!player.settings.crossfade)
+                Picker("Transitions", selection: $player.settings.transitions) {
+                    Text("Off").tag(PlaybackSettings.Transitions.off)
+                    Text("Crossfade").tag(PlaybackSettings.Transitions.crossfade)
+                    Text("AutoMix").tag(PlaybackSettings.Transitions.autoMix)
+                }
+                if player.settings.transitions == .crossfade {
+                    Slider(value: $player.settings.crossfadeSeconds, in: 1...12, step: 1) {
+                        Text("\(Int(player.settings.crossfadeSeconds)) seconds").monospacedDigit()
+                    } minimumValueLabel: { Text("1 s") } maximumValueLabel: { Text("12 s") }
+                }
             } footer: {
-                footer("Songs of the same album that play in order are not crossfaded.")
+                footer(transitionsFooter(player.settings.transitions))
             }
             Section {
                 Picker("Sound Check", selection: $player.settings.soundCheck) {
@@ -64,6 +69,15 @@ struct PlaybackSettingsView: View {
 
     private func footer(_ text: String) -> some View {
         Text(text).font(.caption).foregroundStyle(.secondary)
+    }
+
+    private func transitionsFooter(_ transitions: PlaybackSettings.Transitions) -> String {
+        switch transitions {
+        case .off: "Songs play one after the other without a gap."
+        case .crossfade: "Songs fade into each other. Songs of the same album that play in order are not crossfaded."
+        case .autoMix: "AutoMix blends songs like a DJ: it finds the beat, the intro and the outro of each song and mixes on the beat. "
+            + "Songs that are not analyzed yet crossfade. Songs of the same album that play in order are not mixed."
+        }
     }
 }
 

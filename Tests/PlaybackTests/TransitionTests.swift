@@ -4,7 +4,7 @@ import Testing
 @Suite struct TransitionTests {
     private var crossfade: PlaybackSettings {
         var s = PlaybackSettings()
-        s.crossfade = true
+        s.transitions = .crossfade
         s.crossfadeSeconds = 6
         return s
     }

@@ -41,7 +41,7 @@ public struct Transition: Equatable, Sendable {
 public extension PlaybackSettings {
     /// Crossfade from `song` into `next`, or nil to play them gapless. `duration` is the length of `song`.
     func transition(from song: Song?, to next: Song?, duration: TimeInterval?) -> Transition? {
-        guard crossfade, let duration, duration > 2, song?.id != next?.id, !isAlbumSequence(song, next) else { return nil }
+        guard transitions != .off, let duration, duration > 2, song?.id != next?.id, !isAlbumSequence(song, next) else { return nil }
         let fade = min(min(max(crossfadeSeconds, 1), 12), duration / 2)
         return Transition(at: duration - fade, duration: fade)
     }
