@@ -31,6 +31,7 @@ import SwiftUI
         case "perf": await perf(model)
         case "jukebox": await jukebox(model)
         case "appearance": await appearance(model)
+        case "mixes": await mixRules(model)
         default: check(false, "known check \(name)")
         }
     }

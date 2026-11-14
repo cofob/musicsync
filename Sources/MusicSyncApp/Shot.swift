@@ -194,9 +194,13 @@ import SwiftUI
         case "mixes":
             await seedHistory(model)
             model.selection = .home
-        case "mix":
+        case "mix", "because":
             await seedHistory(model)
-            if let mix = await first({ model.mixes.mixes.first }) { model.show(.mix(mix.id)) }
+            if let mix = await first({ (scene == "because" ? model.mixes.because : model.mixes.mixes).first }) { model.show(.mix(mix.id)) }
+        case "mix-menu":
+            await seedHistory(model)
+            guard let song = await first({ model.mixes.mixes.first.flatMap { model.mixes.songs(of: $0).first } }) else { break }
+            open(VStack(alignment: .leading) { SongMenuItems(song: song) }.buttonStyle(.borderless).padding(20).frame(width: 280), "Song Menu", model)
         case "autoplay":
             await seedHistory(model)
             model.mixes.autoPlay = true
