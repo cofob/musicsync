@@ -278,6 +278,14 @@ import SwiftUI
                 click(CGPoint(x: 700, y: 393 + row * 42), flags)
                 try? await Task.sleep(for: .milliseconds(700))  // no double-click
             }
+        case "songs-select":
+            // Songs table: click, ⌘-click and ⇧-click, for the gray selection.
+            model.selection = .songs
+            try? await Task.sleep(for: .seconds(3))
+            for (row, flags) in [(1, NSEvent.ModifierFlags()), (3, .command), (6, .shift)] {
+                click(CGPoint(x: 700, y: 97 + row * 24), flags)
+                try? await Task.sleep(for: .milliseconds(700))
+            }
         case "miniplayer", "miniplayer-queue":
             // Through the Window menu, as the user does; the main window hides.
             await playPaused(model)

@@ -188,20 +188,35 @@ struct SongsTable: NSViewRepresentable {
 
         private func cell(_ column: Column, _ song: Song?, in tableView: NSTableView) -> NSView {
             guard let model = parent?.model else { return NSView() }
+            let reused = tableView.makeView(withIdentifier: column.cellID, owner: nil)
+            let accent = NSColor(Color.musicAccent)
             switch column {
             case .title:
-                return hosted(column, in: tableView, song.map { AnyView(SongTitleCell(song: $0).environment(model)) })
+                let cell = reused as? TitleCell ?? TitleCell(column.cellID)
+                cell.textField?.stringValue = song?.title ?? ""
+                cell.textField?.textColor = song.map { model.player.current?.id == $0.id } == true ? accent : .labelColor
+                let badge = song.flatMap { model.downloads.badge($0) }
+                cell.badge.image = badge.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
+                cell.badge.isHidden = badge == nil
+                cell.more.contentTintColor = accent
+                cell.more.isHidden = song == nil
+                cell.alphaValue = song.map(model.downloads.isAvailable) == false ? 0.4 : 1
+                cell.menuItems = { song.map { NSHostingMenu(rootView: SongMenuItems(song: $0).environment(model)) } }
+                return cell
             case .rating:
-                let rating = song.flatMap { song in
-                    model.ratingUnsupported ? nil : AnyView(RatingStars(rating: model.rating(song), size: 10, hidesEmpty: true) { model.setRating($0, for: song) })
-                }
-                return hosted(column, in: tableView, rating)
+                let cell = reused as? RatingCell ?? RatingCell(column.cellID)
+                cell.isHidden = song == nil || model.ratingUnsupported
+                cell.rating = song.map(model.rating) ?? 0
+                cell.tint = accent
+                cell.onSet = { rating in song.map { model.setRating(rating, for: $0) } }
+                return cell
             case .star:
-                let cell = tableView.makeView(withIdentifier: column.cellID, owner: nil) as? NSImageView ?? starView(column)
+                let cell = reused as? NSImageView ?? starView(column)
+                cell.contentTintColor = accent
                 cell.isHidden = !(song.map(model.isStarred) ?? false)
                 return cell
             default:
-                let cell = tableView.makeView(withIdentifier: column.cellID, owner: nil) as? TextCell ?? TextCell(column)
+                let cell = reused as? TextCell ?? TextCell(column.cellID, digits: column == .time || column == .plays)
                 cell.textField?.stringValue = song.map { text(column, $0) } ?? ""
                 return cell
             }
@@ -218,77 +233,15 @@ struct SongsTable: NSViewRepresentable {
             }
         }
 
-        private func hosted(_ column: Column, in tableView: NSTableView, _ content: AnyView?) -> NSView {
-            let cell = tableView.makeView(withIdentifier: column.cellID, owner: nil) as? HostingCell ?? HostingCell(column)
-            cell.host.rootView = content ?? AnyView(EmptyView())
-            return cell
-        }
-
         private func starView(_ column: Column) -> NSImageView {
             let view = NSImageView(image: NSImage(systemSymbolName: "star.fill", accessibilityDescription: "Favorite") ?? NSImage())
             view.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
-            view.contentTintColor = NSColor(Color.musicAccent)
             view.identifier = column.cellID
             return view
         }
-    }
-
-    /// One line of text, truncated; times and counts use even-width digits.
-    final class TextCell: NSTableCellView {
-        init(_ column: Column) {
-            super.init(frame: .zero)
-            identifier = column.cellID
-            let field = NSTextField(labelWithString: "")
-            field.lineBreakMode = .byTruncatingTail
-            if column == .time || column == .plays { field.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular) }
-            field.translatesAutoresizingMaskIntoConstraints = false
-            addSubview(field)
-            textField = field
-            NSLayoutConstraint.activate([
-                field.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 2),
-                field.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -2),
-                field.centerYAnchor.constraint(equalTo: centerYAnchor),
-            ])
-        }
-
-        required init?(coder: NSCoder) { nil }
-    }
-
-    /// A SwiftUI cell; the view is kept and only its content changes when the table reuses it.
-    final class HostingCell: NSTableCellView {
-        let host = NSHostingView(rootView: AnyView(EmptyView()))
-
-        init(_ column: Column) {
-            super.init(frame: .zero)
-            identifier = column.cellID
-            host.sizingOptions = []
-            host.frame = bounds
-            host.autoresizingMask = [.width, .height]
-            addSubview(host)
-        }
-
-        required init?(coder: NSCoder) { nil }
     }
 }
 
 private extension SongsTable.Column {
     var cellID: NSUserInterfaceItemIdentifier { NSUserInterfaceItemIdentifier("cell-" + rawValue) }
-}
-
-/// Title, download badge and "•••" menu; red while the song plays, faded when it cannot play offline.
-private struct SongTitleCell: View {
-    @Environment(AppModel.self) private var model
-    let song: Song
-
-    var body: some View {
-        HStack {
-            Text(song.title).lineLimit(1)
-                .foregroundStyle(model.player.current?.id == song.id ? Color.musicAccent : .primary)
-            Spacer(minLength: 4)
-            if let badge = model.downloads.badge(song) { Image(systemName: badge).font(.caption).foregroundStyle(.secondary) }
-            RowMenu { SongMenuItems(song: song) }
-        }
-        .frame(maxHeight: .infinity)
-        .opacity(model.downloads.isAvailable(song) ? 1 : 0.4)
-    }
 }
