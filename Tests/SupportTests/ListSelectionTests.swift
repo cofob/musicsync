@@ -69,3 +69,25 @@ private let rows = ["a", "b", "c", "d", "e"]
     // Filtered rows come back still selected.
     #expect(s.ordered(in: rows) == ["b", "d"])
 }
+
+@Test func arrowsMoveOneRowAndStopAtTheEnds() {
+    var s = ListSelection<String>()
+    s.move(1, in: rows)
+    #expect(s.ordered(in: rows) == ["a"])
+    s.move(1, in: rows)
+    #expect(s.ordered(in: rows) == ["b"])
+    s.move(-1, in: rows)
+    s.move(-1, in: rows)
+    #expect(s.ordered(in: rows) == ["a"])
+    s.click("e")
+    s.move(1, in: rows)
+    #expect(s.ordered(in: rows) == ["e"])
+}
+
+@Test func arrowUpWithoutSelectionTakesTheLastRow() {
+    var s = ListSelection<String>()
+    s.move(-1, in: rows)
+    #expect(s.ordered(in: rows) == ["e"])
+    s.move(1, in: [])
+    #expect(s.ordered(in: rows) == ["e"])
+}

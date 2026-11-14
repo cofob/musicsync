@@ -73,6 +73,10 @@ struct MusicSyncApp: App {
                     .keyboardShortcut(.rightArrow, modifiers: .command)
                 Button("Previous") { model.player.previous() }
                     .keyboardShortcut(.leftArrow, modifiers: .command)
+                Button("Increase Volume") { model.player.volume = min(model.player.volume + 0.1, 1) }
+                    .keyboardShortcut(.upArrow, modifiers: .command)
+                Button("Decrease Volume") { model.player.volume = max(model.player.volume - 0.1, 0) }
+                    .keyboardShortcut(.downArrow, modifiers: .command)
                 Divider()
                 Toggle("Shuffle", isOn: Binding(get: { model.player.shuffle }, set: { model.player.setShuffle($0) }))
                 Picker("Repeat", selection: Binding(get: { model.player.repeatMode }, set: { model.player.repeatMode = $0 })) {

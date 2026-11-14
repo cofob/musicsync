@@ -195,6 +195,9 @@ struct TrackRow<Leading: View, MenuItems: View>: View {
         .background(isSelected ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear), in: selectionShape)
         .contentShape(Rectangle())
         .contextMenu { menu }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel([title, subtitle, time.map(spokenTime)].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", "))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var selectionShape: UnevenRoundedRectangle {

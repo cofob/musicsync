@@ -100,6 +100,7 @@ struct MiniPlayerView: View {
                 Button(song.map(model.isStarred) == true ? "Undo Favorite" : "Favorite",
                        systemImage: song.map(model.isStarred) == true ? "star.fill" : "star") { song.map(model.toggleStar) }
                     .disabled(song == nil)
+                    .accessibilityLabel("Favorite").accessibilityValue(song.map(model.isStarred) == true ? "On" : "Off")
                 Spacer(minLength: 0)
                 TransportControls(scale: 0.85, spacing: 10)
                 Spacer(minLength: 0)
@@ -107,6 +108,7 @@ struct MiniPlayerView: View {
                 Button("Up Next", systemImage: "list.bullet") { showsQueue.toggle() }
                     .foregroundStyle(showsQueue ? Color.musicAccent : .white)
                     .help("Up Next")
+                    .accessibilityValue(showsQueue ? "On" : "Off")
             }
         }
         .labelStyle(.iconOnly)

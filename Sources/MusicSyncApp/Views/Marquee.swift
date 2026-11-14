@@ -3,6 +3,7 @@ import SwiftUI
 /// One line of text that scrolls sideways, again and again, when it does not fit.
 struct Marquee: View {
     let text: String
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var textWidth: CGFloat = 0
     @State private var boxWidth: CGFloat = 0
     @State private var offset: CGFloat = 0
@@ -10,7 +11,7 @@ struct Marquee: View {
     private let gap: CGFloat = 40
 
     var body: some View {
-        let scrolls = textWidth > boxWidth + 1
+        let scrolls = textWidth > boxWidth + 1 && !reduceMotion
         Text(text).lineLimit(1).hidden()
             .frame(maxWidth: .infinity, alignment: .leading)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { boxWidth = $0 }

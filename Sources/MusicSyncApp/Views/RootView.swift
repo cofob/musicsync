@@ -3,6 +3,7 @@ import SwiftUI
 struct RootView: View {
     @Environment(AppModel.self) private var model
     @FocusedValue(\.songListCommands) private var songList
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         @Bindable var model = model
@@ -51,9 +52,10 @@ struct RootView: View {
                 // minus the opening sidebar, makes the sidebar animation overflow and snap back.
                 .frame(minWidth: 680, minHeight: 560)
             }
+            .accessibilityHidden(model.showNowPlaying)  // VoiceOver reads only Now Playing over it
             if model.showNowPlaying {
-                NowPlayingView().transition(.move(edge: .bottom)).zIndex(1)
-                NowPlayingVolume().transition(NowPlayingVolume.transition).zIndex(2)
+                NowPlayingView().transition(reduceMotion ? .opacity : .move(edge: .bottom)).zIndex(1)
+                NowPlayingVolume().transition(reduceMotion ? .opacity : NowPlayingVolume.transition).zIndex(2)
             }
         }
         .animation(.smooth(duration: 0.35), value: model.showNowPlaying)

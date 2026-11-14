@@ -25,6 +25,7 @@ import SwiftUI
         case "nowplaying-lyrics": await nowPlayingLyrics(model)
         case "nowplaying-drag": await nowPlayingDrag(model)
         case "podcast-resume": await podcastResume(model)
+        case "accessibility": await accessibility(model)
         default: check(false, "known check \(name)")
         }
     }
@@ -394,6 +395,131 @@ import SwiftUI
         guard let sidebar = frames.first(where: { $0.minX < 1 }),
               let list = frames.first(where: { abs($0.width - 280) < 1 }) else { return check(false, "sidebar and artist list: \(frames)") }
         check(list.minX >= sidebar.maxX - 1, "the artist list \(list) starts right of the sidebar \(sidebar)")
+    }
+
+    // MARK: Accessibility
+
+    /// What VoiceOver reads on Home, an album, Now Playing and the MiniPlayer, and the player keys.
+    private static func accessibility(_ model: AppModel) async {
+        guard AccessibilityAudit.isTrusted else { return check(false, "the terminal has the Accessibility permission (System Settings > Privacy)") }
+        await Shot.playPaused(model)
+        UserDefaults.app.set(false, forKey: MiniPlayer.queueKey)
+        guard let window = mainWindow else { return check(false, "main window") }
+        let player = model.player
+        let on = { (isOn: Bool) in isOn ? "On" : "Off" }
+        try? await Task.sleep(for: .seconds(4))
+
+        let home = audit("Home", window: window.title)
+        check(home.filter { $0.role == "AXButton" && $0.label.contains(", ") }.count >= 5, "Home cards read \"Album, Artist\"")
+        toggles(["Shuffle": on(player.shuffle), "Repeat": player.repeatMode.rawValue.capitalized], in: home)
+        slider("Position", in: home)
+
+        await albumRows(model, window)
+        await playerKeys(model, window)
+        await songsTable(model, window)
+
+        model.nowPlayingPanel = .queue
+        model.showNowPlaying = true
+        try? await Task.sleep(for: .seconds(1.5))
+        let playing = audit("Now Playing", window: window.title)
+        let starred = { if case .server(let song)? = player.current { model.isStarred(song) } else { false } }
+        toggles(["Favorite": on(starred()), "Lyrics": "Off", "Queue": "On", "Shuffle": on(player.shuffle)], in: playing)
+        if model.mixes.isAvailable { toggles(["AutoPlay": on(model.mixes.autoPlay)], in: playing) }
+        check(!playing.contains { $0.label == "Hide Sidebar" || $0.label == "Open Now Playing" }, "the page under Now Playing is hidden from VoiceOver")
+        if let volume = slider("Volume", in: playing) {
+            player.volume = 0.5
+            AXUIElementPerformAction(volume.element, "AXIncrement" as CFString)
+            check(await wait { abs(player.volume - 0.6) < 0.01 }, "VoiceOver increment on Volume: \(player.volume)")
+        }
+        slider("Position", in: playing)
+        key(53, "\u{1b}", window).map { if !window.performKeyEquivalent(with: $0) { window.sendEvent($0) } }
+        check(await wait { !model.showNowPlaying }, "Escape closes Now Playing")
+
+        check(windowMenu("Switch to MiniPlayer"), "Window > Switch to MiniPlayer")
+        guard let mini = await Shot.first({ NSApp.windows.first { $0.identifier?.rawValue.hasPrefix(MiniPlayer.id) == true && $0.isVisible } }) else { return check(false, "MiniPlayer opens") }
+        try? await Task.sleep(for: .seconds(1))  // its controls show for a moment at first
+        let small = audit("MiniPlayer", window: mini.title)
+        toggles(["Favorite": on(starred()), "Up Next": "Off", "Shuffle": on(player.shuffle)], in: small)
+        slider("Position", in: small)
+        mini.performClose(nil)
+        _ = await wait { window.isVisible }
+    }
+
+    /// Album rows read title and time; ↓ and ↑ move the selection, Return plays it.
+    private static func albumRows(_ model: AppModel, _ window: NSWindow) async {
+        guard let album = await Shot.first({ model.albums.first { ($0.songCount ?? 0) > 3 } }),
+              let songs = try? await model.album(album.id)?.song else { return check(false, "an album") }
+        model.show(.album(album))
+        try? await Task.sleep(for: .seconds(3))
+        let nodes = audit("Album", window: window.title)
+        let song = songs[1]
+        let time = song.duration.map { spokenTime(TimeInterval($0)) } ?? ""
+        check(nodes.contains { $0.label.hasPrefix(song.title + ", ") && $0.label.hasSuffix(time) }, "a song row reads \"\(song.title), …, \(time)\"")
+        await tap(window, row: 1, top: 393, height: 42)
+        for (code, arrow) in [(125, NSDownArrowFunctionKey), (125, NSDownArrowFunctionKey), (126, NSUpArrowFunctionKey)] {
+            await send(key(UInt16(code), arrowKey(arrow), window), window)
+        }
+        await send(key(36, "\r", window), window)
+        check(await wait { model.player.current?.id == songs[2].id }, "↓ ↓ ↑ from row 1, then Return plays row 2: \(model.player.current.flatMap { c in songs.firstIndex { $0.id == c.id } } ?? -1)")
+        if model.player.isPlaying { model.player.toggle() }
+        model.path = []
+    }
+
+    /// The Songs table (AppKit): its cells and buttons have names too.
+    private static func songsTable(_ model: AppModel, _ window: NSWindow) async {
+        await Shot.mirrored(model)
+        await Shot.select(.songs, model)
+        guard await songs() != nil else { return }
+        audit("Songs", window: window.title)
+        await Shot.select(.home, model)
+    }
+
+    /// ⌘→, ⌘←, ⌘↑ and ⌘↓ in the Playback menu, and Space.
+    private static func playerKeys(_ model: AppModel, _ window: NSWindow) async {
+        let player = model.player
+        let menu = NSApp.mainMenu?.item(withTitle: "Playback")?.submenu
+        let arrows = ["Next": NSRightArrowFunctionKey, "Previous": NSLeftArrowFunctionKey, "Increase Volume": NSUpArrowFunctionKey, "Decrease Volume": NSDownArrowFunctionKey]
+        for (title, arrow) in arrows.sorted(by: { $0.key < $1.key }) {
+            let item = menu?.item(withTitle: title)
+            check(item?.keyEquivalent == arrowKey(arrow) && item?.keyEquivalentModifierMask == .command, "Playback > \(title) is ⌘ and an arrow")
+        }
+        player.volume = 0.5
+        for (title, expected) in [("Increase Volume", 0.6), ("Decrease Volume", 0.5)] {
+            if let menu, let i = menu.items.firstIndex(where: { $0.title == title }) { menu.performActionForItem(at: i) }
+            check(await wait { abs(player.volume - expected) < 0.01 }, "\(title): \(player.volume)")
+        }
+        // Through the app's event monitor, as a typed key goes.
+        let wasPlaying = player.isPlaying
+        key(49, " ", window).map(NSApp.sendEvent)
+        check(await wait { player.isPlaying != wasPlaying }, "Space toggles playback")
+        if player.isPlaying { player.toggle() }
+    }
+
+    private static func arrowKey(_ code: Int) -> String { String(Character(UnicodeScalar(UInt16(code)) ?? " ")) }
+
+    /// Every control has a label; returns the tree of the window titled `window`.
+    @discardableResult private static func audit(_ name: String, window: String) -> [AccessibilityAudit.Node] {
+        let nodes = AccessibilityAudit.nodes().filter { $0.window == window }
+        let missing = AccessibilityAudit.unlabeled(nodes)
+        check(nodes.count > 20 && missing.isEmpty, "\(name): \(nodes.count) elements, controls without a label: \(missing.map { "\($0.role)/\($0.subrole)" })")
+        return nodes
+    }
+
+    /// The buttons with these labels read these values.
+    private static func toggles(_ values: [String: String], in nodes: [AccessibilityAudit.Node]) {
+        for (label, value) in values.sorted(by: { $0.key < $1.key }) {
+            let found = nodes.filter { $0.label == label && $0.role == "AXButton" }.map(\.value)
+            check(!found.isEmpty && found.allSatisfy { $0 == value }, "\(label) reads \(value): \(found)")
+        }
+    }
+
+    /// The slider labeled `label`: VoiceOver can move it and reads its value in words.
+    @discardableResult private static func slider(_ label: String, in nodes: [AccessibilityAudit.Node]) -> AccessibilityAudit.Node? {
+        let found = nodes.first { $0.role == "AXSlider" && $0.label == label }
+        let words = found?.value.map { label == "Volume" ? $0.hasSuffix("%") : $0.contains(" of ") } ?? false
+        check(found.map { $0.actions.contains("AXIncrement") && $0.actions.contains("AXDecrement") } == true && words,
+              "\(label) is an adjustable slider: \(found?.value ?? "none") \(found?.actions ?? [])")
+        return found
     }
 
     // MARK: Helpers

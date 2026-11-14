@@ -66,6 +66,7 @@ struct NowPlayingView: View {
             .foregroundStyle(on ? Color.black : .white)
             .background(on ? Color.white.opacity(0.9) : .clear, in: Capsule())
             .help(title)
+            .accessibilityValue(on ? "On" : "Off")
     }
 }
 
@@ -116,6 +117,7 @@ private struct PlayerColumn: View {
                     let starred = model.isStarred(song)
                     Button(starred ? "Undo Favorite" : "Favorite", systemImage: starred ? "star.fill" : "star") { model.toggleStar(song) }
                         .buttonStyle(RoundGlassStyle())
+                        .accessibilityLabel("Favorite").accessibilityValue(starred ? "On" : "Off")
                     Menu { SongMenuItems(song: song, inQueue: false) } label: { Image(systemName: "ellipsis") }
                         .menuStyle(.button).buttonStyle(RoundGlassStyle()).menuIndicator(.hidden).fixedSize()
                 }
@@ -176,6 +178,7 @@ struct ArtworkBackground: View {
 /// Lyrics of the current song; synced lines follow playback and seek on click.
 struct LyricsPanel: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// Nil while loading.
     let lyrics: Lyrics?
     var size: CGFloat = 30
@@ -206,7 +209,7 @@ struct LyricsPanel: View {
                 }
                 // Room for the blur on the left: the scroll view clips at its edge.
                 .padding(.vertical, 220).padding(.leading, 16).padding(.trailing, 40)
-                .animation(.easeOut(duration: 0.35), value: current)
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.35), value: current)
             }
             .scrollIndicators(.never)
             .padding(.leading, -16)
@@ -217,7 +220,7 @@ struct LyricsPanel: View {
             .onAppear { if let current { proxy.scrollTo(current, anchor: Self.anchor) } }
             .onChange(of: current) {
                 guard let current else { return }
-                withAnimation(.smooth(duration: 0.6)) { proxy.scrollTo(current, anchor: Self.anchor) }
+                withAnimation(reduceMotion ? nil : .smooth(duration: 0.6)) { proxy.scrollTo(current, anchor: Self.anchor) }
             }
         }
     }

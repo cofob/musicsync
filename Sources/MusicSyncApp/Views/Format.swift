@@ -7,6 +7,12 @@ func formatTime(_ seconds: TimeInterval) -> String {
     return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
 }
 
+/// A time as VoiceOver should say it: "3 minutes, 5 seconds".
+func spokenTime(_ seconds: TimeInterval) -> String {
+    let total = Int(min(max(0, seconds.isFinite ? seconds : 0), 1e9))
+    return Duration.seconds(total).formatted(.units(allowed: [.hours, .minutes, .seconds], width: .wide))
+}
+
 /// "58 min" or "2 hr 5 min" for long durations such as albums and playlists.
 func formatTotal(_ seconds: Int) -> String {
     let minutes = (seconds + 30) / 60

@@ -83,10 +83,18 @@ struct SongList: View {
         .onKeyPress(.return) { play(selectedRows(keys)) }
         .onDeleteCommand { remove(selectedRows(keys)) }
         .onKeyPress(.escape) { if selection.isEmpty { return .ignored }; selection.clear(); return .handled }
+        .onKeyPress(.downArrow) { move(1, keys) }
+        .onKeyPress(.upArrow) { move(-1, keys) }
         .focusedSceneValue(\.songListCommands, SongListCommands(selectAll: { selection.selectAll(keys); focused = true }, delete: { remove(selectedRows(keys)) }))
     }
 
     private func selectedRows(_ keys: [RowKey]) -> [Int] { keys.indices.filter { selection.contains(keys[$0]) } }
+
+    private func move(_ offset: Int, _ keys: [RowKey]) -> KeyPress.Result {
+        guard !keys.isEmpty else { return .ignored }
+        selection.move(offset, in: keys)
+        return .handled
+    }
 
     private func remove(_ rows: [Int]) {
         guard let onRemove, !rows.isEmpty else { return }

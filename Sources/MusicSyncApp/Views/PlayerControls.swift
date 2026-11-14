@@ -11,24 +11,25 @@ struct TransportControls: View {
     var body: some View {
         let player = model.player
         HStack(spacing: spacing) {
-            if !compact { toggle("Shuffle", "shuffle", isOn: player.shuffle) { player.setShuffle(!player.shuffle) } }
+            if !compact { toggle("Shuffle", "shuffle", isOn: player.shuffle, value: player.shuffle ? "On" : "Off") { player.setShuffle(!player.shuffle) } }
             Button("Previous", systemImage: "backward.fill") { player.previous() }
                 .font(.system(size: 17 * scale)).disabled(!player.hasPrevious)
             Button(player.isPlaying ? "Pause" : "Play", systemImage: player.isPlaying ? "pause.fill" : "play.fill") { player.toggle() }
                 .font(.system(size: 24 * scale)).frame(width: 28 * scale).disabled(player.queue.isEmpty)
             Button("Next", systemImage: "forward.fill") { player.next() }
                 .font(.system(size: 17 * scale)).disabled(!player.hasNext)
-            if !compact { toggle("Repeat", player.repeatMode.symbol, isOn: player.repeatMode != .off) { player.repeatMode = player.repeatMode.next } }
+            if !compact { toggle("Repeat", player.repeatMode.symbol, isOn: player.repeatMode != .off, value: player.repeatMode.rawValue.capitalized) { player.repeatMode = player.repeatMode.next } }
         }
         .labelStyle(.iconOnly)
         .buttonStyle(HitAreaButtonStyle())
     }
 
-    private func toggle(_ title: String, _ symbol: String, isOn: Bool, action: @escaping () -> Void) -> some View {
+    private func toggle(_ title: String, _ symbol: String, isOn: Bool, value: String, action: @escaping () -> Void) -> some View {
         Button(title, systemImage: symbol, action: action)
             .font(.system(size: 13 * scale, weight: .semibold))
             .foregroundStyle(isOn ? AnyShapeStyle(Color.musicAccent) : AnyShapeStyle(.secondary))
             .help(title)
+            .accessibilityValue(value)
     }
 }
 
@@ -39,6 +40,10 @@ struct LevelBar: View {
     var tint: Color = .primary
     var onChange: (Double) -> Void = { _ in }
     var onCommit: (Double) -> Void
+    /// What VoiceOver reads: the name, the value, and the change of one increment or decrement.
+    var label = ""
+    var valueText = ""
+    var step = 0.05
     @State private var hovering = false
 
     var body: some View {
@@ -54,6 +59,10 @@ struct LevelBar: View {
         }
         .frame(height: max(14, height * 2))
         .onHover { h in withAnimation(.easeOut(duration: 0.15)) { hovering = h } }
+        .accessibilityRepresentation {
+            Slider(value: Binding(get: { value }, set: { onCommit($0) }), in: 0...1, step: step) { Text(label) }
+                .accessibilityValue(valueText)
+        }
     }
 }
 
@@ -103,7 +112,8 @@ struct ScrubBar: View {
         let elapsed = scrub ?? player.elapsed
         let bar = LevelBar(value: duration > 0 ? elapsed / duration : 0, height: height, tint: tint,
                            onChange: { scrub = $0 * duration },
-                           onCommit: { player.seek(to: $0 * duration); scrub = nil })
+                           onCommit: { player.seek(to: $0 * duration); scrub = nil },
+                           label: "Position", valueText: "\(spokenTime(elapsed)) of \(spokenTime(duration))", step: duration > 0 ? 10 / duration : 0)
         let start = Text(formatTime(elapsed))
         let end = Text("−" + formatTime(max(0, duration - elapsed)))
         Group {
@@ -155,7 +165,8 @@ struct VolumeSlider: View {
     var body: some View {
         let player = model.player
         LevelBar(value: player.volume, height: 5, tint: tint,
-                 onChange: { player.volume = $0 }, onCommit: { player.volume = $0 })
+                 onChange: { player.volume = $0 }, onCommit: { player.volume = $0 },
+                 label: "Volume", valueText: "\(Int((player.volume * 100).rounded()))%", step: 0.1)
     }
 }
 

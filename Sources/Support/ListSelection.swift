@@ -39,6 +39,14 @@ public struct ListSelection<ID: Hashable>: Equatable {
         base = selected
     }
 
+    /// Arrow keys: only the row `offset` rows from the anchor, within `ids`; with no anchor in `ids`, the first
+    /// row going down or the last going up.
+    public mutating func move(_ offset: Int, in ids: [ID]) {
+        guard !ids.isEmpty else { return }
+        let to = anchor.flatMap(ids.firstIndex).map { min(max($0 + offset, 0), ids.count - 1) } ?? (offset > 0 ? 0 : ids.count - 1)
+        click(ids[to])
+    }
+
     public mutating func clear() {
         selected = []
         anchor = nil
