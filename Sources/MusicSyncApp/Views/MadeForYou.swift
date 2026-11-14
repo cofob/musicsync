@@ -113,7 +113,7 @@ private struct MixCard: View {
             }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CardPressStyle())
         .contextMenu { MixMenuItems(mix: mix) }
     }
 }
@@ -163,7 +163,7 @@ private struct SongCard: View {
             }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CardPressStyle())
         .contextMenu { SongMenuItems(song: song) }
     }
 }
@@ -209,7 +209,7 @@ struct AutoPlayButton: View {
                     .background(.primary.opacity(mixes.autoPlay ? 0.2 : 0), in: Capsule())
                     .contentShape(Capsule())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(HitAreaButtonStyle())
             .help(mixes.autoPlay ? "AutoPlay: similar songs play when the queue ends" : "Turn On AutoPlay")
             .accessibilityLabel("AutoPlay")
             .accessibilityValue(mixes.autoPlay ? "On" : "Off")

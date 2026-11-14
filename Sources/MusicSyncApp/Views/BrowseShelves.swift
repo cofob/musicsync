@@ -51,7 +51,7 @@ struct ArtistShelf: View {
                         }
                         .frame(width: 140).contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(CardPressStyle())
                     .contextMenu { ArtistMenuItems(artist: artist) }
                 }
             }
@@ -92,7 +92,7 @@ struct ExpandableText: View {
             Text(text).lineLimit(expanded ? nil : 3).foregroundStyle(.secondary).textSelection(.enabled)
                 .frame(maxWidth: 720, alignment: .leading)
             Button(expanded ? "Less" : "More") { withAnimation(.smooth) { expanded.toggle() } }
-                .buttonStyle(.plain).font(.callout.weight(.semibold)).foregroundStyle(Color.musicAccent)
+                .buttonStyle(HitAreaButtonStyle()).font(.callout.weight(.semibold)).foregroundStyle(Color.musicAccent)
         }
     }
 }

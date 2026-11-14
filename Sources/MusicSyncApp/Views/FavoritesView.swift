@@ -102,7 +102,7 @@ private struct ArtistCard: View {
             .fixedSize(horizontal: false, vertical: true)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CardPressStyle())
         .contextMenu { ArtistMenuItems(artist: artist) }
     }
 }

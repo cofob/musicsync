@@ -28,7 +28,7 @@ struct GenresView: View {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 230, maximum: 340), spacing: 20)], spacing: 20) {
                     if let shown {
                         ForEach(shown) { genre in
-                            NavigationLink(value: Route.genre(genre.name)) { GenreCollageTile(genre: genre) }.buttonStyle(.plain)
+                            NavigationLink(value: Route.genre(genre.name)) { GenreCollageTile(genre: genre) }.buttonStyle(CardPressStyle())
                         }
                     } else if loadError == nil {
                         ForEach(0..<12, id: \.self) { _ in PlaceholderBlock(height: 150, cornerRadius: 14) }.shimmering()

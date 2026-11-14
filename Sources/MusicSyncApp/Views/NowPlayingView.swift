@@ -133,7 +133,7 @@ private struct RoundGlassStyle: ButtonStyle {
         configuration.label
             .labelStyle(.iconOnly).font(.system(size: 14, weight: .semibold))
             .frame(width: 32, height: 32)
-            .background(.white.opacity(configuration.isPressed ? 0.3 : 0.15), in: Circle())
+            .animation(.press) { $0.background(.white.opacity(configuration.isPressed ? 0.3 : 0.15), in: Circle()) }
             .contentShape(Circle())
     }
 }

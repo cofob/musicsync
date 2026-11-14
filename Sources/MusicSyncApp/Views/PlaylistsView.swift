@@ -23,7 +23,7 @@ struct PlaylistsView: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(CardPressStyle())
                     .contextMenu {
                         Button("Play", systemImage: "play.fill") { model.play(playlist) }
                         Button("Shuffle", systemImage: "shuffle") { model.play(playlist, shuffled: true) }

@@ -25,7 +25,7 @@ struct AlbumCard<Badge: View>: View {
             .fixedSize(horizontal: false, vertical: true)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CardPressStyle())
         .draggable(DragPayload.album(album.id).text)
         .contextMenu { AlbumMenuItems(album: album) }
     }

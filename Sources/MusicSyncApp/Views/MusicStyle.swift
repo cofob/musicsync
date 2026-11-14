@@ -46,7 +46,7 @@ struct FilledCapsuleStyle: ButtonStyle {
             .font(.body.weight(.semibold))
             .foregroundStyle(Color.musicAccent)
             .padding(.horizontal, 18).frame(height: 32)
-            .background(Color.primary.opacity(configuration.isPressed ? 0.14 : 0.07), in: Capsule())
+            .animation(.press) { $0.background(Color.primary.opacity(configuration.isPressed ? 0.14 : 0.07), in: Capsule()) }
             .opacity(isEnabled ? 1 : 0.4)
             .contentShape(Capsule())
     }
@@ -63,7 +63,7 @@ struct CircleIconStyle: ButtonStyle {
             .font(.system(size: size * 0.42, weight: .semibold))
             .foregroundStyle(Color.musicAccent)
             .frame(width: size, height: size)
-            .background(Color.primary.opacity(configuration.isPressed ? 0.14 : 0.07), in: Circle())
+            .animation(.press) { $0.background(Color.primary.opacity(configuration.isPressed ? 0.14 : 0.07), in: Circle()) }
             .opacity(isEnabled ? 1 : 0.4)
             .contentShape(Circle())
     }
@@ -247,7 +247,7 @@ struct ShelfHeader: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain).font(.title2.bold())
+            .buttonStyle(HitAreaButtonStyle()).font(.title2.bold())
         } else {
             Text(title).font(.title2.bold())
         }
@@ -344,6 +344,20 @@ struct HitAreaButtonStyle: ButtonStyle {
         configuration.label
             .frame(width: width, height: height)
             .contentShape(Rectangle())
-            .opacity(isEnabled ? (configuration.isPressed ? 0.6 : 1) : 0.4)
+            .animation(.press) { $0.opacity(configuration.isPressed ? 0.6 : 1) }
+            .opacity(isEnabled ? 1 : 0.4)
     }
+}
+
+/// A pressed card shrinks a little with an animation; `.plain` dims it at once instead.
+struct CardPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .animation(.press) { $0.scaleEffect(configuration.isPressed ? 0.97 : 1) }
+    }
+}
+
+extension Animation {
+    /// Press feedback of every button style: short, so a click never feels slow, but never a jump.
+    static let press = Animation.easeOut(duration: 0.12)
 }

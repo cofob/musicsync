@@ -81,7 +81,7 @@ private struct AccentPicker: View {
                         .padding(2)
                         .overlay { Circle().strokeBorder(selection == accent ? accent.color : .clear, lineWidth: 1.5) }
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(HitAreaButtonStyle())
                 .help(accent.title)
                 .accessibilityLabel(accent.title)
                 .accessibilityAddTraits(selection == accent ? .isSelected : [])

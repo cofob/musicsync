@@ -123,7 +123,7 @@ private struct FeatureCard: View {
                 .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CardPressStyle())
         .contextMenu { AlbumMenuItems(album: album) }
     }
 }

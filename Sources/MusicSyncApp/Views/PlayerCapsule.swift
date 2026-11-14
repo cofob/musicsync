@@ -49,7 +49,7 @@ struct PlayerCapsule: View {
                     }
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(HitAreaButtonStyle())
                 .help("Open Now Playing")
                 SeekBar()
             }

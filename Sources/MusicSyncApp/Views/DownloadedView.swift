@@ -162,7 +162,7 @@ private struct PlaylistCard: View {
             .fixedSize(horizontal: false, vertical: true)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CardPressStyle())
         .contextMenu {
             Button("Play", systemImage: "play.fill") { model.play(playlist) }
             PinMenuItem(reason: .playlist(playlist.id)) { model.download(playlist) }

@@ -66,7 +66,7 @@ private struct BrowseGenresView: View {
                         ForEach(0..<12, id: \.self) { _ in PlaceholderBlock(height: 120, cornerRadius: 12) }.shimmering()
                     }
                     ForEach(genres) { genre in
-                        NavigationLink(value: Route.genre(genre.name)) { GenreTile(genre: genre) }.buttonStyle(.plain)
+                        NavigationLink(value: Route.genre(genre.name)) { GenreTile(genre: genre) }.buttonStyle(CardPressStyle())
                     }
                 }
             }
@@ -206,7 +206,7 @@ private struct ArtistsRow: View {
                                     }
                                     .frame(width: 150).contentShape(Rectangle())
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(CardPressStyle())
                                 .id(artist.id)
                             }
                         }

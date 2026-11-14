@@ -125,7 +125,7 @@ private struct UpNextRow: View {
             .background(RoundedRectangle(cornerRadius: 6).fill(.primary.opacity(hovering ? 0.08 : 0)))
         }
         .buttonStyle(HitAreaButtonStyle())
-        .onHover { hovering = $0 }
+        .onHover { h in withAnimation(.easeOut(duration: 0.15)) { hovering = h } }
         .help("Play")
     }
 }

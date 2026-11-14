@@ -101,7 +101,7 @@ struct SyncStatusRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(CardPressStyle())
             // Explicit start: opens the preview, where the sync is confirmed.
             if pending {
                 Button("Sync…", systemImage: "arrow.trianglehead.2.clockwise") { sync.dismissRun(); sync.showSheet = true }
@@ -407,7 +407,7 @@ private struct HoverCircleStyle: ButtonStyle {
             .font(.system(size: 13, weight: .bold))
             .foregroundStyle(.white)
             .frame(width: 30, height: 30)
-            .background(.black.opacity(configuration.isPressed ? 0.7 : 0.5), in: Circle())
+            .animation(.press) { $0.background(.black.opacity(configuration.isPressed ? 0.7 : 0.5), in: Circle()) }
             .opacity(isEnabled ? 1 : 0.4)
             .contentShape(Circle())
     }

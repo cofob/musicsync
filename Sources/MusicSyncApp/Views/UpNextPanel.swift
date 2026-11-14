@@ -88,7 +88,7 @@ struct UpNextPanel: View {
             Spacer()
             if clear {
                 Button("Clear") { model.player.clearUpcoming() }
-                    .buttonStyle(.plain).font(.callout.weight(.semibold)).foregroundStyle(.secondary)
+                    .buttonStyle(HitAreaButtonStyle()).font(.callout.weight(.semibold)).foregroundStyle(.secondary)
             }
         }
         .padding(.top, 10).padding(.horizontal, 6)

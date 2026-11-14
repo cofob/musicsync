@@ -116,7 +116,7 @@ struct SearchSuggestionsView: View {
                 .background(search.highlighted == index ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 8))
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(HitAreaButtonStyle())
         .onHover { if $0 { search.highlighted = index } }
     }
 }

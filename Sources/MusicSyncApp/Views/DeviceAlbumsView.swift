@@ -40,7 +40,7 @@ struct DeviceCard: View {
             .fixedSize(horizontal: false, vertical: true)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CardPressStyle())
         .contextMenu {
             Button("Play", systemImage: "play.fill", action: onPlay)
             if let onDelete { Divider(); DeleteFromIPodButton(action: onDelete) }

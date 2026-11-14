@@ -54,15 +54,6 @@ struct LibraryStatusView: View {
     }
 }
 
-/// A pressed card shrinks a little with an animation; `.plain` dims it at once instead.
-private struct CardPressStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
-    }
-}
-
 /// Texts shared by the sidebar status and its popover.
 enum LibraryStatusText {
     static func phaseName(_ phase: MirrorPhase?) -> String {

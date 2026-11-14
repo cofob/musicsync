@@ -23,7 +23,7 @@ struct RatingStars: View {
                 .accessibilityLabel("\(n) \(n == 1 ? "star" : "stars")")
             }
         }
-        .onHover { hovering = $0 }
+        .onHover { h in withAnimation(.easeOut(duration: 0.15)) { hovering = h } }
     }
 }
 
