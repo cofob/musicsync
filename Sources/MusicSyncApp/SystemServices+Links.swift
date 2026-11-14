@@ -31,7 +31,7 @@ extension SystemServices {
         }
     }
 
-    private func songs(_ kind: DeepLink.Kind, id: String) async throws -> [Song] {
+    func songs(_ kind: DeepLink.Kind, id: String) async throws -> [Song] {
         switch kind {
         case .album: return try await app.album(id)?.song ?? []
         case .playlist: return try await app.playlist(id)?.entry ?? []

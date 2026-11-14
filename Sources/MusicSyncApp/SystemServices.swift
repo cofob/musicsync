@@ -57,6 +57,8 @@ final class SystemServices {
             Watcher({ [app] in app.store.map(ObjectIdentifier.init) }) { [weak self] _ in self?.serverChanged() },
             Watcher({ [app] in app.usesLocalLibrary ? app.libraryVersion : -1 }) { [weak self] _ in self?.updateSpotlight() },
             Watcher({ [app] in app.player.current?.id }) { [weak self] _ in self?.trackChanged() },
+            // Siri learns the playlist names of the "Play <playlist>" phrase; the demo leaves the real app's alone.
+            Watcher({ [app] in app.libraryVersion }) { [app] _ in if !app.demo { MusicSyncShortcuts.updateAppShortcutParameters() } },
         ]
         applyHotKeys()
         IntentHost.system = self

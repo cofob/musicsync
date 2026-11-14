@@ -129,7 +129,7 @@ final class SearchModel {
     }
 
     /// Local database when it has the library (instant), else `search3`. Nil on failure (shown in `error`).
-    private func lookup(_ text: String, limit: Int, debounce: Duration?) async -> SearchResult3? {
+    func lookup(_ text: String, limit: Int, debounce: Duration?) async -> SearchResult3? {
         guard let app else { return nil }
         if app.usesLocalLibrary, let db = app.library?.database {
             let found = await db.search(text, limit: limit)
