@@ -16,6 +16,7 @@ struct PlayerCapsule: View {
                 VolumeButton {
                     panelButton("Lyrics", "quote.bubble", .lyrics)
                     panelButton("Queue", "list.bullet", .queue)
+                    OutputButton()
                     AirPlayButton().frame(width: 20, height: 20)
                 }
             }
@@ -41,6 +42,8 @@ struct PlayerCapsule: View {
                             Marquee(text: item.title).font(.callout.weight(.semibold))
                             if let error = player.errorMessage {
                                 Text(error).font(.callout).foregroundStyle(.red).lineLimit(1)
+                            } else if model.jukebox.isActive {
+                                PlayingOnServerLabel().font(.callout).foregroundStyle(Color.musicAccent)
                             } else {
                                 Marquee(text: [item.artist, item.album].compactMap { $0 }.joined(separator: " — "))
                                     .font(.callout).foregroundStyle(.secondary)

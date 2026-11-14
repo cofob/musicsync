@@ -79,6 +79,11 @@ struct NowPlayingVolume: View {
 
     var body: some View {
         HStack(spacing: 12) {
+            if model.jukebox.isActive {
+                PlayingOnServerLabel().font(.callout.weight(.semibold))
+                Divider().frame(height: 18)
+            }
+            OutputButton(tint: .white).buttonStyle(HitAreaButtonStyle(width: 22, height: 22))
             AirPlayButton(tint: .white).frame(width: 22, height: 22)
             Divider().frame(height: 18)
             VolumeSlider(tint: .white).frame(width: 120)
