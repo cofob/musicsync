@@ -45,9 +45,6 @@ public struct Manifest: Codable, Sendable, Equatable {
     public var lastSync: Date?
 
     public init(serverKey: String = "") { self.serverKey = serverKey }
-
-    /// Song id of the stock track with this dbid.
-    func songID(dbid: UInt64) -> String? { entries.first { $0.value.dbid == dbid }?.key }
 }
 
 public extension SubsonicClient {
@@ -62,11 +59,18 @@ public extension SubsonicClient {
 public enum ManifestStore {
     public static func url(for device: IPodDevice) -> URL { device.musicSyncDir.appendingPathComponent("manifest.json") }
 
-    /// Missing, corrupt or foreign-server manifests give an empty one plus a warning.
+    /// Missing, unreadable, corrupt or foreign-server manifests give an empty one plus a warning.
     /// Tracks the manifest does not know are never touched, so nothing is lost.
     public static func load(for device: IPodDevice, serverKey: String) -> (manifest: Manifest, warning: String?) {
+        (try? read(for: device, serverKey: serverKey))
+            ?? (Manifest(serverKey: serverKey), "The sync manifest cannot be read. Existing tracks are treated as foreign.")
+    }
+
+    /// `load`, but a manifest that exists and cannot be read throws: a sync must not save over it.
+    static func read(for device: IPodDevice, serverKey: String) throws -> (manifest: Manifest, warning: String?) {
         let url = url(for: device)
-        guard let data = try? Data(contentsOf: url) else { return (Manifest(serverKey: serverKey), nil) }
+        let data: Data
+        do { data = try Data(contentsOf: url) } catch CocoaError.fileReadNoSuchFile { return (Manifest(serverKey: serverKey), nil) }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         guard let manifest = try? decoder.decode(Manifest.self, from: data), manifest.version <= Manifest.currentVersion else {

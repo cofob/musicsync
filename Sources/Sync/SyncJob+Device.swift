@@ -5,7 +5,7 @@ import ITunesDB
 extension SyncJob {
     /// Loads manifest, databases and play statistics; drops manifest entries the device no longer has.
     func readDevice() async throws {
-        let loaded = ManifestStore.load(for: device, serverKey: client.serverKey)
+        let loaded = try ManifestStore.read(for: device, serverKey: client.serverKey)
         manifest = loaded.manifest
         committed = loaded.manifest
         if let warning = loaded.warning { warn(warning) }
@@ -44,7 +44,8 @@ extension SyncJob {
                     let deltas = db.merge(counts)
                     await scrobbler.enqueue(scrobbleRequests(deltas), source: data)
                 } else {
-                    warn("Play Counts does not match the database (\(counts.entries.count) vs \(db.tracks.count) tracks), discarded. A copy is kept in the Mac backup.")
+                    warn("Play Counts does not match the database (\(counts.entries.count) vs \(db.tracks.count) tracks), discarded with the On-The-Go playlists. A copy is kept in the Mac backup.")
+                    return
                 }
             } catch { warn("Play Counts is unreadable, discarded (a copy is kept in the Mac backup): \(error)") }
         }
@@ -60,8 +61,9 @@ extension SyncJob {
     /// N plays of a managed track become N timestamps, one track length apart.
     private func scrobbleRequests(_ deltas: [PlayDelta]) -> [ScrobbleRequest] {
         let tracks = Dictionary(db.tracks.map { ($0.id, $0) }) { a, _ in a }
+        let songs = Dictionary(manifest.entries.map { ($0.value.dbid, $0.key) }) { a, _ in a }
         return deltas.flatMap { delta -> [ScrobbleRequest] in
-            guard let track = tracks[delta.trackID], let songID = manifest.songID(dbid: track.dbid) else { return [] }
+            guard let track = tracks[delta.trackID], let songID = songs[track.dbid] else { return [] }
             return Scrobbler.timestamps(plays: Int(delta.plays), lastPlayed: delta.lastPlayed, duration: Double(track.lengthMs) / 1000)
                 .map { ScrobbleRequest(songID: songID, time: $0) }
         }
