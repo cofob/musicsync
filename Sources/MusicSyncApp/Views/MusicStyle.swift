@@ -257,8 +257,10 @@ struct ShelfHeader: View {
     }
 }
 
-/// Inline message for a page that failed to load, with a retry button.
+/// Inline message for a page that failed to load, with a retry button. It also tries again by itself once the
+/// server answers (`DownloadsModel.retrySoon`).
 struct LoadFailedView: View {
+    @Environment(AppModel.self) private var model
     let message: String
     let retry: () -> Void
 
@@ -270,6 +272,11 @@ struct LoadFailedView: View {
         } actions: {
             Button("Try Again", action: retry).buttonStyle(FilledCapsuleStyle())
         }
+        // Asked again after each retry: a page that keeps its message on a failed retry waits for the next ping.
+        .task(id: model.downloads.reconnects) { model.downloads.retrySoon() }
+        .onChange(of: model.downloads.reconnects) { retry() }
+        .onAppear { PageProbe.failures += 1 }
+        .onDisappear { PageProbe.failures -= 1 }
     }
 }
 
@@ -297,6 +304,8 @@ struct PlaceholderBlock: View {
     var body: some View {
         // Max width, not a fixed one: in a narrow column the blocks shrink and the page does not overflow.
         RoundedRectangle(cornerRadius: cornerRadius).fill(.quaternary).frame(maxWidth: width).frame(height: height)
+            .onAppear { PageProbe.placeholders += 1 }
+            .onDisappear { PageProbe.placeholders -= 1 }
     }
 }
 

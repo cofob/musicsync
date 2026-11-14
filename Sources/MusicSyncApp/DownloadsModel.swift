@@ -33,6 +33,11 @@ final class DownloadsModel {
     private(set) var status = DownloadStatus()
     /// True when the server cannot be reached; set by the reachability check (and the `offline` shot scene).
     var isOffline = false
+    /// Bumped when the server answers after `retrySoon()`: pages that failed to load try again.
+    private(set) var reconnects = 0
+    @ObservationIgnored private var retryWanted = false
+    @ObservationIgnored private var retryDelay = DownloadsModel.firstRetry
+    @ObservationIgnored private var lastRetry = Date.distantPast
     /// Settings > Downloads; saved on every change.
     var settings = DownloadSettings.load() {
         didSet {
@@ -112,8 +117,18 @@ final class DownloadsModel {
         usedBytes = list.reduce(0) { $0 + ($1.state == .done ? $1.size : 0) }
     }
 
-    /// Pings the server: every 10 s while it is unreachable, every minute otherwise. A server that answers with an
-    /// error (a refused password) is reachable: offline mode would hide the songs and the real problem.
+    /// Asks for a ping soon; when the server answers, `reconnects` is bumped. Called by a page that failed to load.
+    /// Pages that keep failing while the server answers wait longer each time (up to 5 min).
+    func retrySoon() {
+        if Date().timeIntervalSince(lastRetry) > 30 { retryDelay = Self.firstRetry }
+        retryWanted = true
+    }
+
+    private static let firstRetry: TimeInterval = 3
+
+    /// Pings the server: every 10 s while it is unreachable, every minute otherwise, and after `retrySoon()`.
+    /// A server that answers with an error (a refused password) is reachable: offline mode would hide the songs and
+    /// the real problem. The ping is tried again like any read, so one lost reply does not mean offline.
     private func watchServer(_ client: SubsonicClient, _ manager: DownloadManager) -> Task<Void, Never> {
         Task { [weak self] in
             while !Task.isCancelled {
@@ -124,7 +139,17 @@ final class DownloadsModel {
                     model.isOffline = !reachable
                     await manager.setOffline(!reachable)
                 }
-                try? await Task.sleep(for: .seconds(reachable ? 60 : 10))
+                if reachable, model.retryWanted {
+                    model.retryWanted = false
+                    model.lastRetry = Date()
+                    model.retryDelay = min(300, model.retryDelay * 2)
+                    model.reconnects += 1
+                }
+                let start = Date()
+                while !Task.isCancelled, Date().timeIntervalSince(start) < (reachable ? 60 : 10),
+                      !(model.retryWanted && Date().timeIntervalSince(start) >= model.retryDelay) {
+                    try? await Task.sleep(for: .milliseconds(500))
+                }
             }
         }
     }

@@ -16,6 +16,8 @@ final class PagedList<Item: Sendable> {
     @ObservationIgnored private var loading: Set<Int> = []
     /// Page numbers, least recently shown first.
     @ObservationIgnored private var recent: [Int] = []
+    /// Failed tries by page; a failed page is tried again by itself, a little later each time.
+    @ObservationIgnored private var failures: [Int: Int] = [:]
     @ObservationIgnored private let load: Loader
     let pageSize: Int
     private let maxPages: Int
@@ -50,6 +52,7 @@ final class PagedList<Item: Sendable> {
             let items = try await load(page * pageSize, pageSize)
             pages[page] = items
             error = nil
+            failures[page] = nil
             if total == nil {
                 count = items.count == pageSize ? max(count, (page + 2) * pageSize) : page * pageSize + items.count
                 if items.count < pageSize { total = count }
@@ -59,6 +62,12 @@ final class PagedList<Item: Sendable> {
         } catch where !error.isCancellation {
             self.error = error.friendlyMessage
             if total == nil, pages.isEmpty { count = 0 }
+            let tries = (failures[page] ?? 0) + 1
+            failures[page] = tries
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(min(60, 2 << min(tries, 5))))
+                await self?.load(page: page)
+            }
         } catch {}
     }
 
