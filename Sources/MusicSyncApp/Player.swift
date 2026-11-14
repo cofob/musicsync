@@ -1,4 +1,3 @@
-import AVFoundation
 import AppKit
 import MediaPlayer
 import Observation
@@ -61,7 +60,7 @@ final class Player {
     private(set) var elapsed: TimeInterval = 0
     private(set) var artwork: NSImage?
     private(set) var errorMessage: String?
-    var volume: Double = 1 { didSet { player.volume = Float(volume) } }
+    var volume: Double = 1 { didSet { mixer.volume = Float(volume) } }
     private(set) var shuffle = false
     var repeatMode = RepeatMode.off { didSet { resetUpcoming() } }
     /// Playback > Private Session: no scrobbles, so plays stay out of the server's history and counts.
@@ -84,35 +83,23 @@ final class Player {
 
     var current: PlayItem? { index.flatMap { queue.indices.contains($0) ? queue[$0] : nil } }
     var duration: TimeInterval {
-        if let d = current?.duration { return d }
-        let d = player.currentItem?.duration.seconds ?? 0
-        return d.isFinite ? d : 0
+        current?.duration ?? mixer.duration ?? 0
     }
     var hasNext: Bool { index.map { $0 + 1 < queue.count || repeatMode != .off } ?? false }
     var hasPrevious: Bool { index != nil }
     /// Queue entries after the current one.
     var upcoming: ArraySlice<PlayItem> { queue[min((index ?? -1) + 1, queue.count)...] }
-    /// For `AVRoutePickerView`.
-    var routingPlayer: AVPlayer { player }
 
-    private struct Slot {
-        let item: AVPlayerItem
-        var index: Int
-        let status: NSKeyValueObservation
-    }
-
-    @ObservationIgnored let player = AVQueuePlayer()
-    @ObservationIgnored private var slots: [ObjectIdentifier: Slot] = [:]
-    @ObservationIgnored private var observations: [NSKeyValueObservation] = []
-    @ObservationIgnored private var timeObserver: Any?
+    /// Plays the current and the next song: gapless or crossfaded (`Playback/Mixer`).
+    @ObservationIgnored let mixer = Mixer()
+    /// Queue index of the song the mixer holds as next.
+    @ObservationIgnored private var nextIndex: Int?
     /// Queue indexes that failed raw and are streamed as mp3 instead.
     @ObservationIgnored var transcoded: Set<Int> = []
     /// Tracks that failed since the last one became ready; a full queue of them stops playback.
     @ObservationIgnored private var failures = 0
     @ObservationIgnored private var startedAt = Date()
     @ObservationIgnored private var scrobbled = false
-    /// Item the UI shows as current; guards against handling the same item change twice.
-    @ObservationIgnored private var currentItemID: ObjectIdentifier?
     /// Queue order before shuffling; nil after manual queue edits.
     @ObservationIgnored private var unshuffled: [PlayItem]?
     /// Cover id `artwork` shows; the same cover is not loaded again.
@@ -122,15 +109,10 @@ final class Player {
     @ObservationIgnored var sleepTask: Task<Void, Never>?
 
     init() {
-        if ProcessInfo.processInfo.environment["MUSICSYNC_MUTE"] == "1" { volume = 0; player.volume = 0 }
+        if ProcessInfo.processInfo.environment["MUSICSYNC_MUTE"] == "1" { volume = 0; mixer.volume = 0 }
         applySpeed()
-        observations = [
-            player.observe(\.currentItem) { [weak self] _, _ in Task { @MainActor in self?.currentItemChanged() } },
-            player.observe(\.timeControlStatus) { [weak self] _, _ in Task { @MainActor in self?.statusChanged() } },
-        ]
-        timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { [weak self] time in
-            MainActor.assumeIsolated { self?.tick(time.seconds) }
-        }
+        mixer.onEvent = { [weak self] in self?.mixerEvent($0) }
+        mixer.onTime = { [weak self] in self?.tick($0) }
         setupRemoteCommands()
     }
 
@@ -207,9 +189,9 @@ final class Player {
 
     func toggle() {
         if isPlaying {
-            player.pause()
-        } else if player.currentItem != nil {
-            player.play()
+            mixer.pause()
+        } else if mixer.hasCurrent {
+            mixer.resume()
         } else if !queue.isEmpty {
             start(at: index ?? 0)
         }
@@ -223,9 +205,8 @@ final class Player {
 
     /// Stops and clears the queue.
     func stop() {
-        player.removeAllItems()
-        slots = [:]
-        currentItemID = nil
+        mixer.stop()
+        nextIndex = nil
         queue = []
         unshuffled = nil
         index = nil
@@ -237,14 +218,7 @@ final class Player {
     func next() {
         guard let index, hasNext else { return }
         let target = (index + 1) % queue.count
-        let items = player.items()
-        if items.count > 1, slots[ObjectIdentifier(items[1])]?.index == target {
-            player.advanceToNextItem()
-            currentItemChanged()
-            player.play()
-        } else {
-            start(at: target)
-        }
+        if nextIndex == target, mixer.skipToNext() { mixer.resume() } else { start(at: target) }
     }
 
     /// Restarts the track when more than 3 s in, otherwise goes to the previous one.
@@ -256,27 +230,23 @@ final class Player {
     func seek(to time: TimeInterval) {
         elapsed = time
         seekTarget = (time, Date().addingTimeInterval(3))
-        player.seek(to: CMTime(seconds: time, preferredTimescale: 600))
+        mixer.seek(to: time)
         updateNowPlaying()
     }
 
     // MARK: Queue handling
 
-    private func start(at i: Int) {
+    func start(at i: Int, paused: Bool = false) {
         guard let i = playable(i) else { return }
-        player.removeAllItems()
-        slots = [:]
         index = i
         elapsed = 0
-        enqueue(i)
-        currentItemID = player.currentItem.map(ObjectIdentifier.init)
-        enqueue(following(i))
-        player.play()
+        if let cue = cue(at: i) { mixer.play(cue, paused: paused) } else { mixer.stop() }
+        preload(following(i))
         trackStarted()
     }
 
     /// Entry played automatically after `i`, honoring repeat.
-    private func following(_ i: Int) -> Int? {
+    func following(_ i: Int) -> Int? {
         if sleepTimer == .endOfSong { return nil }
         return switch repeatMode {
         case .one: i
@@ -297,65 +267,53 @@ final class Player {
         resetUpcoming()
     }
 
-    /// Re-syncs the preloaded next item with `queue` after it changed.
+    /// Re-syncs the preloaded next song with `queue` after it changed.
     func resetUpcoming() {
         transcoded = []
-        for (id, slot) in slots where id != currentItemID {
-            player.remove(slot.item)
-            slots[id] = nil
-        }
         guard let index else { return }
-        if let id = currentItemID { slots[id]?.index = index }
-        enqueue(following(index))
+        preload(following(index))
     }
 
-    /// Appends queue entry `i` to the AVQueuePlayer (no-op if out of range or already preloaded).
-    private func enqueue(_ i: Int?) {
-        guard let i = i.flatMap(playable),
-              !slots.contains(where: { $0.value.index == i && $0.key != currentItemID }),
-              let item = makeItem(queue[i], at: i) else { return }
-        let status = item.observe(\.status) { [weak self] item, _ in
-            let id = ObjectIdentifier(item)
-            Task { @MainActor in self?.itemStatusChanged(id) }
+    /// Hands queue entry `i` to the mixer as the next song, with its crossfade; nil clears it.
+    private func preload(_ i: Int?) {
+        let i = i.flatMap(playable)
+        let cue = i.flatMap(cue(at:))
+        nextIndex = cue == nil ? nil : i
+        mixer.setNext(cue, transition: i.flatMap(transition(to:)))
+    }
+
+    private func mixerEvent(_ event: Mixer.Event) {
+        switch event {
+        case .advanced: advanced()
+        case .ready: failures = 0
+        case .failed(let current, let message): failed(current: current, message: message)
+        case .ended: ended()
+        case .playing(let playing): isPlaying = playing; updateNowPlaying()
         }
-        slots[ObjectIdentifier(item)] = Slot(item: item, index: i, status: status)
-        player.insert(item, after: nil)
     }
 
-    private func currentItemChanged() {
-        guard let item = player.currentItem else { return ended() }
-        guard ObjectIdentifier(item) != currentItemID,
-              let slot = slots[ObjectIdentifier(item)] else { return }
-        currentItemID = ObjectIdentifier(item)
-        index = slot.index
+    /// The preloaded next song became the audible one.
+    private func advanced() {
+        guard let i = nextIndex else { return }
+        index = i
+        nextIndex = nil
         elapsed = 0
-        let live = Set(player.items().map(ObjectIdentifier.init))
-        slots = slots.filter { live.contains($0.key) }
-        enqueue(following(slot.index))
+        preload(following(i))
         trackStarted()
     }
 
-    private func statusChanged() {
-        isPlaying = player.timeControlStatus != .paused
-        updateNowPlaying()
-    }
-
-    /// Falls back to an mp3 stream when a raw stream fails; skips the track if that fails too.
-    private func itemStatusChanged(_ id: ObjectIdentifier) {
-        guard let slot = slots[id] else { return }
-        if slot.item.status == .readyToPlay { failures = 0 }
-        guard slot.item.status == .failed else { return }
-        let i = slot.index
+    /// Falls back to an mp3 stream when the first choice fails; skips the track if that fails too.
+    private func failed(current: Bool, message: String?) {
+        guard let i = current ? index : nextIndex, queue.indices.contains(i) else { return }
         var retry = false
         if case .server = queue[i], !transcoded.contains(i) { transcoded.insert(i); retry = true }
-        if !retry { errorMessage = slot.item.error?.localizedDescription ?? "Playback failed"; failures += 1 }
+        if !retry { errorMessage = message ?? "Playback failed"; failures += 1 }
         let skip = failures < queue.count
-        if i == index {
-            if retry { start(at: i) } else if skip { next() } else { player.pause() }
+        if current {
+            if retry { start(at: i) } else if skip { next() } else { mixer.pause() }
         } else {
-            player.remove(slot.item)
-            slots[id] = nil
-            if retry { enqueue(i) } else if skip { enqueue(following(i)) }
+            nextIndex = nil
+            if retry { preload(i) } else if skip { preload(following(i)) }
         }
     }
 

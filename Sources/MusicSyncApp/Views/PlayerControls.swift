@@ -95,7 +95,8 @@ struct ScrubBar: View {
     }
 }
 
-/// AirPlay route picker for the app's player.
+/// AirPlay route picker. It has no player and so routes the system output: the player plays on two decks
+/// during a crossfade, and a picker bound to one `AVPlayer` would move only that one.
 struct AirPlayButton: NSViewRepresentable {
     @Environment(AppModel.self) private var model
     var tint: NSColor = .labelColor
@@ -103,7 +104,6 @@ struct AirPlayButton: NSViewRepresentable {
     func makeNSView(context: Context) -> AVRoutePickerView {
         let view = AVRoutePickerView()
         view.isRoutePickerButtonBordered = false
-        view.player = model.player.routingPlayer
         return view
     }
 

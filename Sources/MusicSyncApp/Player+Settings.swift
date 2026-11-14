@@ -8,7 +8,7 @@ extension Player {
         guard settings != old else { return }
         settings.save()
         applySpeed()
-        if let index, let item = player.currentItem { Task { await item.setGain(gain(at: index)) } }
+        if let index { mixer.setGain(gain(at: index)) }
         // Quality, crossfade or gain changed: the preloaded next song is built again.
         if settings.speed == old.speed { resetUpcoming() }
     }
@@ -26,9 +26,11 @@ extension Player {
         resetUpcoming()
     }
 
-    /// Called when the last song played to its end.
+    /// The current song played to its end with nothing after it. After the sleep timer stopped it, the next song waits paused.
     func ended() {
-        if sleepTimer == .endOfSong { sleepTimer = nil }
+        guard sleepTimer == .endOfSong, let index else { return }
+        sleepTimer = nil
+        if let i = following(index) { start(at: i, paused: true) }
     }
 
     func pause() { if isPlaying { toggle() } }

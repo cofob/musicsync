@@ -2,39 +2,54 @@ import AVFoundation
 import Playback
 import Subsonic
 
-/// Player items for queue entries: the downloaded file, else a stream in the chosen quality.
+/// Mixer cues for queue entries: the downloaded file, else a stream in the chosen quality.
 extension Player {
-    func makeItem(_ entry: PlayItem, at i: Int) -> AVPlayerItem? {
-        let item: AVPlayerItem
-        switch entry {
-        case .file(let url, _, _, _):
-            item = AVPlayerItem(url: url)
-        case .server(let song):
-            if !transcoded.contains(i), let url = localFile?(song.id) {
-                item = AVPlayerItem(url: url)
-            } else {
-                guard let client else { return nil }
-                let stream = settings.stream(for: song, fallback: transcoded.contains(i))
-                let url = client.streamURL(id: song.id, format: stream.format, maxBitRate: stream.maxBitRate)
-                item = AVPlayerItem(asset: AVURLAsset(url: url, options: stream.contentType.map { [AVURLAssetOverrideMIMETypeKey: $0] }))
-            }
-        }
-        // Keeps the pitch when the speed is not 1.
-        item.audioTimePitchAlgorithm = .spectral
+    func cue(at i: Int) -> Mixer.Cue? {
         let gain = gain(at: i)
-        Task { await item.setGain(gain) }
-        return item
+        switch queue[i] {
+        case .file(let url, _, _, _):
+            return Self.cue(url, gain: gain)
+        case .server(let song):
+            if !transcoded.contains(i), let url = localFile?(song.id) { return Self.cue(url, gain: gain) }
+            guard let client else { return nil }
+            let stream = settings.stream(for: song, fallback: transcoded.contains(i))
+            let seeksOnServer = stream.isConverted && supportsTranscodeOffset && settings.transcodeOffset
+            return Self.streamCue(song.id, stream, client, gain: gain, from: 0, seeksOnServer: seeksOnServer)
+        }
+    }
+
+    /// `from` starts a converted stream at that second on the server; such cues seek by loading a new stream,
+    /// as converted streams cannot seek themselves.
+    private static func streamCue(_ id: String, _ stream: StreamRequest, _ client: SubsonicClient, gain: Float, from: Int,
+                                  seeksOnServer: Bool) -> Mixer.Cue {
+        let url = client.streamURL(id: id, format: stream.format, maxBitRate: stream.maxBitRate, timeOffset: from > 0 ? from : nil)
+        var cue = cue(url, gain: gain, contentType: stream.contentType)
+        cue.offset = TimeInterval(from)
+        if seeksOnServer { cue.reload = { streamCue(id, stream, client, gain: gain, from: Int($0), seeksOnServer: true) } }
+        return cue
+    }
+
+    private static func cue(_ url: URL, gain: Float, contentType: String? = nil) -> Mixer.Cue {
+        let item = AVPlayerItem(asset: AVURLAsset(url: url, options: contentType.map { [AVURLAssetOverrideMIMETypeKey: $0] }))
+        item.audioTimePitchAlgorithm = .spectral  // keeps the pitch when the speed is not 1
+        return Mixer.Cue(item: item, gain: gain)
     }
 
     /// Sound Check volume of entry `i`; Album mode uses the album gain when a neighbor in the queue is the same album in order.
     func gain(at i: Int) -> Float {
-        func song(_ i: Int) -> Song? { if queue.indices.contains(i), case .server(let s) = queue[i] { s } else { nil } }
-        let inAlbumOrder = isAlbumSequence(song(i - 1), song(i)) || isAlbumSequence(song(i), song(i + 1))
-        return settings.gain(for: song(i), inAlbumOrder: inAlbumOrder)
+        let inAlbumOrder = isAlbumSequence(song(at: i - 1), song(at: i)) || isAlbumSequence(song(at: i), song(at: i + 1))
+        return settings.gain(for: song(at: i), inAlbumOrder: inAlbumOrder)
     }
 
-    func applySpeed() {
-        player.defaultRate = Float(settings.speed)
-        if player.rate != 0 { player.rate = player.defaultRate }
+    /// Crossfade from the current entry into entry `i`, or nil for gapless.
+    func transition(to i: Int) -> Transition? {
+        guard let index, queue.indices.contains(index) else { return nil }
+        return settings.transition(from: song(at: index), to: song(at: i), duration: queue[index].duration)
     }
+
+    private func song(at i: Int) -> Song? {
+        if queue.indices.contains(i), case .server(let song) = queue[i] { song } else { nil }
+    }
+
+    func applySpeed() { mixer.rate = Float(settings.speed) }
 }
