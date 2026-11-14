@@ -16,8 +16,9 @@ let package = Package(
         .target(name: "Integration", dependencies: ["Subsonic"]),
         .target(name: "Remote"),
         .target(name: "Playback", dependencies: ["Support", "Subsonic"]),
+        .target(name: "Preferences", dependencies: ["Support"]),
         .target(name: "Sync", dependencies: ["Support", "Subsonic", "ITunesDB", "Artwork", "Transcode", "Device"]),
-        .executableTarget(name: "MusicSyncApp", dependencies: ["Support", "Subsonic", "ITunesDB", "Artwork", "Transcode", "Device", "Sync", "Library", "Recommend", "Integration", "Remote", "Playback"]),
+        .executableTarget(name: "MusicSyncApp", dependencies: ["Support", "Subsonic", "ITunesDB", "Artwork", "Transcode", "Device", "Sync", "Library", "Recommend", "Integration", "Remote", "Playback", "Preferences"]),
         .testTarget(name: "SupportTests", dependencies: ["Support"]),
         .testTarget(name: "SubsonicTests", dependencies: ["Subsonic"]),
         .testTarget(name: "ITunesDBTests", dependencies: ["ITunesDB"]),
@@ -30,5 +31,6 @@ let package = Package(
         .testTarget(name: "IntegrationTests", dependencies: ["Integration"]),
         .testTarget(name: "RemoteTests", dependencies: ["Remote"]),
         .testTarget(name: "PlaybackTests", dependencies: ["Playback"]),
+        .testTarget(name: "PreferencesTests", dependencies: ["Preferences"]),
     ]
 )
