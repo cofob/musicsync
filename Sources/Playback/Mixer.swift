@@ -50,6 +50,8 @@ import AVFoundation
     public var duration: TimeInterval? { decks[active].duration.map { $0 + (current?.offset ?? 0) } }
     /// A transition is running: two songs play.
     public var isFading: Bool { fade != nil }
+    /// Runs on every song through its audio mix.
+    public let equalizer = Equalizer()
 
     let decks = [Deck(), Deck()]
     /// Deck of the current song.
@@ -88,7 +90,7 @@ import AVFoundation
         deck.player.insert(cue.item, after: nil)
         // The gain is set before the first sound.
         Task {
-            await cue.item.setGain(cue.gain)
+            await cue.item.setGain(cue.gain, equalizer: equalizer)
             if isPlaying, current?.item === cue.item { deck.player.rate = rate }
         }
     }
@@ -101,7 +103,7 @@ import AVFoundation
         self.transition = transition
         guard let cue else { return }
         observe(cue.item)
-        Task { await cue.item.setGain(cue.gain) }
+        Task { await cue.item.setGain(cue.gain, equalizer: equalizer) }
         loadNext()
     }
 
@@ -157,7 +159,7 @@ import AVFoundation
             prune()
             deck.player.insert(cue.item, after: deck.player.currentItem)
             deck.player.advanceToNextItem()
-            Task { await cue.item.setGain(cue.gain) }
+            Task { await cue.item.setGain(cue.gain, equalizer: equalizer) }
         } else {
             deck.player.seek(to: CMTime(seconds: max(0, time - current.offset), preferredTimescale: 600))
         }
@@ -168,7 +170,7 @@ import AVFoundation
     public func setGain(_ gain: Float) {
         guard let item = current?.item else { return }
         current?.gain = gain
-        Task { await item.setGain(gain) }
+        Task { await item.setGain(gain, equalizer: equalizer) }
     }
 
     public func stop() {

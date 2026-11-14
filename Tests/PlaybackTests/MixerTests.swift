@@ -53,6 +53,18 @@ import Testing
         #expect(!mixer.hasCurrent)
     }
 
+    @Test func equalizerTapRunsOnBothDecks() async throws {
+        mixer.equalizer.set(EqualizerGains(preamp: -3, bands: [6, 0, 0, 0, 0, 0, 0, 0, 0, -6]))
+        mixer.play(try cue(2))
+        mixer.setNext(try cue(2), transition: Transition(at: 0.8, duration: 0.8, curve: .linear))
+        _ = try #require(await time(of: .advanced(skipped: false)))
+        await sleep(0.4)
+        #expect(playingDecks == 2)
+        #expect(mixer.decks.allSatisfy { $0.player.currentItem?.audioMix?.inputParameters.first?.audioTapProcessor != nil })
+        // 1.2 s of two decks at 44.1 kHz; the tap gets the audio ahead of the clock.
+        #expect(mixer.equalizer.processedFrames > 44100)
+    }
+
     @Test func crossfadeOverlapsTwoDecks() async throws {
         mixer.play(try cue(3))
         mixer.setNext(try cue(3), transition: Transition(at: 1, duration: 1, curve: .linear))
