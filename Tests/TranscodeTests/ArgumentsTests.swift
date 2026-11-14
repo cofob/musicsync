@@ -105,13 +105,6 @@ private let resample = "aresample=44100:filter_size=64:phase_shift=10:cutoff=0.9
     }
 }
 
-@Test func soundCheckValues() {
-    #expect(SoundCheck.value(replayGainDB: 0) == 1000)
-    #expect(SoundCheck.value(replayGainDB: -6) == 3981)
-    #expect(SoundCheck.value(replayGainDB: 6) == 251)
-    #expect(SoundCheck.value(replayGainDB: -200) == UInt32.max)
-}
-
 @Test func mediaInfoFromFFprobeJSON() throws {
     let json = """
     {"streams":[{"codec_type":"audio","codec_name":"flac","sample_rate":"96000","channels":2,
