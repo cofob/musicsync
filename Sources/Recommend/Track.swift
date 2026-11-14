@@ -6,8 +6,10 @@ public struct Track: Sendable, Hashable, Identifiable {
     public let title: String
     public let artist: String
     public let albumId: String?
-    /// Lowercased genre names.
+    /// Genre keys (`GenreName.key`).
     public let genres: [String]
+    /// The genres as tagged, for display.
+    let genreNames: [String]
     public let year: Int?
     public let duration: Int?
     public let starred: Bool
@@ -27,7 +29,8 @@ public struct Track: Sendable, Hashable, Identifiable {
         self.title = title
         self.artist = artist ?? ""
         self.albumId = albumId
-        genres = Self.genres(genre)
+        genreNames = GenreName.split(genre)
+        genres = genreNames.map(GenreName.key)
         self.year = year
         self.duration = duration
         self.starred = starred
@@ -36,13 +39,6 @@ public struct Track: Sendable, Hashable, Identifiable {
         self.created = created
         self.lastPlayed = lastPlayed
         artistKeys = Set([artist, albumArtist].compactMap { $0.map(Self.key) }.filter { !$0.isEmpty })
-    }
-
-    /// "Rock; Pop/Indie" -> ["rock", "pop", "indie"].
-    static func genres(_ text: String?) -> [String] {
-        var seen = Set<String>()
-        return (text ?? "").split(whereSeparator: { ";/,".contains($0) }).map { key(String($0)) }
-            .filter { !$0.isEmpty && seen.insert($0).inserted }
     }
 
     static func key(_ text: String) -> String { text.trimmingCharacters(in: .whitespaces).lowercased() }

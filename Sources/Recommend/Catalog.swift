@@ -17,6 +17,8 @@ public struct Catalog: Sendable {
     let byArtist: [String: [String]]
     let byAlbum: [String: [String]]
     let byGenre: [String: [String]]
+    /// Display name per genre key: its most common spelling.
+    let genreNames: [String: String]
     let playlists: [Group]
     let sessions: [Group]
     let playlistsOf: [String: [Int]]
@@ -40,12 +42,15 @@ public struct Catalog: Sendable {
         self.stats = stats
         self.now = now
         var byArtist: [String: [String]] = [:], byAlbum: [String: [String]] = [:], byGenre: [String: [String]] = [:]
+        var spellings: [String: Int] = [:]
         for id in ids {
             guard let t = tracks[id] else { continue }
             for key in t.artistKeys { byArtist[key, default: []].append(id) }
             if let album = t.albumId { byAlbum[album, default: []].append(id) }
             for genre in t.genres { byGenre[genre, default: []].append(id) }
+            for name in t.genreNames { spellings[name, default: 0] += 1 }
         }
+        genreNames = GenreName.displayNames(spellings)
         self.byArtist = byArtist
         self.byAlbum = byAlbum
         self.byGenre = byGenre

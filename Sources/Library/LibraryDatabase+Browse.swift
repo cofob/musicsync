@@ -1,4 +1,5 @@
 import Foundation
+import Recommend
 import Subsonic
 
 /// A genre of the mirrored library: counts and a few covers for its tile.
@@ -18,38 +19,73 @@ public struct GenreSummary: Sendable, Hashable, Identifiable {
     }
 }
 
-/// Reads for the artist, genre and album pages.
-extension LibraryDatabase {
-    /// Genres of the albums, the most albums first.
-    public func genres() -> [GenreSummary] {
-        read([]) { db in
-            let songs = Dictionary(try db.rows("""
-                SELECT json_extract(json, '$.genre') g, COUNT(*) FROM songs WHERE g IS NOT NULL AND g != '' GROUP BY g
-                """) { ($0.text(0) ?? "", $0.int(1)) }) { a, _ in a }
-            let covers = Dictionary(grouping: try db.rows("""
-                SELECT genre, coverArt FROM (SELECT genre, coverArt, ROW_NUMBER() OVER (PARTITION BY genre ORDER BY playCount DESC, sortName) r
-                  FROM albums WHERE genre IS NOT NULL AND genre != '' AND coverArt IS NOT NULL AND coverArt != '') WHERE r <= 4 ORDER BY genre, r
-                """) { ($0.text(0) ?? "", $0.text(1) ?? "") }) { $0.0 }
-            return try db.rows("""
-                SELECT genre, COUNT(*) n FROM albums WHERE genre IS NOT NULL AND genre != '' GROUP BY genre ORDER BY n DESC, genre
-                """) { row in
-                let name = row.text(0) ?? ""
-                return GenreSummary(name: name, albumCount: row.int(1), songCount: songs[name] ?? 0, covers: covers[name]?.map(\.1) ?? [])
+extension GenreSummary {
+    /// One summary per genre: tags are split, spellings merged under the most common one.
+    /// `albums`: genre tag, a cover (the most played first) and how many albums the row stands for. `songs`: songs per genre tag.
+    public static func grouped(albums: [(genre: String, cover: String?, count: Int)], songs: [(genre: String, count: Int)]) -> [GenreSummary] {
+        var spellings: [String: Int] = [:], albumCounts: [String: Int] = [:], songCounts: [String: Int] = [:], covers: [String: [String]] = [:]
+        for album in albums {
+            for name in GenreName.split(album.genre) {
+                let key = GenreName.key(name)
+                spellings[name, default: 0] += album.count
+                albumCounts[key, default: 0] += album.count
+                if let cover = album.cover, !cover.isEmpty, covers[key, default: []].count < 4 { covers[key, default: []].append(cover) }
             }
         }
-    }
-
-    /// Albums of a genre, the newest release first.
-    public func albums(genre: String) -> [Album] {
-        read([]) { try decodeAll($0, Album.self, "SELECT json FROM albums WHERE genre = ? ORDER BY COALESCE(year, 0) DESC, sortName, id", [genre]) }
-    }
-
-    /// Songs of a genre, the most played first.
-    public func songs(genre: String, limit: Int? = nil) -> [Song] {
-        read([]) {
-            try decodeAll($0, Song.self, "SELECT json FROM songs WHERE json_extract(json, '$.genre') = ? ORDER BY playCount DESC, titleKey, id LIMIT ?",
-                          [genre, limit ?? -1])
+        for song in songs {
+            for name in GenreName.split(song.genre) {
+                spellings[name, default: 0] += song.count
+                songCounts[GenreName.key(name), default: 0] += song.count
+            }
         }
+        return GenreName.displayNames(spellings).compactMap { key, name in
+            albumCounts[key].flatMap { $0 == 0 ? nil : GenreSummary(name: name, albumCount: $0, songCount: songCounts[key] ?? 0, covers: covers[key] ?? []) }
+        }
+        .sorted { ($0.albumCount, $1.name) > ($1.albumCount, $0.name) }
+    }
+}
+
+/// Reads for the artist, genre and album pages.
+extension LibraryDatabase {
+    /// Genres of the albums, the most albums first. Spellings of one genre are merged.
+    public func genres() -> [GenreSummary] {
+        read([]) { db in
+            let albums = try db.rows("""
+                SELECT genre, coverArt FROM albums WHERE genre IS NOT NULL AND genre != '' ORDER BY playCount DESC, sortName
+                """) { (genre: $0.text(0) ?? "", cover: $0.text(1), count: 1) }
+            let songs = try db.rows("""
+                SELECT json_extract(json, '$.genre') g, COUNT(*) FROM songs WHERE g IS NOT NULL AND g != '' GROUP BY g
+                """) { (genre: $0.text(0) ?? "", count: $0.int(1)) }
+            return GenreSummary.grouped(albums: albums, songs: songs)
+        }
+    }
+
+    /// Albums of a genre, any spelling, the newest release first.
+    public func albums(genre: String) -> [Album] {
+        read([]) { db in
+            let tags = try matchingTags(db, "SELECT DISTINCT genre FROM albums WHERE genre IS NOT NULL", genre)
+            return try decodeAll(db, Album.self, """
+                SELECT json FROM albums WHERE genre IN (SELECT value FROM json_each(?)) ORDER BY COALESCE(year, 0) DESC, sortName, id
+                """, [tags])
+        }
+    }
+
+    /// Songs of a genre, any spelling, the most played first.
+    public func songs(genre: String, limit: Int? = nil) -> [Song] {
+        read([]) { db in
+            let tags = try matchingTags(db, "SELECT DISTINCT json_extract(json, '$.genre') g FROM songs WHERE g IS NOT NULL", genre)
+            return try decodeAll(db, Song.self, """
+                SELECT json FROM songs WHERE json_extract(json, '$.genre') IN (SELECT value FROM json_each(?))
+                ORDER BY playCount DESC, titleKey, id LIMIT ?
+                """, [tags, limit ?? -1])
+        }
+    }
+
+    /// The tags from `sql` that contain `genre` in any spelling, as a JSON array for `json_each`.
+    private func matchingTags(_ db: SQLiteConnection, _ sql: String, _ genre: String) throws -> String {
+        let key = GenreName.key(genre)
+        let tags = try db.rows(sql) { $0.text(0) ?? "" }.filter { GenreName.split($0).contains { GenreName.key($0) == key } }
+        return String(decoding: try JSONEncoder().encode(tags), as: UTF8.self)
     }
 
     /// Every song by the artist, also on albums of others: newest album first, then disc and track.

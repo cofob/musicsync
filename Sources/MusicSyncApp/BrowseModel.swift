@@ -103,20 +103,24 @@ final class BrowseModel {
     func genres() async throws -> [GenreSummary] {
         if app.usesLocalLibrary, let db = app.library?.database { return await db.genres() }
         guard let client = app.client else { return [] }
-        let covers = Dictionary(grouping: app.albums.filter { $0.coverArt != nil }) { $0.genre ?? "" }
-        return try await client.getGenres()
-            .map { GenreSummary(name: $0.value, albumCount: $0.albumCount ?? 0, songCount: $0.songCount ?? 0,
-                                covers: (covers[$0.value] ?? []).prefix(4).compactMap(\.coverArt)) }
-            .filter { $0.albumCount > 0 }
-            .sorted { $0.albumCount == $1.albumCount ? $0.name < $1.name : $0.albumCount > $1.albumCount }
+        let covers = app.albums.sorted { ($0.playCount ?? 0) > ($1.playCount ?? 0) }.map { (genre: $0.genre ?? "", cover: $0.coverArt, count: 0) }
+        let server = try await client.getGenres()
+        return GenreSummary.grouped(albums: server.map { ($0.value, nil, $0.albumCount ?? 0) } + covers,
+                                    songs: server.map { ($0.value, $0.songCount ?? 0) })
     }
 
     func genrePage(_ name: String) async throws -> GenrePage {
         if app.usesLocalLibrary, let db = app.library?.database {
             return GenrePage(albums: await db.albums(genre: name), songs: await db.songs(genre: name))
         }
-        let albums = Self.newestFirst(app.albums.filter { $0.genre == name })
-        let songs = try await app.client?.getSongsByGenre(name, count: 500) ?? []
+        // The server matches one exact tag, so ask for each spelling of the genre among the albums.
+        let key = GenreName.key(name)
+        let albums = Self.newestFirst(app.albums.filter { GenreName.split($0.genre).contains { GenreName.key($0) == key } })
+        let tags = Set([name] + albums.flatMap { GenreName.split($0.genre).filter { GenreName.key($0) == key } })
+        var songs: [Song] = []
+        for tag in tags.sorted() { songs += try await app.client?.getSongsByGenre(tag, count: 500) ?? [] }
+        var seen = Set<String>()
+        songs = songs.filter { seen.insert($0.id).inserted }
         return GenrePage(albums: albums, songs: songs.sorted { ($0.playCount ?? 0) > ($1.playCount ?? 0) })
     }
 }

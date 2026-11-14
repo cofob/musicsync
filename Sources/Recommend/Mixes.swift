@@ -127,7 +127,7 @@ public extension Catalog {
             for id in songs { if let a = tracks[id]?.artist, !a.isEmpty { artists[a, default: 0] += 1 } }
             let names = artists.sorted { ($0.value, $1.key) > ($1.value, $0.key) }.prefix(3).map(\.key)
             mixes.append(Mix(id: "daily-\(mixes.count + 1)", kind: .daily, title: "Daily Mix \(mixes.count + 1)",
-                             subtitle: ([genre.capitalized] + names).joined(separator: " · "), trackIds: songs, seedId: nil))
+                             subtitle: ([genreNames[genre] ?? genre] + names).joined(separator: " · "), trackIds: songs, seedId: nil))
         }
         return mixes
     }

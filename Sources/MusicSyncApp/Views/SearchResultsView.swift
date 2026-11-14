@@ -1,3 +1,4 @@
+import Library
 import SwiftUI
 import Subsonic
 
@@ -79,14 +80,10 @@ private struct BrowseGenresView: View {
         .onChange(of: model.libraryVersion, initial: true) { genres = Self.genres(model.albums) }
     }
 
-    /// Genres with the most albums first; the cover of the most played album represents a genre.
+    /// Genres with the most albums first, spellings merged; the cover of the most played album represents a genre.
     static func genres(_ albums: [Album]) -> [Genre] {
-        let groups = Dictionary(grouping: albums.filter { !($0.genre ?? "").isEmpty }) { $0.genre! }
-        return groups.sorted { $0.value.count == $1.value.count ? $0.key < $1.key : $0.value.count > $1.value.count }
-            .prefix(32)
-            .map { name, albums in
-                Genre(name: name, cover: albums.filter { $0.coverArt != nil }.max { ($0.playCount ?? 0) < ($1.playCount ?? 0) }?.coverArt)
-            }
+        let rows = albums.sorted { ($0.playCount ?? 0) > ($1.playCount ?? 0) }.map { (genre: $0.genre ?? "", cover: $0.coverArt, count: 1) }
+        return GenreSummary.grouped(albums: rows, songs: []).prefix(32).map { Genre(name: $0.name, cover: $0.covers.first) }
     }
 }
 

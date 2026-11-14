@@ -38,6 +38,17 @@ private func isSpaced(_ ids: [String]) -> Bool {
         #expect(Track(id: "2", title: "T", artist: nil).artistKeys.isEmpty)
     }
 
+    @Test func genreSpellings() {
+        #expect(Set(["Hip-Hop", "Hip Hop", "hiphop", "Hip  Hop", "HIP_HOP"].map(GenreName.key)) == ["hiphop"])
+        #expect(GenreName.key("Drum & Bass") == GenreName.key("drum and bass"))
+        #expect(GenreName.key("Électronique") == "electronique")
+        #expect(GenreName.split(" Rock ; Pop/rock,, Indie ") == ["Rock", "Pop", "Indie"])
+        #expect(GenreName.split(nil).isEmpty && GenreName.split(" - ; ").isEmpty)
+        #expect(GenreName.displayNames(["Hip-Hop": 5, "hiphop": 2, "Hip Hop": 5, "Jazz": 1, "-": 9]) == ["hiphop": "Hip Hop", "jazz": "Jazz"])
+        let t = Track(id: "1", title: "T", artist: nil, genre: "Hip-Hop; hip hop")
+        #expect(t.genres == ["hiphop"] && t.genreNames == ["Hip-Hop"])
+    }
+
     @Test func completionFollowsTheScrobbleRule() {
         #expect(PlayEvent(songId: "s", startedAt: now, played: 100, duration: 200).completed)
         #expect(PlayEvent(songId: "s", startedAt: now, played: 99, duration: 200).skipped)
