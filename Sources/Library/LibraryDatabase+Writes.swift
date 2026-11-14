@@ -40,8 +40,9 @@ extension LibraryDatabase {
 
     // MARK: Albums
 
+    /// Navidrome puts the album's update time into `coverArt`, so a track edit changes it.
     static func fingerprint(_ a: Album) -> String {
-        "\(a.songCount ?? -1)|\(a.duration ?? -1)|\(a.created ?? "")|\(a.name)|\(a.year ?? 0)"
+        "\(a.songCount ?? -1)|\(a.duration ?? -1)|\(a.created ?? "")|\(a.name)|\(a.year ?? 0)|\(a.coverArt ?? "")"
     }
 
     func albumCursor() -> AlbumCursor? {
@@ -79,7 +80,7 @@ extension LibraryDatabase {
         }
     }
 
-    /// Called after a COMPLETE listing: removes albums (and their songs) not seen in this run, clears the cursor.
+    /// Called after a COMPLETE listing: removes albums (and their songs) not seen in this run and unused covers, clears the cursor.
     /// Deletes nothing when the listing was empty.
     func finishAlbumListing(run: String) throws {
         try write { db in
@@ -88,6 +89,11 @@ extension LibraryDatabase {
                 try db.run("DELETE FROM lyrics WHERE songId IN (SELECT id FROM songs WHERE albumId IN (\(gone)))", [run])
                 try db.run("DELETE FROM songs WHERE albumId IN (\(gone))", [run])
                 try db.run("DELETE FROM albums WHERE seen IS NOT ?", [run])
+                let orphans = "FROM covers WHERE coverArtId NOT IN (SELECT coverArt FROM albums WHERE coverArt IS NOT NULL)"
+                for name in try db.rows("SELECT path \(orphans) AND path IS NOT NULL", [], { $0.text(0)! }) {
+                    try? FileManager.default.removeItem(at: coversDirectory.appendingPathComponent(name))
+                }
+                try db.run("DELETE \(orphans)")
             }
             try db.exec("DELETE FROM meta WHERE key IN ('albums.run', 'albums.offset', 'albums.scan')")
         }

@@ -94,6 +94,7 @@ private struct Fixture {
         #expect(await f.db.albums().map(\.id) == ["al-1", "al-3"])
         #expect(await f.db.songCount() == 4)
         #expect(await f.db.search("Album 02").song.isEmpty)
+        #expect(await f.db.smallCoverURL(coverArtId: "cov-al-2") == nil)
     }
 
     @Test func failingListingDeletesNothing() async {
