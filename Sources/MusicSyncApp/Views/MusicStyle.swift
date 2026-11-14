@@ -150,6 +150,8 @@ struct TrackRow<Leading: View, MenuItems: View>: View {
     let time: TimeInterval?
     var isCurrent = false
     var isSelected = false
+    /// Edges next to another selected row: the selection draws as one block, rounded only at its ends.
+    var joined: VerticalEdge.Set = []
     /// Small star before the time, as in Apple Music.
     var isStarred = false
     /// Small gray symbol before the time, e.g. the download state.
@@ -183,9 +185,14 @@ struct TrackRow<Leading: View, MenuItems: View>: View {
         }
         .padding(.horizontal, 10)
         .frame(minHeight: subtitle == nil ? 42 : 54)
-        .background(isSelected ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 8))
+        .background(isSelected ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear), in: selectionShape)
         .contentShape(Rectangle())
         .contextMenu { menu }
+    }
+
+    private var selectionShape: UnevenRoundedRectangle {
+        let top: CGFloat = joined.contains(.top) ? 0 : 8, bottom: CGFloat = joined.contains(.bottom) ? 0 : 8
+        return UnevenRoundedRectangle(topLeadingRadius: top, bottomLeadingRadius: bottom, bottomTrailingRadius: bottom, topTrailingRadius: top)
     }
 }
 

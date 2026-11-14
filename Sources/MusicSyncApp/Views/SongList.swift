@@ -66,7 +66,7 @@ struct SongList: View {
             ForEach(Array(songs.enumerated()), id: \.offset) { index, song in
                 row(song, index, keys: keys, picked: picked)
                     .overlay(alignment: .bottom) {
-                        if index < songs.count - 1, !picked.contains(index) { Divider().padding(.leading, leading == .cover ? 64 : 50).padding(.trailing, 10) }
+                        if index < songs.count - 1, !picked.contains(index), !picked.contains(index + 1) { Divider().padding(.leading, leading == .cover ? 64 : 50).padding(.trailing, 10) }
                     }
                     .overlay { if dropTarget == index { RoundedRectangle(cornerRadius: 8).strokeBorder(Color.musicAccent, lineWidth: 2) } }
                     .draggable(dragPayload(index, picked).text)
@@ -88,7 +88,7 @@ struct SongList: View {
         let isCurrent = model.player.current?.id == song.id
         let isSelected = selection.contains(keys[index])
         return TrackRow(title: song.title, subtitle: subtitle(song), time: song.duration.map(TimeInterval.init),
-                        isCurrent: isCurrent, isSelected: isSelected,
+                        isCurrent: isCurrent, isSelected: isSelected, joined: isSelected ? joined(index, picked) : [],
                         isStarred: model.isStarred(song), badge: model.downloads.badge(song), detail: detail(song), tag: tag?(song)) {
             switch leading {
             case .track:
@@ -107,6 +107,13 @@ struct SongList: View {
         .opacity(model.downloads.isAvailable(song) ? 1 : 0.4)
         .onTapGesture(count: 2) { onPlay(index) }
         .simultaneousGesture(TapGesture().onEnded { select(keys[index], in: keys) })
+    }
+
+    private func joined(_ index: Int, _ picked: [Int]) -> VerticalEdge.Set {
+        var edges: VerticalEdge.Set = []
+        if picked.contains(index - 1) { edges.insert(.top) }
+        if picked.contains(index + 1) { edges.insert(.bottom) }
+        return edges
     }
 
     private var rowKeys: [RowKey] {
