@@ -112,6 +112,7 @@ import SwiftUI
             // A sample smart playlist: in the editor, or saved and open. Waits for the local mirror.
             await mirrored(model)
             var sample = SmartPlaylist(name: "Long Songs")
+            sample.id = SmartPlaylist.idPrefix + "shot-sample"  // replaced, not added again, on the next run
             sample.rules = .init(match: .all, items: [
                 .rule(.init(field: .duration, op: .greater, number: 240)),
                 .group(.init(match: .any, items: [.rule(.init(field: .genre, op: .contains, text: "rock")), .rule(.init(field: .year, op: .greater, number: 2000))])),

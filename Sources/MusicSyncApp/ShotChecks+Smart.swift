@@ -20,6 +20,7 @@ extension ShotChecks {
             return p
         }
         let smart = model.smartPlaylists
+        let before = smart.playlists.count  // the demo defaults are shared: earlier runs may have left some
         let cases: [(P, (Song) -> Bool)] = [
             (make("Jazz 90s", .all, [.rule(P.Rule(field: .genre, op: .is, text: "jazz")),
                                      .rule(P.Rule(field: .year, op: .inRange, number: 1990, number2: 1999))]),
@@ -72,6 +73,8 @@ extension ShotChecks {
         check(await wait { model.downloads.order[.playlist(first.id)] == expected }, "a download pin keeps the smart playlist's songs")
         model.removeDownload(.playlist(first.id))
         check(await wait { !model.downloads.isPinned(.playlist(first.id)) }, "the pin goes again")
-        check(smart.playlists.count == cases.count + 2, "the sidebar lists \(smart.playlists.count) smart playlists")
+        check(smart.playlists.count == before + cases.count + 2, "the sidebar lists the \(cases.count + 2) new smart playlists")
+        for p in cases.map(\.0) + [most, random] { smart.delete(p) }
+        check(smart.playlists.count == before, "deleted smart playlists leave the sidebar")
     }
 }
