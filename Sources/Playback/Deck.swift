@@ -5,14 +5,20 @@ import AVFoundation
 @MainActor final class Deck {
     let player = AVQueuePlayer()
     weak var mixer: Mixer?
-    var volume: Float = 1 { didSet { player.volume = volume * fade } }
+    var volume: Float = 1 { didSet { applyVolume() } }
     /// Transition volume, 0…1.
-    var fade: Float = 1 { didSet { player.volume = volume * fade } }
+    var fade: Float = 1 { didSet { applyVolume() } }
     private var observation: NSKeyValueObservation?
     private var timeObserver: Any?
     private var boundaryObserver: Any?
 
+    /// Tests and dev runs with MUSICSYNC_MUTE=1 never reach the speakers, whatever the volume is set to.
+    /// Volume 0, not `isMuted`: the equalizer tap still sees the full signal, so output measures keep working.
+    static let silent = ProcessInfo.processInfo.environment["MUSICSYNC_MUTE"] == "1"
+        || ["swiftpm-testing-helper", "xctest"].contains(ProcessInfo.processInfo.processName)
+
     init() {
+        applyVolume()
         observation = player.observe(\.currentItem) { [weak self] _, _ in
             Task { @MainActor in if let self { self.mixer?.itemChanged(self) } }
         }
@@ -20,6 +26,8 @@ import AVFoundation
             MainActor.assumeIsolated { if let self { self.mixer?.tick(self) } }
         }
     }
+
+    private func applyVolume() { player.volume = Self.silent ? 0 : volume * fade }
 
     /// Time in the current item.
     var time: TimeInterval {
