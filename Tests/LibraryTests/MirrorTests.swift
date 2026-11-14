@@ -38,6 +38,7 @@ private struct Fixture {
         #expect(await f.db.lyrics(songId: "s-1-2") == nil)
         let cover = try #require(await f.db.smallCoverURL(coverArtId: "cov-al-1"))
         #expect(try Data(contentsOf: cover) == Data("COVER-BYTES".utf8))
+        #expect(await f.db.smallCoverURLs()["cov-al-1"] == cover)
         #expect(await f.db.isPopulated)
 
         let status = f.mirror.currentStatus
