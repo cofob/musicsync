@@ -133,17 +133,29 @@ public actor DownloadStore {
 
     // MARK: States
 
-    func markDownloading(_ id: String) throws {
-        try write { try $0.run("UPDATE songs SET state = 'downloading', error = NULL WHERE id = ?", [id]) }
+    // The download steps change only a song in the state they expect, so a cancel or a removal in between wins.
+
+    /// False when the song is no longer queued.
+    func markDownloading(_ id: String) throws -> Bool {
+        try update("UPDATE songs SET state = 'downloading', error = NULL WHERE id = ? AND state = 'queued'", [id])
     }
 
-    /// False when the song was removed meanwhile; the caller deletes the file then.
+    /// False when the song was cancelled or removed meanwhile; the caller deletes the file then.
     func markDone(_ id: String, fileName: String, size: Int64, format: String, bitRate: Int?) throws -> Bool {
+        try update("UPDATE songs SET state = 'done', fileName = ?, size = ?, format = ?, bitRate = ?, error = NULL WHERE id = ? AND state = 'downloading'",
+                   [fileName, size, format, bitRate, id])
+    }
+
+    /// A failed download: queued again for a retry, else failed.
+    func markFailure(_ id: String, error: String, retry: Bool) throws {
+        _ = try update("UPDATE songs SET state = ?, error = ? WHERE id = ? AND state = 'downloading'", [retry ? "queued" : "failed", error, id])
+    }
+
+    /// Runs one UPDATE; true when it changed a row.
+    private func update(_ sql: String, _ params: [any SQLConvertible]) throws -> Bool {
         try write { db in
-            guard try db.scalar("SELECT COUNT(*) FROM songs WHERE id = ?", [id]) > 0 else { return false }
-            try db.run("UPDATE songs SET state = 'done', fileName = ?, size = ?, format = ?, bitRate = ?, error = NULL WHERE id = ?",
-                       [fileName, size, format, bitRate, id])
-            return true
+            try db.run(sql, params)
+            return try db.scalar("SELECT changes()") > 0
         }
     }
 

@@ -61,7 +61,7 @@ private func allDone(_ m: DownloadManager, _ count: Int) async -> Bool {
         let dir = TempDir()
         let file = dir.url.appendingPathComponent("d.sqlite")
         try await DownloadStore(fileURL: file).add([track("a")], reason: .song)
-        try await DownloadStore(fileURL: file).markDownloading("a")
+        #expect(try await DownloadStore(fileURL: file).markDownloading("a"))
         let reopened = DownloadStore(fileURL: file)
         #expect(await reopened.nextQueued(excluding: []) == nil)
         try await reopened.resetInterrupted()
@@ -85,7 +85,7 @@ private func allDone(_ m: DownloadManager, _ count: Int) async -> Bool {
         #expect(entry.size == 1000 && entry.format == "flac")
         #expect(await m.store.usedBytes() == 2000)
         #expect(await m.store.lyrics("a")?.first?.line.first?.value == "La")
-        #expect(await eventually { FileManager.default.fileExists(atPath: m.coversDirectory.appendingPathComponent("cov-al-1@600").path) })
+        #expect(FileManager.default.fileExists(atPath: m.coversDirectory.appendingPathComponent("cov-al-1@600").path))
         #expect(server.requests("download").count == 2)
         #expect(await eventually { m.currentStatus.batchTotal == 0 && m.currentStatus.progress.isEmpty })
 
@@ -135,9 +135,11 @@ private func allDone(_ m: DownloadManager, _ count: Int) async -> Bool {
         try await m.download([track("a")])
         #expect(await eventually { await m.store.entry("a")?.state == .downloading })
         await m.cancel("a")
-        #expect(await eventually { m.currentStatus.progress.isEmpty })
+        #expect(await eventually { await m.running.isEmpty })
         let entry = try #require(await m.store.entry("a"))
         #expect(entry.isCancelled && entry.fileName == nil)
+        #expect(server.requests("download:a").count == 1)
+        #expect(await m.waiting.isEmpty)
 
         server.delayMs = 0
         await m.retry(["a"])

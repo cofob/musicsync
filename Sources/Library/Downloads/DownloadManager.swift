@@ -13,9 +13,9 @@ public actor DownloadManager {
     private var settings: DownloadSettings
     private var client: SubsonicClient?
     private var offline = false
-    private var running: [String: Task<Void, Never>] = [:]
+    private(set) var running: [String: Task<Void, Never>] = [:]
     /// Songs waiting for a retry after a failure, and their failure counts.
-    private var waiting: Set<String> = []
+    private(set) var waiting: Set<String> = []
     private var attempts: [String: Int] = [:]
     private var pumping = false
     private var pumpAgain = false
@@ -124,9 +124,10 @@ public actor DownloadManager {
 
     /// Stops a song's download; it stays failed ("Cancelled") until `retry`.
     public func cancel(_ id: String) async {
-        try? await store.markFailed(id, error: DownloadEntry.cancelledMessage)
+        // The task first: its `run` then writes nothing more.
         running[id]?.cancel()
         waiting.remove(id)
+        try? await store.markFailed(id, error: DownloadEntry.cancelledMessage)
         changed()
     }
 
@@ -198,7 +199,7 @@ public actor DownloadManager {
 
     private func run(_ entry: DownloadEntry, plan: DownloadPlan, client: SubsonicClient) async {
         let id = entry.id
-        try? await store.markDownloading(id)
+        guard (try? await store.markDownloading(id)) == true, !Task.isCancelled else { return await finished(id) }
         changed()
         let hub = hub, estimate = plan.estimate(entry.song)
         do {
@@ -209,15 +210,19 @@ public actor DownloadManager {
             try Task.checkCancellation()
             let name = Self.fileName(id, suffix: plan.suffix)
             let size = try place(tmp, as: name)
-            if try await store.markDone(id, fileName: name, size: size, format: plan.suffix, bitRate: plan.bitRate) {
+            await extras(entry.song, client: client)
+            if !Task.isCancelled, try await store.markDone(id, fileName: name, size: size, format: plan.suffix, bitRate: plan.bitRate) {
                 hub.update { $0.batchDone += 1 }
-                await extras(entry.song, client: client)
             } else {
                 try? FileManager.default.removeItem(at: filesDirectory.appendingPathComponent(name))
             }
         } catch where !Task.isCancelled {
             await failed(id, error)
         } catch {}
+        await finished(id)
+    }
+
+    private func finished(_ id: String) async {
         running[id] = nil
         hub.update { $0.progress[id] = nil }
         changed()
@@ -229,12 +234,9 @@ public actor DownloadManager {
         let count = (attempts[id] ?? 0) + 1
         attempts[id] = count
         libraryLog.warning("download \(id) failed (\(count)): \(error.localizedDescription)")
-        guard count < Self.maxAttempts else {
-            try? await store.markFailed(id, error: error.localizedDescription)
-            return
-        }
-        try? await store.markFailed(id, error: error.localizedDescription)
-        try? await store.requeue([id])
+        let retry = count < Self.maxAttempts
+        try? await store.markFailure(id, error: error.localizedDescription, retry: retry)
+        guard retry else { return }
         waiting.insert(id)
         let delay = backoff(count)
         Task {
