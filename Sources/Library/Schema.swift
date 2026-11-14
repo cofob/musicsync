@@ -65,6 +65,16 @@ enum Schema {
       + fts(table: "albums", columns: ["name", "artist"])
       + fts(table: "songs", columns: ["title", "artist", "album"])
 
+    /// Tables added after version 1, created on every open, so an existing library is kept.
+    /// external_lyrics: lyrics from other sources than the server (json NULL = that source has none).
+    static let additions = [
+        """
+        CREATE TABLE IF NOT EXISTS external_lyrics(
+          songId TEXT NOT NULL, source TEXT NOT NULL, json TEXT, fetchedAt REAL NOT NULL,
+          PRIMARY KEY(songId, source)) WITHOUT ROWID
+        """,
+    ]
+
     /// External-content FTS5 index kept in sync by triggers. Upserts must use `ON CONFLICT DO UPDATE`
     /// (not `REPLACE`) so the rowid stays stable.
     private static func fts(table: String, columns: [String]) -> [String] {

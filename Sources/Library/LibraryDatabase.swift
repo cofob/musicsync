@@ -128,6 +128,7 @@ public actor LibraryDatabase {
                 throw SQLiteError(code: 26, message: "schema \(version) or server mismatch")
             }
         }
+        for sql in Schema.additions { try db.exec(sql) }
         return db
     }
 
