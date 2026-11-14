@@ -14,7 +14,12 @@ import Testing
         mixer.onEvent = { [unowned self] in events.append(($0, Date().timeIntervalSince(start))) }
     }
 
-    deinit { files.forEach { try? FileManager.default.removeItem(at: $0) } }
+    isolated deinit {
+        // The mixer can outlive the test: it stops and reports to no one.
+        mixer.onEvent = { _ in }
+        mixer.stop()
+        files.forEach { try? FileManager.default.removeItem(at: $0) }
+    }
 
     private func cue(_ seconds: Double) throws -> Mixer.Cue {
         let url = try silentFile(seconds: seconds)
