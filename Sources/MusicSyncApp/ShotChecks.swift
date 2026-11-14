@@ -323,22 +323,43 @@ import SwiftUI
             let ok = await wait { mini.level == level }
             check(item && ok, "Keep on Top: level \(mini.level.rawValue)")
         }
-        let before = mini.frame
-        await upNext(mini)
-        check(await wait { abs(mini.frame.height - (before.height + MiniPlayer.queueHeight)) < 1 && abs(mini.frame.maxY - before.maxY) < 1 },
-              "Up Next adds \(MiniPlayer.queueHeight) pt below, the top stays: \(before) → \(mini.frame)")
-        await upNext(mini)
-        check(await wait { abs(mini.frame.height - before.height) < 1 && abs(mini.frame.maxY - before.maxY) < 1 },
-              "Up Next again: back to \(before.height) pt, the top stays: \(mini.frame)")
+        let songs = model.player.queue
+        if !songs.isEmpty {
+            model.player.play(Array(repeating: songs, count: 300 / songs.count + 1).flatMap { $0 })  // a long queue
+            if model.player.isPlaying { model.player.toggle() }
+        }
+        // The default size, again, after a resize with Up Next open, and after a resize without it.
+        for width in [nil, 400, 260] as [CGFloat?] {
+            if let width { mini.setFrame(NSRect(x: mini.frame.minX, y: mini.frame.maxY - width, width: width, height: width), display: true) }
+            try? await Task.sleep(for: .milliseconds(300))
+            let before = mini.frame, content = mini.contentView?.frame.height ?? 0
+            let shown = await upNext(mini, open: true)
+            check(shown < 0.25, "Up Next shows \(model.player.queue.count) songs in \(Int(shown * 1000)) ms")
+            check(await wait { abs(mini.frame.height - (before.height + MiniPlayer.queueHeight)) < 1 && abs(mini.frame.maxY - before.maxY) < 1 },
+                  "Up Next adds \(MiniPlayer.queueHeight) pt below, the top stays: \(before) → \(mini.frame)")
+            if width == 400 {  // the user makes the window narrower with Up Next open
+                mini.setFrame(NSRect(x: mini.frame.minX, y: mini.frame.minY + 60, width: 340, height: mini.frame.height - 60), display: true)
+                try? await Task.sleep(for: .milliseconds(300))
+            }
+            let wide = mini.frame.width
+            let hidden = await upNext(mini, open: false)
+            check(hidden < 0.1, "Up Next hides in \(Int(hidden * 1000)) ms")
+            check(await wait { abs(mini.frame.height - wide) < 1 && abs((mini.contentView?.frame.height ?? 0) - wide) < 1 && abs(mini.frame.maxY - before.maxY) < 1 },
+                  "Up Next again: the window is square, \(content) pt high before, content \(mini.contentView?.frame.height ?? 0) in \(mini.frame)")
+        }
         mini.performClose(nil)
         check(await wait { !mini.isVisible && main.isVisible }, "closing the MiniPlayer shows the main window")
     }
 
-    /// Clicks Up Next, the last button at the bottom right of the cover; the controls show for 4 s after opening.
-    private static func upNext(_ mini: NSWindow) async {
-        guard let content = mini.contentView else { return }
-        let y = mini.frame.width - 24  // the cover is square, Up Next goes below it
-        await click(content, at: NSPoint(x: content.bounds.width - 26, y: content.isFlipped ? y : content.bounds.height - y))
+    /// Turns Up Next on or off as its button does (the controls show only under the mouse); returns the seconds
+    /// until the Up Next list is in the window or gone; the window grows or shrinks after that.
+    private static func upNext(_ mini: NSWindow, open: Bool) async -> TimeInterval {
+        let start = Date()
+        UserDefaults.app.set(open, forKey: MiniPlayer.queueKey)
+        for _ in 0..<1000 where (Shot.tableView(in: mini.contentView)?.numberOfRows ?? 0 > 0) != open {
+            try? await Task.sleep(for: .milliseconds(2))
+        }
+        return Date().timeIntervalSince(start)
     }
 
     private static func equalizer(_ model: AppModel) async {

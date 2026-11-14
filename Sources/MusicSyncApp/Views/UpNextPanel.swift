@@ -65,15 +65,14 @@ struct UpNextPanel: View {
     private func section(_ title: String, _ slots: [PlayQueue<PlayItem>.Slot], clear: Bool) -> some View {
         let player = model.player
         header(title, clear: clear)
-        ForEach(slots) { slot in
-            // A row may draw once more with its old slot after the queue got shorter.
-            if player.queue.indices.contains(slot.index) {
-                row(player.queue[slot.index], selected: selected == slot.id)
-                    .onTapGesture(count: 2) { player.play(at: slot.index) }
-                    .onTapGesture { selected = slot.id }
-                    .contextMenu { menu(slot) }
-                    .swipeActions { Button("Remove", systemImage: "minus.circle", role: .destructive) { player.remove(at: [slot.index]) } }
-            }
+        // The item goes with its slot: a row may draw once more after the queue got shorter. An `if` in the row
+        // instead makes the list resolve every row of a long queue to count its views, and Up Next opens late.
+        ForEach(slots.filter { player.queue.indices.contains($0.index) }.map { ($0, player.queue[$0.index]) }, id: \.0.id) { slot, item in
+            row(item, selected: selected == slot.id)
+                .onTapGesture(count: 2) { player.play(at: slot.index) }
+                .onTapGesture { selected = slot.id }
+                .contextMenu { menu(slot) }
+                .swipeActions { Button("Remove", systemImage: "minus.circle", role: .destructive) { player.remove(at: [slot.index]) } }
         }
         .onMove { offsets, destination in
             let target = destination < slots.count ? slots[destination].index : slots[slots.count - 1].index + 1

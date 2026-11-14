@@ -50,6 +50,7 @@ struct MiniPlayerView: View {
     /// The controls show for a moment when the window opens, so the user sees them.
     @State private var peek = true
     @State private var window: NSWindow?
+    @State private var resize: Task<Void, Never>?
 
     var body: some View {
         let player = model.player
@@ -62,7 +63,7 @@ struct MiniPlayerView: View {
                     .frame(maxHeight: .infinity)
             }
         }
-        .frame(minWidth: 260, maxWidth: .infinity, minHeight: 260, maxHeight: .infinity, alignment: .top)
+        .frame(minWidth: 260, maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background { ArtworkBackground(image: player.artwork) }
         .foregroundStyle(.white)
         .environment(\.colorScheme, .dark)
@@ -115,14 +116,22 @@ struct MiniPlayerView: View {
         .background(LinearGradient(colors: [.black.opacity(0.45), .black.opacity(0.1), .black.opacity(0.7)], startPoint: .top, endPoint: .bottom))
     }
 
-    /// The window keeps the square cover; Up Next adds height below it, the top edge stays.
+    /// The window keeps the square cover; Up Next adds height below it, the top edge stays. The animation steps
+    /// the frame from a task: `setFrame(_:display:animate:)` blocks the app while it runs, and the window animator
+    /// leaves the Up Next table in a live resize that crashes when the table goes.
     private func fit(animate: Bool) {
         guard let window else { return }
-        var frame = window.frame
-        let height = frame.width + (showsQueue ? MiniPlayer.queueHeight : 0)
-        frame.origin.y += frame.height - height
-        frame.size.height = height
-        window.setFrame(frame, display: true, animate: animate)
+        let top = window.frame.maxY, from = window.frame.height
+        let to = window.frame.width + (showsQueue ? MiniPlayer.queueHeight : 0)
+        resize?.cancel()
+        resize = Task {
+            for step in animate ? 1...12 : 12...12 {
+                if animate { try? await Task.sleep(for: .milliseconds(16)) }
+                guard !Task.isCancelled else { return }
+                let t = Double(step) / 12, height = from + (to - from) * t * (2 - t)  // ease out
+                window.setFrame(NSRect(x: window.frame.minX, y: top - height, width: window.frame.width, height: height), display: true)
+            }
+        }
         if showsQueue { window.contentResizeIncrements = NSSize(width: 1, height: 1) }
         else { window.contentAspectRatio = NSSize(width: 1, height: 1) }
         window.isMovableByWindowBackground = true
