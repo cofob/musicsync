@@ -22,7 +22,7 @@ struct UpNextPanel: View {
                 Text("Up Next").font(.title2.bold())
                 Spacer()
                 if player.isMixing { AutoMixBadge() }
-                Text(player.shuffle ? "Shuffle On" : "").font(.callout).foregroundStyle(.white.opacity(0.6))
+                Text(player.shuffle ? "Shuffle On" : "").font(.callout).foregroundStyle(.secondary)
                 AutoPlayButton()
             }
             ScrollViewReader { proxy in
@@ -43,7 +43,7 @@ struct UpNextPanel: View {
                     if !source.isEmpty { section("Continue Playing", source, clear: user.isEmpty) }
                     if !auto.isEmpty { section("AutoPlay", auto, clear: false) }
                     if user.isEmpty && source.isEmpty && auto.isEmpty {
-                        Text("Nothing up next").foregroundStyle(.white.opacity(0.6)).listRowBackground(Color.clear)
+                        Text("Nothing up next").foregroundStyle(.secondary).listRowBackground(Color.clear)
                     }
                 }
                 .onChange(of: player.history.map(\.id), initial: true) { Task { history = player.history } }
@@ -84,11 +84,11 @@ struct UpNextPanel: View {
     /// Section title as a plain row: pinned headers would cover the rows under them on the clear background.
     private func header(_ title: String, clear: Bool = false) -> some View {
         HStack {
-            Text(title).font(.headline).foregroundStyle(.white.opacity(0.85))
+            Text(title).font(.headline).foregroundStyle(.primary)
             Spacer()
             if clear {
                 Button("Clear") { model.player.clearUpcoming() }
-                    .buttonStyle(.plain).font(.callout.weight(.semibold)).foregroundStyle(.white.opacity(0.75))
+                    .buttonStyle(.plain).font(.callout.weight(.semibold)).foregroundStyle(.secondary)
             }
         }
         .padding(.top, 10).padding(.horizontal, 6)
@@ -139,19 +139,19 @@ struct UpNextPanel: View {
             CoverImage(id: item.coverArt, size: 100, cornerRadius: 5).frame(width: 40, height: 40)
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title).lineLimit(1).fontWeight(playing ? .semibold : .regular)
-                Text(item.artist ?? "").font(.callout).foregroundStyle(.white.opacity(0.6)).lineLimit(1)
+                Text(item.artist ?? "").font(.callout).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
             if playing {
-                Image(systemName: model.player.isPlaying ? "speaker.wave.2.fill" : "speaker.fill").foregroundStyle(.white.opacity(0.8))
+                Image(systemName: model.player.isPlaying ? "speaker.wave.2.fill" : "speaker.fill").foregroundStyle(.secondary)
             } else {
-                Text(item.duration.map(formatTime) ?? "").monospacedDigit().foregroundStyle(.white.opacity(0.6))
+                Text(item.duration.map(formatTime) ?? "").monospacedDigit().foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 4).padding(.horizontal, 6)
-        .background(selected ? Color.white.opacity(0.15) : .clear, in: RoundedRectangle(cornerRadius: 6))
+        .background(selected ? Color.primary.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: 6))
         .contentShape(Rectangle())
         .listRowBackground(Color.clear)
-        .listRowSeparatorTint(.white.opacity(0.15))
+        .listRowSeparatorTint(.primary.opacity(0.15))
     }
 }

@@ -24,6 +24,7 @@ import SwiftUI
         case "artists": await artists(model)
         case "nowplaying-lyrics": await nowPlayingLyrics(model)
         case "nowplaying-drag": await nowPlayingDrag(model)
+        case "sidepanel": await sidePanel(model)
         default: check(false, "known check \(name)")
         }
     }
@@ -393,6 +394,45 @@ import SwiftUI
         guard let sidebar = frames.first(where: { $0.minX < 1 }),
               let list = frames.first(where: { abs($0.width - 280) < 1 }) else { return check(false, "sidebar and artist list: \(frames)") }
         check(list.minX >= sidebar.maxX - 1, "the artist list \(list) starts right of the sidebar \(sidebar)")
+    }
+
+    // MARK: Side panel
+
+    /// The capsule's Queue button and View > Lyrics toggle the side panel; neither opens Now Playing.
+    private static func sidePanel(_ model: AppModel) async {
+        await Shot.playPaused(model)
+        UserDefaults.app.removeObject(forKey: SidePanel.key)
+        guard let window = mainWindow, let content = window.contentView else { return check(false, "main window") }
+        try? await Task.sleep(for: .seconds(2))
+        let panel = { UserDefaults.app.string(forKey: SidePanel.key) ?? "none" }
+        let inspector = { (inspectorWidth(content) ?? 0) > 200 }
+        check(!inspector(), "no side panel at first")
+        // Queue: the second icon left of the volume button at the right end of the capsule, 20 pt from the window edge.
+        let queue = NSPoint(x: content.bounds.width - 121, y: 41)
+        await click(content, at: content.isFlipped ? NSPoint(x: queue.x, y: content.bounds.height - queue.y) : queue)
+        check(await wait { panel() == "queue" && inspector() }, "Queue opens the side panel (\(panel()))")
+        check(!model.showNowPlaying, "Queue leaves Now Playing closed")
+        for (state, open) in [("lyrics", true), ("none", false)] {
+            let item = viewMenu("Lyrics")
+            let shown = await wait { panel() == state && inspector() == open }
+            check(item && shown, "View > Lyrics: panel \(state)")
+        }
+    }
+
+    /// The width of the inspector column: a last split view pane as wide as `SidePanel` allows.
+    private static func inspectorWidth(_ view: NSView) -> CGFloat? {
+        if let split = view as? NSSplitView, let last = split.arrangedSubviews.last, !split.isSubviewCollapsed(last),
+           (250...430).contains(last.frame.width) {
+            return last.frame.width
+        }
+        return view.subviews.lazy.compactMap(inspectorWidth).first
+    }
+
+    /// Runs the item of the View menu.
+    private static func viewMenu(_ title: String) -> Bool {
+        guard let menu = NSApp.mainMenu?.item(withTitle: "View")?.submenu, let i = menu.items.firstIndex(where: { $0.title == title }) else { return false }
+        menu.performActionForItem(at: i)
+        return true
     }
 
     // MARK: Helpers

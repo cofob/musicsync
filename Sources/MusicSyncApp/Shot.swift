@@ -13,6 +13,8 @@ import SwiftUI
 @MainActor enum Shot {
     private static let env = ProcessInfo.processInfo.environment
     static let output = env["MUSICSYNC_SHOT"]
+    /// The scene being shot, for state a scene cannot set from outside a view.
+    static var scene: String? { output == nil ? nil : env["MUSICSYNC_SCENE"] }
     /// A window that is not part of the scene graph (Settings); kept alive until the capture.
     private static var extraWindow: NSWindow?
     /// Titles of a menu bar menu and its submenus to open before the capture, e.g. ["Playback", "Sleep Timer"].
@@ -26,7 +28,11 @@ import SwiftUI
             NSApp.windows.first?.setContentSize(NSSize(width: Double(env["MUSICSYNC_SHOT_WIDTH"] ?? "") ?? 1280, height: 820))
             await show(env["MUSICSYNC_SCENE"] ?? "home", model)
             try? await Task.sleep(for: .seconds(delay))
-            let capture: @MainActor @Sendable () -> Void = { exit(save(to: URL(fileURLWithPath: output)) && !ShotChecks.failed ? 0 : 1) }
+            let capture: @MainActor @Sendable () -> Void = {
+                let saved = save(to: URL(fileURLWithPath: output))
+                UserDefaults.app.removeObject(forKey: SidePanel.key)  // the demo settings are shared with other shots
+                exit(saved && !ShotChecks.failed ? 0 : 1)
+            }
             if menuPath.isEmpty { capture() } else { openMenu(then: capture) }
         }
     }
@@ -235,6 +241,14 @@ import SwiftUI
                 if model.player.isPlaying { model.player.toggle() }
                 model.showNowPlaying = scene == "radio-nowplaying"
             }
+        case "volume", "seek-hover":
+            await playPaused(model)
+            model.selection = .home
+        case "panel-queue", "panel-lyrics":
+            // The side panel; the shot clears it again.
+            await queueScene(model)
+            UserDefaults.app.set((scene == "panel-queue" ? NowPlayingPanel.queue : .lyrics).rawValue, forKey: SidePanel.key)
+            model.selection = .home
         case "upnext", "queue-quit":
             // History, Playing Next and AutoPlay sections, paused; "queue-quit" then quits, so the queue is saved.
             await queueScene(model)

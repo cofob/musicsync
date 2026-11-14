@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import Subsonic
 
-enum NowPlayingPanel { case none, lyrics, queue }
+enum NowPlayingPanel: String { case none, lyrics, queue }
 
 /// Full-window player over a gradient sampled from the cover, with a lyrics or queue panel.
 struct NowPlayingView: View {
@@ -174,10 +174,11 @@ struct ArtworkBackground: View {
 }
 
 /// Lyrics of the current song; synced lines follow playback and seek on click.
-private struct LyricsPanel: View {
+struct LyricsPanel: View {
     @Environment(AppModel.self) private var model
     /// Nil while loading.
     let lyrics: Lyrics?
+    var size: CGFloat = 30
 
     var body: some View {
         if let lyrics { lines(lyrics) } else { ProgressView() }
@@ -191,8 +192,8 @@ private struct LyricsPanel: View {
                     ForEach(Array(lyrics.lines.enumerated()), id: \.offset) { i, line in
                         let distance = current.map { abs($0 - i) } ?? 0
                         Text(line.text.isEmpty ? "• • •" : line.text)
-                            .font(.system(size: 30, weight: .bold))
-                            .foregroundStyle(.white.opacity(!lyrics.isSynced || i == current ? 1 : 0.35))
+                            .font(.system(size: size, weight: .bold))
+                            .foregroundStyle(.primary.opacity(!lyrics.isSynced || i == current ? 1 : 0.35))
                             .blur(radius: lyrics.isSynced ? min(Double(distance), 3) * 0.8 : 0)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())

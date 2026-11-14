@@ -1,23 +1,24 @@
 import AVKit
 import SwiftUI
 
-/// Shuffle, previous, play/pause, next, repeat. `scale` 1 fits the bottom capsule.
+/// Shuffle, previous, play/pause, next, repeat; `compact` leaves out shuffle and repeat. `scale` 1 fits the bottom capsule.
 struct TransportControls: View {
     @Environment(AppModel.self) private var model
     var scale: CGFloat = 1
     var spacing: CGFloat = 14
+    var compact = false
 
     var body: some View {
         let player = model.player
         HStack(spacing: spacing) {
-            toggle("Shuffle", "shuffle", isOn: player.shuffle) { player.setShuffle(!player.shuffle) }
+            if !compact { toggle("Shuffle", "shuffle", isOn: player.shuffle) { player.setShuffle(!player.shuffle) } }
             Button("Previous", systemImage: "backward.fill") { player.previous() }
                 .font(.system(size: 17 * scale)).disabled(!player.hasPrevious)
             Button(player.isPlaying ? "Pause" : "Play", systemImage: player.isPlaying ? "pause.fill" : "play.fill") { player.toggle() }
                 .font(.system(size: 24 * scale)).frame(width: 28 * scale).disabled(player.queue.isEmpty)
             Button("Next", systemImage: "forward.fill") { player.next() }
                 .font(.system(size: 17 * scale)).disabled(!player.hasNext)
-            toggle("Repeat", player.repeatMode.symbol, isOn: player.repeatMode != .off) { player.repeatMode = player.repeatMode.next }
+            if !compact { toggle("Repeat", player.repeatMode.symbol, isOn: player.repeatMode != .off) { player.repeatMode = player.repeatMode.next } }
         }
         .labelStyle(.iconOnly)
         .buttonStyle(HitAreaButtonStyle())
@@ -92,6 +93,8 @@ struct ScrubBar: View {
     var tint: Color = .primary
     /// Times beside the bar (capsule) or under it (Now Playing).
     var timesBelow = false
+    /// False hides the times beside the bar.
+    var showsTimes = true
     @State private var scrub: Double?
 
     var body: some View {
@@ -111,6 +114,8 @@ struct ScrubBar: View {
                     bar
                     HStack { start; Spacer(); end }
                 }
+            } else if !showsTimes {
+                bar
             } else {
                 HStack(spacing: 8) { start.frame(minWidth: 34, alignment: .leading); bar; end.frame(minWidth: 38, alignment: .trailing) }
             }
@@ -154,29 +159,37 @@ struct VolumeSlider: View {
     }
 }
 
-/// Speaker button that expands into a volume slider.
-struct VolumeButton: View {
+/// The icons in `content`, then a speaker button. Hovering or clicking the speaker turns them all into a
+/// volume slider in a capsule, as in Apple Music; it goes back when the pointer leaves.
+struct VolumeButton<Content: View>: View {
     @Environment(AppModel.self) private var model
-    @State private var expanded = false
-    @State private var collapse: Task<Void, Never>?
+    @ViewBuilder var content: Content
+    @State private var expanded = Shot.scene == "volume"
 
     var body: some View {
-        HStack(spacing: 10) {
-            if expanded { VolumeSlider().frame(width: 110).transition(.opacity.combined(with: .move(edge: .trailing))) }
-            Button("Volume", systemImage: volumeSymbol(model.player.volume)) {
-                withAnimation(.snappy) { expanded.toggle() }
-            }
-            .labelStyle(.iconOnly).buttonStyle(HitAreaButtonStyle(width: 24, height: 24)).font(.system(size: 17))
+        let symbol = volumeSymbol(model.player.volume)
+        HStack(spacing: 18) {
+            content
+            Button("Volume", systemImage: symbol) { expand(!expanded) }
+                .onHover { if $0 { expand(true) } }
         }
-        .padding(.horizontal, expanded ? 12 : 0).padding(.vertical, expanded ? 6 : 0)
-        .background { if expanded { Capsule().fill(.primary.opacity(0.08)) } }
-        .onHover { inside in
-            collapse?.cancel()
-            guard !inside, expanded else { return }
-            collapse = Task {
-                guard (try? await Task.sleep(for: .seconds(1.5))) != nil else { return }
-                withAnimation(.snappy) { expanded = false }
+        .opacity(expanded ? 0 : 1)
+        .overlay(alignment: .trailing) {
+            if expanded {
+                HStack(spacing: 8) {
+                    VolumeSlider()
+                    Image(systemName: symbol).frame(width: 24)
+                }
+                .padding(.leading, 14).padding(.trailing, 6)
+                .frame(height: 40)
+                .background(.background.opacity(0.8), in: Capsule())
+                .overlay(Capsule().strokeBorder(.primary.opacity(0.08), lineWidth: 0.5))
+                .shadow(color: .black.opacity(0.1), radius: 6, y: 1)
+                .transition(.opacity.combined(with: .scale(scale: 0.6, anchor: .trailing)))
             }
         }
+        .onHover { if !$0 { expand(false) } }
     }
+
+    private func expand(_ on: Bool) { withAnimation(.snappy(duration: 0.25)) { expanded = on } }
 }

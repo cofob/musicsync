@@ -204,9 +204,9 @@ struct AutoPlayButton: View {
         if mixes.isAvailable {
             Button { mixes.autoPlay.toggle() } label: {
                 Image(systemName: "infinity").font(.body.weight(.bold))
-                    .foregroundStyle(.white.opacity(mixes.autoPlay ? 1 : 0.6))
+                    .foregroundStyle(.primary.opacity(mixes.autoPlay ? 1 : 0.6))
                     .frame(width: 34, height: 24)
-                    .background(.white.opacity(mixes.autoPlay ? 0.25 : 0), in: Capsule())
+                    .background(.primary.opacity(mixes.autoPlay ? 0.2 : 0), in: Capsule())
                     .contentShape(Capsule())
             }
             .buttonStyle(.plain)
