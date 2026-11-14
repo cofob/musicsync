@@ -43,6 +43,18 @@ import SwiftUI
             await playPaused(model)
             open(MenuBarPlayer(), "Menu Bar", model)
         case "menubar-empty": open(MenuBarPlayer(), "Menu Bar", model)
+        case "playlist":
+            let editable = { model.editablePlaylists.first { ($0.songCount ?? 0) > 2 } }
+            if let playlist = await first(editable) { await select(.playlist(playlist.id), model) }
+        case "newplaylist":
+            await select(.playlists, model)
+            model.playlistPrompt = .create(songIds: [])
+        case let s where s.hasPrefix("favorites:"):
+            UserDefaults.app.set(FavoritesView.Segment(rawValue: String(s.dropFirst(10)).capitalized)?.rawValue, forKey: FavoritesView.segmentKey)
+            model.selection = .favorites
+        case "info":
+            guard let album = await first({ model.albums.first }), let song = try? await model.album(album.id)?.song?.first else { break }
+            model.infoSong = song
         case let s where s.hasPrefix("search:"):
             await select(.search, model)
             model.searchText = String(s.dropFirst(7))
