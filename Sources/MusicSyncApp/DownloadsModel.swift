@@ -27,6 +27,8 @@ final class DownloadsModel {
     private(set) var entries: [String: DownloadEntry] = [:]
     private(set) var pins: [DownloadPin] = []
     private(set) var groups: [DownloadReason: Group] = [:]
+    /// Song ids of each pin in album or playlist order.
+    private(set) var order: [DownloadReason: [String]] = [:]
     private(set) var usedBytes: Int64 = 0
     private(set) var status = DownloadStatus()
     /// True when the server cannot be reached; set by the reachability check (and the `offline` shot scene).
@@ -64,7 +66,7 @@ final class DownloadsModel {
     func stop() async {
         tasks.forEach { $0.cancel() }
         tasks = []
-        entries = [:]; pins = []; groups = [:]; usedBytes = 0
+        entries = [:]; pins = []; groups = [:]; order = [:]; usedBytes = 0
         status = DownloadStatus()
         isOffline = false
         guard let old = manager else { return }
@@ -86,7 +88,7 @@ final class DownloadsModel {
     }
 
     private func reload(_ manager: DownloadManager) async {
-        let list = await manager.store.entries(), pins = await manager.store.pins()
+        let list = await manager.store.entries(), pins = await manager.store.pins(), order = await manager.store.pinOrder()
         guard self.manager === manager else { return }
         var groups: [DownloadReason: Group] = [:]
         for entry in list {
@@ -99,6 +101,7 @@ final class DownloadsModel {
         entries = Dictionary(list.map { ($0.id, $0) }, uniquingKeysWith: { $1 })
         self.pins = pins
         self.groups = groups
+        self.order = order
         usedBytes = list.reduce(0) { $0 + ($1.state == .done ? $1.size : 0) }
     }
 
@@ -149,7 +152,7 @@ final class DownloadsModel {
     /// A downloaded album with its downloaded songs, for album pages while offline.
     func savedAlbum(_ id: String) -> Album? {
         guard case .album(let album)? = pins.first(where: { $0.reason == .album(id) }) else { return nil }
-        return album.withSongs(songs(of: .album(id)).sorted { ($0.discNumber ?? 1, $0.track ?? 0) < ($1.discNumber ?? 1, $1.track ?? 0) })
+        return album.withSongs(songs(of: .album(id)))
     }
 
     func savedPlaylist(_ id: String) -> Playlist? {
@@ -157,5 +160,6 @@ final class DownloadsModel {
         return playlist.withEntries(songs(of: .playlist(id)))
     }
 
-    func songs(of reason: DownloadReason) -> [Song] { (groups[reason]?.ids ?? []).compactMap { entries[$0]?.song } }
+    /// Downloaded songs of a pin in its order, with repeats.
+    func songs(of reason: DownloadReason) -> [Song] { (order[reason] ?? []).compactMap { entries[$0]?.song } }
 }

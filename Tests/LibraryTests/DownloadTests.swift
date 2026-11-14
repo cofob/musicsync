@@ -49,6 +49,14 @@ private func allDone(_ m: DownloadManager, _ count: Int) async -> Bool {
         #expect(await store.pins().map(\.id) == ["playlist:pl-1"])
     }
 
+    @Test func pinKeepsItsOrderAndRepeats() async throws {
+        let dir = TempDir()
+        let store = DownloadStore(fileURL: dir.url.appendingPathComponent("d.sqlite"))
+        _ = try await store.pin(.playlist(decode(["id": "pl-1", "name": "Mix"])), songs: [track("b"), track("a"), track("b")])
+        #expect(await store.pinOrder() == [.playlist("pl-1"): ["b", "a", "b"]])
+        #expect(Set(await store.entries().map(\.id)) == ["a", "b"])
+    }
+
     @Test func interruptedDownloadsQueueAgainAfterRestart() async throws {
         let dir = TempDir()
         let file = dir.url.appendingPathComponent("d.sqlite")

@@ -25,7 +25,8 @@ public actor DownloadStore {
           PRIMARY KEY(songId, reason)) WITHOUT ROWID
         """,
         "CREATE INDEX reasons_reason ON reasons(reason)",
-        "CREATE TABLE pins(reason TEXT PRIMARY KEY, json TEXT NOT NULL, addedAt REAL NOT NULL) WITHOUT ROWID",
+        // songIDs: JSON list in the album or playlist order, with repeats.
+        "CREATE TABLE pins(reason TEXT PRIMARY KEY, json TEXT NOT NULL, songIDs TEXT NOT NULL, addedAt REAL NOT NULL) WITHOUT ROWID",
     ]
 
     private func db() throws -> SQLiteConnection {
@@ -81,10 +82,12 @@ public actor DownloadStore {
     /// Returns the songs that have no reason left (their files must go).
     public func pin(_ pin: DownloadPin, songs: [Song]) throws -> [Released] {
         let rows = try songs.map { ($0.id, try json($0)) }
-        let pinJSON = try json(PinBox(pin.stripped))
+        let pinJSON = try json(PinBox(pin.stripped)), order = try json(songs.map(\.id))
         return try write { db in
-            try db.run("INSERT INTO pins(reason, json, addedAt) VALUES(?, ?, ?) ON CONFLICT(reason) DO UPDATE SET json = excluded.json",
-                       [pin.reason.raw, pinJSON, now])
+            try db.run("""
+                INSERT INTO pins(reason, json, songIDs, addedAt) VALUES(?, ?, ?, ?)
+                ON CONFLICT(reason) DO UPDATE SET json = excluded.json, songIDs = excluded.songIDs
+                """, [pin.reason.raw, pinJSON, order, now])
             let keep = Set(songs.map(\.id))
             for id in try db.rows("SELECT songId FROM reasons WHERE reason = ?", [pin.reason.raw], { $0.text(0) ?? "" }) where !keep.contains(id) {
                 try db.run("DELETE FROM reasons WHERE songId = ? AND reason = ?", [id, pin.reason.raw])
@@ -200,6 +203,17 @@ public actor DownloadStore {
             try db.rows("SELECT json FROM pins ORDER BY addedAt DESC") { row in
                 row.text(0).flatMap { try? decoder.decode(PinBox.self, from: Data($0.utf8)).pin }
             }.compactMap { $0 }
+        }
+    }
+
+    /// Song ids of every pin in its album or playlist order; a song in a playlist twice is listed twice.
+    public func pinOrder() -> [DownloadReason: [String]] {
+        read([:]) { db in
+            var out: [DownloadReason: [String]] = [:]
+            for (raw, text) in try db.rows("SELECT reason, songIDs FROM pins", [], { ($0.text(0) ?? "", $0.text(1) ?? "[]") }) {
+                if let reason = DownloadReason(raw: raw) { out[reason] = (try? decoder.decode([String].self, from: Data(text.utf8))) ?? [] }
+            }
+            return out
         }
     }
 
