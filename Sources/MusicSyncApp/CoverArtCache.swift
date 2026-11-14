@@ -12,20 +12,23 @@ actor CoverArtCache {
     // NSCache is thread-safe.
     private nonisolated(unsafe) let memory = NSCache<NSString, NSImage>()
     private var inFlight: [String: Task<Data?, Never>] = [:]
-    /// Cover id (file-name form) -> pixel sizes saved on disk.
-    private var sizesOnDisk: [String: Set<Int>]
+    /// Cover id (file-name form) -> pixel sizes saved on disk. Read on first use, off the main thread that creates the cache.
+    private lazy var sizesOnDisk: [String: Set<Int>] = Self.sizes(in: directory)
 
     init(client: SubsonicClient, offline: URL? = nil) {
         self.client = client
         self.offline = offline
         directory = Paths.caches("covers", client.config.account)
         memory.countLimit = 500
+    }
+
+    private static func sizes(in directory: URL) -> [String: Set<Int>] {
         var sizes: [String: Set<Int>] = [:]
         for name in (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? [] {
             guard let at = name.lastIndex(of: "@"), let size = Int(name[name.index(after: at)...]) else { continue }
             sizes[String(name[..<at]), default: []].insert(size)
         }
-        sizesOnDisk = sizes
+        return sizes
     }
 
     private static func fileID(_ id: String) -> String { id.replacingOccurrences(of: "/", with: "_") }
