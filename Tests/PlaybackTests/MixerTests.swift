@@ -44,7 +44,7 @@ import Testing
     @Test func gaplessInOneDeck() async throws {
         mixer.play(try cue(1.5))
         mixer.setNext(try cue(1.5))
-        let advanced = try #require(await time(of: .advanced))
+        let advanced = try #require(await time(of: .advanced(skipped: false)))
         #expect(advanced > 1.2 && advanced < 2.5)
         #expect(loadedDecks == 1)
         let ended = try #require(await time(of: .ended))
@@ -56,7 +56,7 @@ import Testing
     @Test func crossfadeOverlapsTwoDecks() async throws {
         mixer.play(try cue(3))
         mixer.setNext(try cue(3), transition: Transition(at: 1, duration: 1, curve: .linear))
-        let advanced = try #require(await time(of: .advanced))
+        let advanced = try #require(await time(of: .advanced(skipped: false)))
         #expect(advanced > 0.9 && advanced < 1.6)
         #expect(mixer.isFading)
         await sleep(0.5)
@@ -73,7 +73,7 @@ import Testing
     @Test func pauseHoldsTheFade() async throws {
         mixer.play(try cue(3))
         mixer.setNext(try cue(3), transition: Transition(at: 0.5, duration: 1.5, curve: .linear))
-        _ = try #require(await time(of: .advanced))
+        _ = try #require(await time(of: .advanced(skipped: false)))
         await sleep(0.4)
         mixer.pause()
         await sleep(0.1)  // one more step at the time where the decks stopped
@@ -92,7 +92,7 @@ import Testing
     @Test func seekEndsTheFade() async throws {
         mixer.play(try cue(3))
         mixer.setNext(try cue(3), transition: Transition(at: 0.5, duration: 2))
-        _ = try #require(await time(of: .advanced))
+        _ = try #require(await time(of: .advanced(skipped: false)))
         await sleep(0.3)
         mixer.seek(to: 2)
         #expect(!mixer.isFading)
@@ -105,7 +105,7 @@ import Testing
     @Test func fastSkipsLeaveOneDeck() async throws {
         mixer.play(try cue(3))
         mixer.setNext(try cue(3), transition: Transition(at: 0.3, duration: 2))
-        _ = try #require(await time(of: .advanced))
+        _ = try #require(await time(of: .advanced(skipped: false)))
         for _ in 0..<20 {
             mixer.play(try cue(3))
             mixer.setNext(try cue(3), transition: Transition(at: 2, duration: 1))
@@ -122,7 +122,7 @@ import Testing
         mixer.setNext(try cue(3), transition: Transition(at: 2.5, duration: 0.5))
         await sleep(0.3)
         #expect(mixer.skipToNext())
-        #expect(events.map(\.0).contains(.advanced))
+        #expect(events.map(\.0).contains(.advanced(skipped: true)))
         #expect(!mixer.skipToNext())
         await sleep(0.3)
         #expect(playingDecks == 1)
@@ -132,7 +132,7 @@ import Testing
     @Test func transitionStartsTheNextSongAtItsOffset() async throws {
         mixer.play(try cue(2))
         mixer.setNext(try cue(3), transition: Transition(at: 0.5, offset: 1.5, duration: 0.5))
-        _ = try #require(await time(of: .advanced))
+        _ = try #require(await time(of: .advanced(skipped: false)))
         await sleep(0.2)
         #expect(mixer.time >= 1.5)
     }
@@ -143,20 +143,20 @@ import Testing
         let failed = await failure()
         #expect(failed == false)
         _ = try #require(await time(of: .ended))
-        #expect(!events.map(\.0).contains(.advanced))
+        #expect(!events.map(\.0).contains(.advanced(skipped: false)))
         #expect(loadedDecks == 0)
     }
 
     @Test func retryAfterAFailedNextPlays() async throws {
-        let retry = try cue(1)
+        let retry = try cue(2)
         mixer.onEvent = { [unowned self] event in
             events.append((event, Date().timeIntervalSince(start)))
             if case .failed(false, _) = event { mixer.setNext(retry, transition: Transition(at: 0.6, duration: 0.3)) }
         }
         mixer.play(try cue(1))
         mixer.setNext(missing(), transition: Transition(at: 0.6, duration: 0.3))
-        _ = try #require(await time(of: .advanced))
-        await sleep(0.4)
+        _ = try #require(await time(of: .advanced(skipped: false)))
+        await sleep(0.7)
         #expect(playingDecks == 1)
         #expect(mixer.decks.contains { $0.player.currentItem === retry.item })
     }

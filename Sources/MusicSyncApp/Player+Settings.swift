@@ -26,13 +26,6 @@ extension Player {
         resetUpcoming()
     }
 
-    /// The current song played to its end with nothing after it. After the sleep timer stopped it, the next song waits paused.
-    func ended() {
-        guard sleepTimer == .endOfSong, let index else { return }
-        sleepTimer = nil
-        if let i = following(index) { start(at: i, paused: true) }
-    }
-
     func pause() { if isPlaying { toggle() } }
 
     /// Reads the server extensions the player uses.

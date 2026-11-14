@@ -83,7 +83,7 @@ final class Player {
 
     var current: PlayItem? { index.flatMap { queue.indices.contains($0) ? queue[$0] : nil } }
     var duration: TimeInterval {
-        current?.duration ?? mixer.duration ?? 0
+        current?.isLive == true ? 0 : current?.duration ?? mixer.duration ?? 0
     }
     var hasNext: Bool { index.map { $0 + 1 < queue.count || repeatMode != .off } ?? false }
     var hasPrevious: Bool { index != nil }
@@ -236,7 +236,7 @@ final class Player {
 
     // MARK: Queue handling
 
-    func start(at i: Int, paused: Bool = false) {
+    private func start(at i: Int, paused: Bool = false) {
         guard let i = playable(i) else { return }
         index = i
         elapsed = 0
@@ -246,7 +246,7 @@ final class Player {
     }
 
     /// Entry played automatically after `i`, honoring repeat.
-    func following(_ i: Int) -> Int? {
+    private func following(_ i: Int) -> Int? {
         if sleepTimer == .endOfSong { return nil }
         return switch repeatMode {
         case .one: i
@@ -275,8 +275,9 @@ final class Player {
     }
 
     /// Hands queue entry `i` to the mixer as the next song, with its crossfade; nil clears it.
+    /// A live stream is never preloaded: it would hold a connection open; `ended()` starts it.
     private func preload(_ i: Int?) {
-        let i = i.flatMap(playable)
+        let i = i.flatMap(playable).flatMap { queue[$0].isLive ? nil : $0 }
         let cue = i.flatMap(cue(at:))
         nextIndex = cue == nil ? nil : i
         mixer.setNext(cue, transition: i.flatMap(transition(to:)))
@@ -284,7 +285,7 @@ final class Player {
 
     private func mixerEvent(_ event: Mixer.Event) {
         switch event {
-        case .advanced: advanced()
+        case .advanced(let skipped): advanced(skipped: skipped)
         case .ready: failures = 0
         case .failed(let current, let message): failed(current: current, message: message)
         case .ended: ended()
@@ -293,13 +294,35 @@ final class Player {
     }
 
     /// The preloaded next song became the audible one.
-    private func advanced() {
+    private func advanced(skipped: Bool) {
         guard let i = nextIndex else { return }
+        let message = skipped ? nil : silentEndMessage
         index = i
         nextIndex = nil
         elapsed = 0
         preload(following(i))
         trackStarted()
+        errorMessage = message
+    }
+
+    /// The current song played to its end with nothing preloaded after it. After the sleep timer stopped it,
+    /// the next song waits paused; a live stream, which is never preloaded, starts now.
+    private func ended() {
+        guard let index else { return }
+        let message = silentEndMessage
+        if sleepTimer == .endOfSong {
+            sleepTimer = nil
+            if let i = following(index) { start(at: i, paused: true) }
+        } else if let i = following(index).flatMap(playable), queue[i].isLive {
+            start(at: i)
+        }
+        if let message { errorMessage = message }
+    }
+
+    /// Set when the current song ended without being heard: the server sent no audio, e.g. an error page.
+    var silentEndMessage: String? {
+        guard elapsed < 1, (current?.duration ?? 0) > 5, let title = current?.title else { return nil }
+        return "“\(title)” could not be played: the server sent no audio."
     }
 
     /// Falls back to an mp3 stream when the first choice fails; skips the track if that fails too.
@@ -310,7 +333,7 @@ final class Player {
         if !retry { errorMessage = message ?? "Playback failed"; failures += 1 }
         let skip = failures < queue.count
         if current {
-            if retry { start(at: i) } else if skip { next() } else { mixer.pause() }
+            if retry { start(at: i) } else if skip { next(); errorMessage = message ?? "Playback failed" } else { mixer.pause() }
         } else {
             nextIndex = nil
             if retry { preload(i) } else if skip { preload(following(i)) }
@@ -326,7 +349,8 @@ final class Player {
         startedAt = Date()
         updateNowPlaying()
         onTrackStart?()
-        if case .server(let song)? = current, let client, !privateSession {
+        // A song loaded paused (after the sleep timer) is not playing yet.
+        if case .server(let song)? = current, let client, !privateSession, isPlaying {
             Task { try? await client.scrobble(ids: [song.id], submission: false) }
         }
         let cover = current?.coverArt
@@ -380,6 +404,7 @@ final class Player {
         ]
         info[MPMediaItemPropertyArtist] = item.artist
         info[MPMediaItemPropertyAlbumTitle] = item.album
+        info[MPNowPlayingInfoPropertyIsLiveStream] = item.isLive
         if let artwork { info[MPMediaItemPropertyArtwork] = Self.mediaArtwork(ImageBox(image: artwork)) }
         center.nowPlayingInfo = info
         center.playbackState = isPlaying ? .playing : .paused

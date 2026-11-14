@@ -23,8 +23,8 @@ import AVFoundation
     }
 
     public enum Event: Equatable, Sendable {
-        /// The next song became the current one: gapless, at the start of a transition, or by `skipToNext`.
-        case advanced
+        /// The next song became the current one: gapless, at the start of a transition, or by `skipToNext` (`skipped`).
+        case advanced(skipped: Bool)
         /// The current or the next song is ready to play.
         case ready
         /// The current or the next song cannot play; a failed next song is dropped.
@@ -112,7 +112,7 @@ import AVFoundation
         } else {
             decks[active].player.advanceToNextItem()
         }
-        advance(to: next)
+        advance(to: next, skipped: true)
         return true
     }
 
@@ -260,14 +260,14 @@ import AVFoundation
 
     // MARK: State
 
-    private func advance(to next: Cue) {
+    private func advance(to next: Cue, skipped: Bool = false) {
         current = next
         self.next = nil
         transition = nil
         seekPending = false
         prune()
         setBoundary()
-        onEvent(.advanced)
+        onEvent(.advanced(skipped: skipped))
     }
 
     /// Puts `next` where it plays from, unless it is there. During a transition the other deck still fades out;
