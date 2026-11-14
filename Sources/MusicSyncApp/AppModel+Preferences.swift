@@ -50,5 +50,6 @@ extension AppModel {
         syncSettings = sync
         mirrorSettings = MirrorSettings()
         player.settings = PlaybackSettings()
+        player.equalizer = EqualizerSettings()
     }
 }

@@ -60,6 +60,7 @@ struct PlaybackSettingsView: View {
                 }
                 SleepTimerPicker(selection: $player.sleepTimer)
             }
+            EqualizerSettingsSection()
             if model.serverQueue.supported { QueueSyncSection() }
         }
         .formStyle(.grouped)

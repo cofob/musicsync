@@ -90,6 +90,7 @@ struct MusicSyncApp: App {
                     .keyboardShortcut("r", modifiers: [.command, .option])
                     .disabled(model.library == nil || model.isMirrorRunning)
             }
+            CommandGroup(before: .windowList) { EqualizerMenuItem() }
             CommandMenu("Device") {
                 Button("Sync Now") { model.sync.dismissRun(); model.sync.showSheet = true }
                     .keyboardShortcut("s")
@@ -109,6 +110,12 @@ struct MusicSyncApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 300, height: 300)
+
+        Window("Equalizer", id: EqualizerView.windowID) {
+            EqualizerView().environment(model).tint(Color.musicAccent)
+        }
+        .windowResizability(.contentSize)
+        .commandsRemoved()  // `EqualizerMenuItem` has the shortcut
 
         Settings {
             SettingsView().environment(model).tint(Color.musicAccent)

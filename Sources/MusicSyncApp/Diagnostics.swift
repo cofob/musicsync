@@ -6,7 +6,7 @@ import Support
 /// Every file goes through `Redact`, so passwords and tokens stay on the Mac.
 enum Diagnostics {
     /// Settings saved as JSON that go into the zip. Remote pairings and the server password are not among them.
-    static let settingsKeys = ["syncSettings", "libraryMirrorSettings", "playbackSettings", "downloadSettings",
+    static let settingsKeys = ["syncSettings", "libraryMirrorSettings", "playbackSettings", "equalizerSettings", "downloadSettings",
                                "appearanceSettings", "homeSettings", "listeningSettings", "advancedSettings"]
 
     /// Blocking; call off the main actor.

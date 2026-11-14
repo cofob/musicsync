@@ -69,6 +69,8 @@ final class Player {
     var privateSession = false
     /// Settings > Playback; saved on every change.
     var settings = PlaybackSettings.load() { didSet { settingsChanged(from: oldValue) } }
+    /// Window > Equalizer; saved on every change.
+    var equalizer = EqualizerSettings.load() { didSet { equalizerChanged(from: oldValue) } }
     /// Pauses at its deadline, or stops at the end of the current song.
     var sleepTimer: SleepTimer? { didSet { sleepTimerChanged() } }
     /// The server has the OpenSubsonic `transcodeOffset` extension.
@@ -115,6 +117,7 @@ final class Player {
     init() {
         if ProcessInfo.processInfo.environment["MUSICSYNC_MUTE"] == "1" { volume = 0; mixer.volume = 0 }
         applySpeed()
+        mixer.equalizer.set(equalizer.gains)
         mixer.onEvent = { [weak self] in self?.mixerEvent($0) }
         mixer.onTime = { [weak self] in self?.tick($0) }
         setupRemoteCommands()

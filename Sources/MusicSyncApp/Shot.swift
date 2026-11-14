@@ -146,6 +146,16 @@ import SwiftUI
             _ = await first({ model.player.current })
             model.player.toggle()
             open(PlaybackSettingsView(), "Playback", model)
+        case "equalizer", "equalizer-off", "equalizer-playing":
+            // Rock, on; `equalizer-playing` plays (muted) until the song runs through the filters.
+            model.player.equalizer.apply(EqualizerPreset.builtIn.first { $0.name == "Rock" } ?? .flat)
+            model.player.equalizer.isOn = scene != "equalizer-off"
+            EqualizerSettings().save()  // the demo defaults stay unchanged
+            if scene == "equalizer-playing", let album = await first({ model.albums.first }) {
+                model.play(album)
+                _ = await first({ model.player.elapsed > 3 ? true : nil })
+            }
+            open(EqualizerView(), "Equalizer", model)
         case "offline":
             await select(.albums, model)
             guard let album = await first({ model.albums.first }) else { break }
