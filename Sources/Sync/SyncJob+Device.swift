@@ -44,9 +44,9 @@ extension SyncJob {
                     let deltas = db.merge(counts)
                     await scrobbler.enqueue(scrobbleRequests(deltas), source: data)
                 } else {
-                    warn("Play Counts does not match the database (\(counts.entries.count) vs \(db.tracks.count) tracks), skipped.")
+                    warn("Play Counts does not match the database (\(counts.entries.count) vs \(db.tracks.count) tracks), discarded. A copy is kept in the Mac backup.")
                 }
-            } catch { warn("Play Counts is unreadable, skipped: \(error)") }
+            } catch { warn("Play Counts is unreadable, discarded (a copy is kept in the Mac backup): \(error)") }
         }
         let lists = names.filter { $0.hasPrefix("OTGPlaylistInfo") }.sorted().compactMap { name in
             (try? Data(contentsOf: device.iTunesDir.appendingPathComponent(name))).flatMap { try? OTGPlaylists.parse($0) }
