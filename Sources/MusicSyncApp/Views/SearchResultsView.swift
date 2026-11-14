@@ -94,15 +94,8 @@ private struct BrowseGenresView: View {
 private struct GenreTile: View {
     let genre: BrowseGenresView.Genre
 
-    private static let palette: [Color] = [
-        Color(red: 0.98, green: 0.14, blue: 0.24), Color(red: 0.95, green: 0.35, blue: 0.20), Color(red: 0.90, green: 0.70, blue: 0.05),
-        Color(red: 0.15, green: 0.70, blue: 0.30), Color(red: 0.10, green: 0.55, blue: 0.60), Color(red: 0.30, green: 0.50, blue: 0.95),
-        Color(red: 0.55, green: 0.35, blue: 0.85), Color(red: 0.95, green: 0.40, blue: 0.60), Color(red: 0.35, green: 0.35, blue: 0.40),
-    ]
-
     var body: some View {
-        let color = Self.palette[abs(genre.name.unicodeScalars.reduce(0) { $0 &* 31 &+ Int($1.value) }) % Self.palette.count]
-        color
+        Color.genre(genre.name)
             .overlay(alignment: .trailing) {
                 CoverImage(id: genre.cover, size: 300, cornerRadius: 0)
                     .saturation(0).blendMode(.multiply).opacity(0.9)
@@ -116,19 +109,6 @@ private struct GenreTile: View {
             .frame(height: 120)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .contentShape(RoundedRectangle(cornerRadius: 12))
-    }
-}
-
-/// Albums of one genre (from Browse).
-struct GenreAlbumsView: View {
-    @Environment(AppModel.self) private var model
-    let genre: String
-
-    var body: some View {
-        let albums = model.albums.filter { $0.genre == genre }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-        AlbumGrid(albums: albums)
-            .overlay { if albums.isEmpty { ContentUnavailableView("No Albums", systemImage: "square.stack") } }
-            .navigationTitle(genre)
     }
 }
 

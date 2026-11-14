@@ -80,7 +80,9 @@ struct ScrubBar: View {
         let start = Text(formatTime(elapsed))
         let end = Text("−" + formatTime(max(0, duration - elapsed)))
         Group {
-            if timesBelow {
+            if player.current?.isLive == true {
+                LiveLabel()
+            } else if timesBelow {
                 VStack(spacing: 2) {
                     bar
                     HStack { start; Spacer(); end }

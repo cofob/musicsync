@@ -8,7 +8,11 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
-                Text("Home").font(.system(size: 34, weight: .bold))
+                HStack {
+                    Text("Home").font(.system(size: 34, weight: .bold))
+                    Spacer()
+                    NavigationLink(value: Route.stats) { Label("Your Stats", systemImage: "chart.bar.fill") }.buttonStyle(FilledCapsuleStyle())
+                }
                 if model.shelves.isEmpty && model.libraryError == nil { placeholder }
                 ForEach(Array(model.shelves.enumerated()), id: \.element.id) { offset, shelf in
                     VStack(alignment: .leading, spacing: 14) {

@@ -14,6 +14,7 @@ enum Route: Hashable {
     case devicePlaylist(Int)
     case genre(String)
     case mix(String)
+    case stats
 }
 
 @MainActor @Observable
@@ -69,6 +70,8 @@ final class AppModel {
     var searchFieldFocused = false
     @ObservationIgnored private(set) lazy var search = SearchModel(app: self)
     @ObservationIgnored private(set) lazy var mixes = MixModel(app: self)
+    @ObservationIgnored private(set) lazy var browse = BrowseModel(app: self)
+    @ObservationIgnored private(set) lazy var radio = RadioModel(app: self)
     /// Sharing, deep links, Spotlight, global shortcuts, notifications.
     @ObservationIgnored private(set) lazy var system = SystemServices(app: self)
     /// The web remote for iPhone, iPad and Apple Watch (Settings > Remote).

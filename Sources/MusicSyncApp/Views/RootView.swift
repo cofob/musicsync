@@ -123,6 +123,8 @@ struct RootView: View {
         case .albums: AlbumsView()
         case .artists: ArtistsView()
         case .songs: SongsView()
+        case .genres: GenresView()
+        case .radio: RadioView()
         case .favorites: FavoritesView()
         case .downloaded: DownloadedView()
         case .playlists: PlaylistsView()
@@ -148,8 +150,9 @@ struct RootView: View {
         case .playlist(let playlist): PlaylistDetailView(playlist: playlist)
         case .deviceAlbum(let id): DeviceAlbumDetailView(id: id)
         case .devicePlaylist(let id): DevicePlaylistDetailView(id: id)
-        case .genre(let name): GenreAlbumsView(genre: name)
+        case .genre(let name): GenreDetailView(genre: name)
         case .mix(let id): MixDetailView(id: id)
+        case .stats: StatsView()
         }
     }
 

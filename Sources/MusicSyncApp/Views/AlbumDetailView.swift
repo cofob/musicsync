@@ -30,6 +30,7 @@ struct AlbumDetailView<Accessory: View>: View {
                 discs(songs).padding(.horizontal, 22)
                 Text(footer(songs)).font(.callout).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 32).padding(.vertical, 20)
+                AlbumSuggestions(album: full ?? album).padding(.horizontal, 32).padding(.bottom, 32)
             }
         }
         .navigationTitle(album.name)
@@ -57,7 +58,7 @@ struct AlbumDetailView<Accessory: View>: View {
     }
 
     private func meta(_ songs: [Song]) -> String {
-        [album.genre, album.year.map(String.init), sourceFormat(songs)].compactMap { $0 }.joined(separator: " · ")
+        [album.genre, album.year.map(String.init), sourceFormat(songs), album.duration.map(formatTotal)].compactMap { $0 }.joined(separator: " · ")
     }
 
     private func footer(_ songs: [Song]) -> String {

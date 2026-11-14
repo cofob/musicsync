@@ -4,11 +4,11 @@ import SwiftUI
 /// and a branch in `RootView.content(for:)`.
 enum SidebarItem: Hashable {
     case search, home
-    case recentlyAdded, artists, albums, songs, favorites, downloaded
+    case recentlyAdded, artists, albums, songs, genres, favorites, downloaded, radio
     case playlists, playlist(String)
     case deviceOverview, deviceAlbums, deviceSongs, devicePlaylists
 
-    static let libraryItems: [SidebarItem] = [.recentlyAdded, .artists, .albums, .songs, .favorites, .downloaded]
+    static let libraryItems: [SidebarItem] = [.recentlyAdded, .artists, .albums, .songs, .genres, .favorites, .downloaded]
     static let deviceItems: [SidebarItem] = [.deviceOverview, .deviceAlbums, .deviceSongs, .devicePlaylists]
 
     var isDevice: Bool { Self.deviceItems.contains(self) }
@@ -21,6 +21,8 @@ enum SidebarItem: Hashable {
         case .albums, .deviceAlbums: "Albums"
         case .artists: "Artists"
         case .songs, .deviceSongs: "Songs"
+        case .genres: "Genres"
+        case .radio: "Radio"
         case .favorites: "Favorites"
         case .downloaded: "Downloaded"
         case .playlists: "All Playlists"
@@ -37,6 +39,8 @@ enum SidebarItem: Hashable {
         case .albums, .deviceAlbums: "square.stack"
         case .artists: "music.microphone"
         case .songs, .deviceSongs: "music.note"
+        case .genres: "guitars"
+        case .radio: "dot.radiowaves.left.and.right"
         case .favorites: "star"
         case .downloaded: "arrow.down.circle"
         case .playlists: "square.grid.3x3"
@@ -67,6 +71,7 @@ struct Sidebar: View {
             ForEach([SidebarItem.search, .home], id: \.self, content: row)
             Section("Library") {
                 ForEach(SidebarItem.libraryItems, id: \.self, content: row)
+                if model.radio.isVisible { row(.radio) }
             }
             if model.ipod.current != nil || model.ipod.isOffline {
                 Section {
@@ -86,6 +91,7 @@ struct Sidebar: View {
             if model.client != nil { VStack(spacing: 6) { OfflineBanner(); LibraryStatusView() }.padding(.horizontal, 10).padding(.bottom, 8) }
         }
         .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 300)
+        .task(id: model.client?.baseURL) { await model.radio.load() }
     }
 
     private func row(_ item: SidebarItem) -> some View {
