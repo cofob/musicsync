@@ -38,10 +38,13 @@ final class DownloadsModel {
         didSet {
             guard settings != oldValue else { return }
             settings.save()
+            if settings.cacheGB != oldValue.cacheGB { cache.setLimit(gb: settings.cacheGB) }
             let settings = settings, manager = manager
             Task { await manager?.update(settings: settings) }
         }
     }
+    /// Streamed songs kept for offline play; separate from downloads.
+    let cache = PlaybackCacheModel()
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
 
     /// Plays downloaded files, and skips songs that cannot play while offline.
@@ -51,13 +54,16 @@ final class DownloadsModel {
             guard let self, case .server(let song) = item else { return true }
             return isAvailable(song)
         }
+        cache.watch(player) { [weak self] in self?.isOffline ?? false }
     }
 
     // MARK: Lifecycle
 
     /// Opens the downloads of `client`'s server and resumes the queue.
     func start(client: SubsonicClient) {
-        let manager = DownloadManager(serverKey: LibraryDatabase.serverKey(for: client.config), settings: settings)
+        let key = LibraryDatabase.serverKey(for: client.config)
+        let manager = DownloadManager(serverKey: key, settings: settings)
+        cache.start(serverKey: key, limitGB: settings.cacheGB)
         self.manager = manager
         tasks = [observe(manager), watchServer(client, manager)]
         Task { await manager.start(client: client) }
@@ -69,6 +75,7 @@ final class DownloadsModel {
         entries = [:]; pins = []; groups = [:]; order = [:]; usedBytes = 0
         status = DownloadStatus()
         isOffline = false
+        cache.stop()
         guard let old = manager else { return }
         manager = nil
         await old.stop()
@@ -123,9 +130,10 @@ final class DownloadsModel {
 
     // MARK: Reads
 
-    func fileURL(_ songID: String) -> URL? { entries[songID].flatMap { manager?.fileURL($0) } }
+    /// The downloaded file, else the cached one.
+    func fileURL(_ songID: String) -> URL? { entries[songID].flatMap { manager?.fileURL($0) } ?? cache.fileURL(songID) }
 
-    /// False while offline for songs that are not downloaded.
+    /// False while offline for songs that are neither downloaded nor cached.
     func isAvailable(_ song: Song) -> Bool { !isOffline || fileURL(song.id) != nil }
 
     func isPinned(_ reason: DownloadReason) -> Bool { pins.contains { $0.reason == reason } }
