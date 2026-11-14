@@ -14,6 +14,7 @@ struct SongMenuItems: View {
             Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") { model.addToQueue([song]) }
         }
         AddToPlaylistMenu(songs: [song])
+        StationButton(seed: .song(song))
         Divider()
         Button("Get Info", systemImage: "info.circle") { model.infoSong = song }
         Button(model.isStarred(song) ? "Undo Favorite" : "Favorite", systemImage: model.isStarred(song) ? "star.slash" : "star") {

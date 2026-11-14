@@ -28,7 +28,7 @@ struct PlaylistDetailView: View {
                     TrackListHeader()
                     // Moving needs the full list in playlist order.
                     let canMove = editable && rows.count == entries.count
-                    SongList(songs: songs, leading: .cover, onPlay: { model.player.play(songs, startAt: $0) },
+                    SongList(songs: songs, leading: .cover, onPlay: { model.mixes.play(songs, from: .playlist, startAt: $0) },
                              onRemove: editable ? { (i: Int) in remove(at: rows[i].offset) } : nil,
                              onMove: canMove ? { (from: Int, to: Int) in move(from: from, to: to) } : nil)
                 }
@@ -43,8 +43,8 @@ struct PlaylistDetailView: View {
         MediaHeader(cover: { CoverImage(id: current.coverArt, size: 600, cornerRadius: 10, symbol: "music.note.list") },
                     title: current.name, canPlay: !songs.isEmpty,
                     onRename: editable ? { model.rename(current, to: $0, comment: current.comment) } : nil,
-                    onPlay: { model.player.play(songs, shuffled: false) },
-                    onShuffle: { model.player.play(songs, shuffled: true) }) {
+                    onPlay: { model.mixes.play(songs, from: .playlist, shuffled: false) },
+                    onShuffle: { model.mixes.play(songs, from: .playlist, shuffled: true) }) {
             if let owner = current.owner { Text(owner).font(.system(size: 22, weight: .medium)).foregroundStyle(Color.musicAccent) }
             if editable {
                 InlineTextField(text: current.comment ?? "", prompt: "Add Description", font: .body, allowsEmpty: true) {

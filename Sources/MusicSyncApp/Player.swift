@@ -73,6 +73,8 @@ final class Player {
     @ObservationIgnored var localFile: ((String) -> URL?)?
     /// False for entries that cannot play now (offline and not downloaded); they are skipped.
     @ObservationIgnored var canPlay: ((PlayItem) -> Bool)?
+    /// Called when a track starts, also when it repeats; the play history and AutoPlay listen here.
+    @ObservationIgnored var onTrackStart: (() -> Void)?
 
     var current: PlayItem? { index.flatMap { queue.indices.contains($0) ? queue[$0] : nil } }
     var duration: TimeInterval {
@@ -370,6 +372,7 @@ final class Player {
         scrobbled = false
         startedAt = Date()
         updateNowPlaying()
+        onTrackStart?()
         if case .server(let song)? = current, let client {
             Task { try? await client.scrobble(ids: [song.id], submission: false) }
         }

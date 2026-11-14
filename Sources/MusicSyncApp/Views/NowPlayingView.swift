@@ -218,6 +218,7 @@ private struct QueuePanel: View {
                 Text("Playing Next").font(.title2.bold())
                 Spacer()
                 Text(player.shuffle ? "Shuffle On" : "").font(.callout).foregroundStyle(.white.opacity(0.6))
+                AutoPlayButton()
             }
             if player.upcoming.isEmpty {
                 Text("Nothing up next").foregroundStyle(.white.opacity(0.6)).frame(maxWidth: .infinity, maxHeight: .infinity)

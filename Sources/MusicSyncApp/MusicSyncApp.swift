@@ -70,6 +70,8 @@ struct MusicSyncApp: App {
                     Text("All").tag(RepeatMode.all)
                     Text("One").tag(RepeatMode.one)
                 }
+                Toggle("AutoPlay", isOn: Binding(get: { model.mixes.autoPlay }, set: { model.mixes.autoPlay = $0 }))
+                    .disabled(!model.mixes.isAvailable)
                 Divider()
                 Button(model.showNowPlaying ? "Hide Now Playing" : "Show Now Playing") { model.showNowPlaying.toggle() }
                     .keyboardShortcut("n", modifiers: [.command, .shift])

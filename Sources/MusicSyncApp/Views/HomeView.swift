@@ -30,6 +30,7 @@ struct HomeView: View {
                         .scrollIndicators(.never)
                         .padding(.horizontal, -32).padding(.vertical, -20)
                     }
+                    if offset == 0 { MadeForYouSection() }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

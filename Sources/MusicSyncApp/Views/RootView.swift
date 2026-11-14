@@ -149,6 +149,7 @@ struct RootView: View {
         case .deviceAlbum(let id): DeviceAlbumDetailView(id: id)
         case .devicePlaylist(let id): DevicePlaylistDetailView(id: id)
         case .genre(let name): GenreAlbumsView(genre: name)
+        case .mix(let id): MixDetailView(id: id)
         }
     }
 

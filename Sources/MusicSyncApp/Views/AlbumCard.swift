@@ -40,6 +40,7 @@ struct AlbumMenuItems: View {
     var body: some View {
         Button("Play", systemImage: "play.fill") { model.play(album) }
         Button("Shuffle", systemImage: "shuffle") { model.play(album, shuffled: true) }
+        StationButton(seed: .album(album))
         Divider()
         Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") { songs { model.playNext($0) } }
         Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") { songs { model.addToQueue($0) } }

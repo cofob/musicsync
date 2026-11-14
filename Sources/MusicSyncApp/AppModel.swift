@@ -13,6 +13,7 @@ enum Route: Hashable {
     case deviceAlbum(String)
     case devicePlaylist(Int)
     case genre(String)
+    case mix(String)
 }
 
 @MainActor @Observable
@@ -67,6 +68,7 @@ final class AppModel {
     /// Set by the toolbar search field.
     var searchFieldFocused = false
     @ObservationIgnored private(set) lazy var search = SearchModel(app: self)
+    @ObservationIgnored private(set) lazy var mixes = MixModel(app: self)
     var showNowPlaying = false
     var nowPlayingPanel = NowPlayingPanel.lyrics
     /// Song shown in the "Get Info" sheet.
@@ -117,6 +119,7 @@ final class AppModel {
         ipod.manualGuid = { [weak self] device in device.volumeUUID.flatMap { self?.syncSettings.manualGuids[$0] } }
         sync.attach(self)
         downloads.attach(to: player)
+        _ = mixes  // starts the play history
         ipod.start()
         spaceMonitor = SpaceKeyMonitor.install { [weak self] in
             guard let player = self?.player, !player.queue.isEmpty else { return false }
@@ -253,6 +256,7 @@ final class AppModel {
                        Shelf(id: "random", title: "Discover", albums: Array(albums.shuffled().prefix(20)))]
                 .filter { !$0.albums.isEmpty }
             libraryError = nil
+            await mixes.load()
             return
         }
         guard let client else { return }
@@ -290,7 +294,7 @@ final class AppModel {
         Task {
             do {
                 let full = try await self.playlist(playlist.id)
-                player.play(full?.entry ?? [], shuffled: shuffled)
+                mixes.play(full?.entry ?? [], from: .playlist, shuffled: shuffled)
             } catch { report(error) }
         }
     }

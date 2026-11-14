@@ -29,6 +29,7 @@ struct PlaylistSidebarRow: View {
         .contextMenu {
             Button("Play", systemImage: "play.fill") { model.play(playlist) }
             PinMenuItem(reason: .playlist(playlist.id)) { model.download(playlist) }
+            StationButton(seed: .playlist(playlist))
             SyncMenuItem(isOn: model.sync.isPlaylistSelected(playlist.id)) { model.sync.togglePlaylist(playlist.id) }
             Divider()
             if editable {

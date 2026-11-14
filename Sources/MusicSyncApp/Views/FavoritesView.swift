@@ -111,6 +111,7 @@ struct ArtistMenuItems: View {
     let artist: Artist
 
     var body: some View {
+        StationButton(seed: .artist(artist.name))
         Button(model.isStarred(artist) ? "Undo Favorite" : "Favorite", systemImage: model.isStarred(artist) ? "star.slash" : "star") {
             model.toggleStar(artist)
         }
