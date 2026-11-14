@@ -4,16 +4,23 @@
 Run the app against it with MUSICSYNC_DEMO_SERVER=http://127.0.0.1:<port> (demo mode only).
 Sizes (env): BIG_ARTISTS (2000), BIG_ALBUMS (5000), BIG_SONGS_PER_ALBUM (10), BIG_PLAYLISTS (500).
 Playlist pl-0 holds 10000 songs, the others 50; artist ar-0 has every 40th album as well. BIG_MEDIA=1 draws album covers
-in the asked size (up to 1000 px), streams 30 s of silence and gives synced lyrics for every song. Otherwise covers, streams and lyrics are
+in the asked size (up to 1000 px), streams (and downloads) 30 s of silence and gives synced lyrics for every song. Otherwise covers, streams and lyrics are
 missing, except for the podcasts:
 three channels with drawn covers, bookmarks kept in memory, and silent episode streams (seekable).
-The user has the jukebox role; the jukebox keeps its playlist in memory and plays no sound."""
+The user has the jukebox role; the jukebox keeps its playlist in memory and plays no sound.
+
+Faults, all off by default: FAULT_LATENCY (max seconds of random delay), and the share of requests that get
+FAULT_500 (HTTP 500), FAULT_DROP (connection closed mid-body), FAULT_MALFORMED (broken JSON or XML) or
+FAULT_TRUNCATE (a short audio stream), e.g. 0.05. FAULT_OUTAGE=<every>:<seconds> stops listening that long, and
+FAULT_AUTH=<every>:<seconds> answers "wrong password", on that schedule. GET /fault?outage=<s>&auth=<s>&random=0|1
+does the same once from now on, and turns the random faults off or on."""
 import functools
 import json
 import os
 import random
 import struct
 import sys
+import threading
 import time
 import zlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -266,9 +273,45 @@ def reply(method, q):
     return podcast(method, q)
 
 
+def schedule(name):
+    every, _, seconds = os.environ.get(name, "").partition(":")
+    return (float(every), float(seconds)) if every and seconds else None
+
+
+faults = {"random": True, "outage": 0.0, "auth": 0.0, "started": time.time()}
+RATES = {k: float(os.environ.get("FAULT_" + k.upper(), 0)) for k in ("500", "drop", "malformed", "truncate")}
+LATENCY = float(os.environ.get("FAULT_LATENCY", 0))
+OUTAGE, AUTH = schedule("FAULT_OUTAGE"), schedule("FAULT_AUTH")
+
+
+def in_window(until, plan):
+    """True while a one-off window or a scheduled one runs."""
+    now = time.time()
+    return now < until or bool(plan and (now - faults["started"]) % plan[0] >= plan[0] - plan[1])
+
+
+def fault(kind):
+    return faults["random"] and random.random() < RATES[kind]
+
+
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urlparse(self.path)
+        if url.path == "/fault":
+            q = {k: float(v[0]) for k, v in parse_qs(url.query).items()}
+            faults.update(random=bool(q.get("random", faults["random"])))
+            for key in ("outage", "auth"):
+                if key in q:
+                    faults[key] = time.time() + q[key]
+            self.send_response(200)
+            self.end_headers()
+            return
+        if in_window(faults["outage"], OUTAGE):
+            return self.drop()
+        if faults["random"] and LATENCY:
+            time.sleep(random.uniform(0, LATENCY))
+        if fault("500"):
+            return self.send(b"Internal Server Error", "text/plain", status=500)
         method = url.path.rsplit("/", 1)[-1].removesuffix(".view")
         q = {k: v[0] for k, v in parse_qs(url.query).items()}
         cover = PODCASTS[int(q["id"][4:])] if method == "getCoverArt" and q.get("id", "").startswith("pod-") else None
@@ -278,35 +321,49 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(album_cover(int(q["id"][3:]) % 24, min(int(q.get("size", 1000)), 1000)), "image/png")
         if method == "stream" and q.get("id", "").startswith("st-"):
             return self.send(SILENCE, "audio/wav")
-        if method == "stream" and MEDIA and q.get("id", "").startswith("s-"):
+        if method in ("stream", "download") and MEDIA and q.get("id", "").startswith("s-"):
             return self.send(SONG, "audio/wav")
-        body = jukebox_control(q, parse_qs(url.query).get("id", [])) if method == "jukeboxControl" else reply(method, q)
+        if method in ("stream", "download") and fault("truncate"):
+            return self.send(SONG[:len(SONG) // 10], "audio/wav")
+        if in_window(faults["auth"], AUTH) and method not in ("getCoverArt", "stream", "download"):
+            body = {"error": {"code": 40, "message": "Wrong username or password"}}
+        else:
+            body = jukebox_control(q, parse_qs(url.query).get("id", [])) if method == "jukeboxControl" else reply(method, q)
         if body is None or body is False:
             self.send_response(404)
             self.end_headers()
             return
         data = json.dumps({"subsonic-response": {"status": "failed" if "error" in body else "ok", "version": "1.16.1", "openSubsonic": True, **body}}).encode()
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
+        if fault("malformed"):
+            data = random.choice([data[:len(data) // 2], b'<?xml version="1.0"?><subsonic-response status="ok"><broken', b"\x00\xff{"])
+        self.send(data, "application/json")
 
-    def send(self, data, kind):
+    def send(self, data, kind, status=200):
         """Whole file or one byte range, so the player can seek."""
         start, end = 0, len(data) - 1
         spec = self.headers.get("Range", "")
         if spec.startswith("bytes="):
             first, _, last = spec[6:].partition("-")
             start, end = int(first or 0), min(int(last) if last else end, end)
-        self.send_response(206 if spec else 200)
+        self.send_response(206 if spec and status == 200 else status)
         self.send_header("Content-Type", kind)
         self.send_header("Accept-Ranges", "bytes")
         self.send_header("Content-Length", str(end - start + 1))
         if spec:
             self.send_header("Content-Range", f"bytes {start}-{end}/{len(data)}")
         self.end_headers()
+        if fault("drop"):
+            self.wfile.write(data[start:start + (end - start + 1) // 2])
+            return self.drop()
         self.wfile.write(data[start:end + 1])
+
+    def drop(self):
+        """Closes the connection at once, as a server that goes away does."""
+        try:
+            self.connection.shutdown(2)
+        except OSError:
+            pass
+        self.close_connection = True
 
     do_POST = do_GET
 
@@ -318,4 +375,14 @@ SILENCE = silence(max(e["duration"] for e in episodes))
 SONG = silence(30)
 port = int(sys.argv[1]) if len(sys.argv) > 1 else 4533
 print(f"{len(artists)} artists, {len(albums)} albums, {len(songs)} songs, {len(playlists)} playlists on port {port}", flush=True)
-ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
+while True:
+    # Listens until an outage starts, then stops listening (connections are refused) until it ends.
+    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    server.daemon_threads = True
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    while not in_window(faults["outage"], OUTAGE):
+        time.sleep(0.2)
+    server.shutdown()
+    server.server_close()
+    while in_window(faults["outage"], OUTAGE):
+        time.sleep(0.2)
