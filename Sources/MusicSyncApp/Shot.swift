@@ -2,6 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 import Integration
 import Library
+import Playback
 import Recommend
 import Subsonic
 import SwiftUI
@@ -77,6 +78,13 @@ import SwiftUI
             }
             await select(.downloaded, model)
         case "settings-downloads": open(DownloadSettingsView(), "Downloads", model)
+        case "settings-playback":
+            model.player.settings.crossfade = true
+            model.player.settings.soundCheck = .album
+            model.player.settings.quality = .aac
+            PlaybackSettings().save()  // the demo defaults stay unchanged
+            _ = await first({ model.player.supportsTranscodeOffset ? true : nil })
+            open(PlaybackSettingsView(), "Playback", model)
         case "offline":
             await select(.albums, model)
             guard let album = await first({ model.albums.first }) else { break }

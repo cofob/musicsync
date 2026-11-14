@@ -165,6 +165,7 @@ final class AppModel {
         let covers = CoverArtCache(client: client, offline: downloads.manager?.coversDirectory)
         self.client = client; self.store = store; self.covers = covers
         player.client = client; player.covers = covers
+        Task { await player.loadFeatures(client) }
         sync.flushScrobbles(client)
         sync.deviceUpdated()  // the manifest belongs to the server
         let library = makeLibrary(client.config)

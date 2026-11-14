@@ -7,6 +7,7 @@ struct SettingsView: View {
     var body: some View {
         TabView {
             GeneralSettingsView().tabItem { Label("General", systemImage: "gearshape") }
+            PlaybackSettingsView().tabItem { Label("Playback", systemImage: "play.circle") }
             ServerSettingsView().tabItem { Label("Server", systemImage: "server.rack") }
             LibrarySettingsView().tabItem { Label("Library", systemImage: "books.vertical") }
             DownloadSettingsView().tabItem { Label("Downloads", systemImage: "arrow.down.circle") }

@@ -58,11 +58,13 @@ public struct SubsonicClient: Sendable {
         url("getCoverArt", [("id", id), ("square", "true")] + (size.map { [("size", String($0))] } ?? []), json: false)
     }
 
-    /// `format` "raw" streams the original file. `maxBitRate` is in kbps.
-    public func streamURL(id: String, format: String? = nil, maxBitRate: Int? = nil) -> URL {
+    /// `format` "raw" streams the original file. `maxBitRate` is in kbps. `timeOffset` (seconds) starts a converted
+    /// stream later; it needs the OpenSubsonic `transcodeOffset` extension.
+    public func streamURL(id: String, format: String? = nil, maxBitRate: Int? = nil, timeOffset: Int? = nil) -> URL {
         url("stream", [("id", id)]
             + (format.map { [("format", $0)] } ?? [])
-            + (maxBitRate.map { [("maxBitRate", String($0))] } ?? []), json: false)
+            + (maxBitRate.map { [("maxBitRate", String($0))] } ?? [])
+            + (timeOffset.map { [("timeOffset", String($0))] } ?? []), json: false)
     }
 
     public func downloadURL(id: String) -> URL { url("download", [("id", id)], json: false) }

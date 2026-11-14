@@ -118,6 +118,8 @@ private func decode<T: Decodable>(_ json: String, key: String?, as: T.Type = T.s
         #expect(q["format"] == "mp3")
         #expect(q["maxBitRate"] == "320")
         #expect(query(client().streamURL(id: "s-1"))["format"] == nil)
+        #expect(q["timeOffset"] == nil)
+        #expect(query(client().streamURL(id: "s-1", format: "mp3", timeOffset: 61))["timeOffset"] == "61")
     }
 
     @Test func baseURLWithPathAndEscaping() {

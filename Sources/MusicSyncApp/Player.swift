@@ -2,6 +2,7 @@ import AVFoundation
 import AppKit
 import MediaPlayer
 import Observation
+import Playback
 import Subsonic
 
 /// One queue entry: a server track or a local file (e.g. a track read from an iPod).
@@ -54,9 +55,6 @@ enum RepeatMode: CaseIterable, Sendable {
 
 @MainActor @Observable
 final class Player {
-    /// Suffixes streamed as-is; everything else is transcoded by the server.
-    private static let rawSuffixes: Set<String> = ["mp3", "m4a", "aac", "alac", "flac", "wav", "aif", "aiff"]
-
     private(set) var queue: [PlayItem] = []
     private(set) var index: Int?
     private(set) var isPlaying = false
@@ -68,6 +66,12 @@ final class Player {
     var repeatMode = RepeatMode.off { didSet { resetUpcoming() } }
     /// Playback > Private Session: no scrobbles, so plays stay out of the server's history and counts.
     var privateSession = false
+    /// Settings > Playback; saved on every change.
+    var settings = PlaybackSettings.load() { didSet { settingsChanged(from: oldValue) } }
+    /// Pauses at its deadline, or stops at the end of the current song.
+    var sleepTimer: SleepTimer? { didSet { sleepTimerChanged() } }
+    /// The server has the OpenSubsonic `transcodeOffset` extension.
+    var supportsTranscodeOffset = false
 
     @ObservationIgnored var client: SubsonicClient?
     @ObservationIgnored var covers: CoverArtCache?
@@ -97,12 +101,12 @@ final class Player {
         let status: NSKeyValueObservation
     }
 
-    @ObservationIgnored private let player = AVQueuePlayer()
+    @ObservationIgnored let player = AVQueuePlayer()
     @ObservationIgnored private var slots: [ObjectIdentifier: Slot] = [:]
     @ObservationIgnored private var observations: [NSKeyValueObservation] = []
     @ObservationIgnored private var timeObserver: Any?
     /// Queue indexes that failed raw and are streamed as mp3 instead.
-    @ObservationIgnored private var transcoded: Set<Int> = []
+    @ObservationIgnored var transcoded: Set<Int> = []
     /// Tracks that failed since the last one became ready; a full queue of them stops playback.
     @ObservationIgnored private var failures = 0
     @ObservationIgnored private var startedAt = Date()
@@ -115,9 +119,11 @@ final class Player {
     @ObservationIgnored private var artworkID: String?
     /// Last seek: ticks far from it (stale, from before the seek) are ignored until one lands near it or the deadline passes.
     @ObservationIgnored private var seekTarget: (time: TimeInterval, deadline: Date)?
+    @ObservationIgnored var sleepTask: Task<Void, Never>?
 
     init() {
         if ProcessInfo.processInfo.environment["MUSICSYNC_MUTE"] == "1" { volume = 0; player.volume = 0 }
+        applySpeed()
         observations = [
             player.observe(\.currentItem) { [weak self] _, _ in Task { @MainActor in self?.currentItemChanged() } },
             player.observe(\.timeControlStatus) { [weak self] _, _ in Task { @MainActor in self?.statusChanged() } },
@@ -271,7 +277,8 @@ final class Player {
 
     /// Entry played automatically after `i`, honoring repeat.
     private func following(_ i: Int) -> Int? {
-        switch repeatMode {
+        if sleepTimer == .endOfSong { return nil }
+        return switch repeatMode {
         case .one: i
         case .all: queue.isEmpty ? nil : (i + 1) % queue.count
         case .off: i + 1
@@ -291,7 +298,7 @@ final class Player {
     }
 
     /// Re-syncs the preloaded next item with `queue` after it changed.
-    private func resetUpcoming() {
+    func resetUpcoming() {
         transcoded = []
         for (id, slot) in slots where id != currentItemID {
             player.remove(slot.item)
@@ -315,23 +322,9 @@ final class Player {
         player.insert(item, after: nil)
     }
 
-    private func makeItem(_ entry: PlayItem, at i: Int) -> AVPlayerItem? {
-        switch entry {
-        case .file(let url, _, _, _):
-            return AVPlayerItem(url: url)
-        case .server(let song):
-            if !transcoded.contains(i), let url = localFile?(song.id) { return AVPlayerItem(url: url) }
-            guard let client else { return nil }
-            let raw = Self.rawSuffixes.contains((song.suffix ?? "").lowercased()) && !transcoded.contains(i)
-            guard raw else { return AVPlayerItem(url: client.streamURL(id: song.id, format: "mp3", maxBitRate: 320)) }
-            // Raw stream URLs have no file extension; tell AVFoundation the type.
-            let options = song.contentType.map { [AVURLAssetOverrideMIMETypeKey: $0] }
-            return AVPlayerItem(asset: AVURLAsset(url: client.streamURL(id: song.id, format: "raw"), options: options))
-        }
-    }
-
     private func currentItemChanged() {
-        guard let item = player.currentItem, ObjectIdentifier(item) != currentItemID,
+        guard let item = player.currentItem else { return ended() }
+        guard ObjectIdentifier(item) != currentItemID,
               let slot = slots[ObjectIdentifier(item)] else { return }
         currentItemID = ObjectIdentifier(item)
         index = slot.index
@@ -424,8 +417,8 @@ final class Player {
             MPMediaItemPropertyTitle: item.title,
             MPMediaItemPropertyPlaybackDuration: duration,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: elapsed,
-            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? 1.0 : 0.0,
-            MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
+            MPNowPlayingInfoPropertyPlaybackRate: isPlaying ? settings.speed : 0.0,
+            MPNowPlayingInfoPropertyDefaultPlaybackRate: settings.speed,
         ]
         info[MPMediaItemPropertyArtist] = item.artist
         info[MPMediaItemPropertyAlbumTitle] = item.album

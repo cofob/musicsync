@@ -76,6 +76,7 @@ struct MusicSyncApp: App {
                     .disabled(!model.mixes.isAvailable)
                 Divider()
                 Toggle("Private Session", isOn: Binding(get: { model.player.privateSession }, set: { model.player.privateSession = $0 }))
+                SleepTimerPicker(selection: Binding(get: { model.player.sleepTimer }, set: { model.player.sleepTimer = $0 }))
                 Divider()
                 Button(model.showNowPlaying ? "Hide Now Playing" : "Show Now Playing") { model.showNowPlaying.toggle() }
                     .keyboardShortcut("n", modifiers: [.command, .shift])
