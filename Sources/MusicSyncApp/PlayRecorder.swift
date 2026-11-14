@@ -47,7 +47,8 @@ final class PlayRecorder {
     private func trackStarted() {
         finish()
         song = nil
-        if case .server(let current)? = player.current {
+        // A Private Session keeps plays out of the history, as it keeps them from scrobbling.
+        if case .server(let current)? = player.current, !player.privateSession {
             song = current
             history = library()?.history
             startedAt = Date()
