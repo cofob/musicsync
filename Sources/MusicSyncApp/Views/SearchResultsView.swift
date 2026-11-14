@@ -51,7 +51,7 @@ private struct BrowseGenresView: View {
     @Environment(AppModel.self) private var model
     @State private var genres: [Genre] = []
 
-    struct Genre: Identifiable {
+    struct Genre: Identifiable, Sendable {
         let name: String
         let cover: String?
         var id: String { name }
@@ -77,11 +77,14 @@ private struct BrowseGenresView: View {
                 SearchPlaceholder(title: "Searching Your Library")
             }
         }
-        .onChange(of: model.libraryVersion, initial: true) { genres = Self.genres(model.albums) }
+        .task(id: model.libraryVersion) {
+            let albums = model.albums  // thousands of albums: grouped off the main thread
+            genres = await Task.detached { Self.genres(albums) }.value
+        }
     }
 
     /// Genres with the most albums first, spellings merged; the cover of the most played album represents a genre.
-    static func genres(_ albums: [Album]) -> [Genre] {
+    nonisolated static func genres(_ albums: [Album]) -> [Genre] {
         let rows = albums.sorted { ($0.playCount ?? 0) > ($1.playCount ?? 0) }.map { (genre: $0.genre ?? "", cover: $0.coverArt, count: 1) }
         return GenreSummary.grouped(albums: rows, songs: []).prefix(32).map { Genre(name: $0.name, cover: $0.covers.first) }
     }
