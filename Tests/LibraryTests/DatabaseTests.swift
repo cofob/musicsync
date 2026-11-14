@@ -129,6 +129,26 @@ import Subsonic
         #expect(elapsed < .seconds(3))
         #expect(await db.search("song 1999").song.isEmpty == false)
     }
+
+    @Test func pagesAreSortedFilteredAndFast() async throws {
+        let dir = TempDir()
+        let db = dir.database()
+        try await seed(db, albums: (0..<2000).map { n in
+            (album("al-\(n)", "Album \(n)", songs: 10),
+             (0..<10).map { song("s-\(n)-\($0)", "Song \(n) \($0)", albumId: "al-\(n)", track: $0 + 1) })
+        })
+        #expect(await db.songCount(matching: "") == 20_000)
+        #expect(await db.songCount(matching: "song 1999") == 10)
+        #expect(await db.albumCount(matching: "album 7") == 111)  // 7, 70–79, 700–799
+        let start = ContinuousClock.now
+        let deep = await db.songs(sort: .title, matching: "", limit: 200, offset: 19_800)
+        #expect(ContinuousClock.now - start < .milliseconds(300))
+        #expect(deep.count == 200)
+        let forward = await db.songs(sort: .title, matching: "", limit: 20_000, offset: 0)
+        let backward = await db.songs(sort: .title, descending: true, matching: "", limit: 20_000, offset: 0)
+        #expect(backward.map(\.id) == forward.reversed().map(\.id))
+        #expect(await db.albums(sort: .name, matching: "album 7", limit: 5, offset: 0).map(\.name) == ["Album 7", "Album 70", "Album 700", "Album 701", "Album 702"])
+    }
 }
 
 @Test func smallCoverIsScaledJPEG() throws {

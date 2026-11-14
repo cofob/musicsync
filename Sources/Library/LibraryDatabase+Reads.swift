@@ -4,11 +4,11 @@ import Subsonic
 /// Read API for the UI. Nothing here throws: on any database problem the result is empty (or nil),
 /// and `isHealthy` tells the caller to use the network instead.
 extension LibraryDatabase {
-    private func decode<T: Decodable>(_ type: T.Type, _ row: SQLiteRow, _ column: Int32 = 0) -> T? {
+    func decode<T: Decodable>(_ type: T.Type, _ row: SQLiteRow, _ column: Int32 = 0) -> T? {
         row.text(column).flatMap { try? decoder.decode(T.self, from: Data($0.utf8)) }
     }
 
-    private func decodeAll<T: Decodable>(_ db: SQLiteConnection, _ type: T.Type, _ sql: String, _ params: [any SQLConvertible] = []) throws -> [T] {
+    func decodeAll<T: Decodable>(_ db: SQLiteConnection, _ type: T.Type, _ sql: String, _ params: [any SQLConvertible] = []) throws -> [T] {
         try db.rows(sql, params) { decode(T.self, $0) }.compactMap { $0 }
     }
 

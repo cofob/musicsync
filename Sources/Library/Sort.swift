@@ -20,7 +20,7 @@ public enum AlbumSort: Sendable {
 }
 
 public enum SongSort: Sendable {
-    case title, artist, album
+    case title, artist, album, duration
     /// Recently added first.
     case newest
     case mostPlayed
@@ -30,6 +30,7 @@ public enum SongSort: Sendable {
         case .title: "titleKey, id"
         case .artist: "artistKey, albumKey, COALESCE(disc, 1), COALESCE(track, 0), id"
         case .album: "albumKey, COALESCE(disc, 1), COALESCE(track, 0), id"
+        case .duration: "COALESCE(duration, 0), titleKey, id"
         case .newest: "COALESCE(created, '') DESC, id"
         case .mostPlayed: "playCount DESC, titleKey, id"
         }
