@@ -132,6 +132,7 @@ struct VolumeSlider: View {
 struct VolumeButton: View {
     @Environment(AppModel.self) private var model
     @State private var expanded = false
+    @State private var collapse: Task<Void, Never>?
 
     var body: some View {
         HStack(spacing: 10) {
@@ -144,9 +145,10 @@ struct VolumeButton: View {
         .padding(.horizontal, expanded ? 12 : 0).padding(.vertical, expanded ? 6 : 0)
         .background { if expanded { Capsule().fill(.primary.opacity(0.08)) } }
         .onHover { inside in
+            collapse?.cancel()
             guard !inside, expanded else { return }
-            Task {
-                try? await Task.sleep(for: .seconds(1.5))
+            collapse = Task {
+                guard (try? await Task.sleep(for: .seconds(1.5))) != nil else { return }
                 withAnimation(.snappy) { expanded = false }
             }
         }
