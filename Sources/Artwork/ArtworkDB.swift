@@ -35,7 +35,7 @@ public final class ArtworkDB: @unchecked Sendable {
         images = content.images
         rawHeaders = content.rawHeaders
         let maxId = content.images.map(\.id).max() ?? 0
-        nextId = max(Self.minimumImageId, maxId + 1, content.nextId)
+        nextId = max(Self.minimumImageId, UInt32(clamping: Int64(maxId) + 1), content.nextId)
     }
 
     /// Loads `ArtworkDB` from `artworkDirectory`; empty database if the file does not exist.
@@ -59,7 +59,7 @@ public final class ArtworkDB: @unchecked Sendable {
             let size = ((try? fm.attributesOfItem(atPath: temp.path)[.size] as? UInt64) ?? nil) ?? 0
             var slots: [UInt32: UInt32] = [:]
             for loc in images.flatMap(\.locations) where loc.file == target.lastPathComponent { slots[loc.offset] = loc.size }
-            let tiles = !slots.isEmpty && UInt64(slots.values.reduce(0, +)) == size
+            let tiles = !slots.isEmpty && slots.values.reduce(UInt64(0)) { $0 + UInt64($1) } == size
                 && slots.map({ UInt64($0.key) + UInt64($0.value) }).max() == size
             if tiles { _ = try? fm.replaceItemAt(target, withItemAt: temp) } else { try? fm.removeItem(at: temp) }
         }
@@ -71,6 +71,7 @@ public final class ArtworkDB: @unchecked Sendable {
     @discardableResult
     public func addImage(_ image: CGImage, sourceSize: UInt32, songDbid: UInt64) throws -> UInt32 {
         guard pendingSwaps.isEmpty, pendingRemovals.isEmpty else { throw ArtworkError.corrupt("call save() after compact()") }
+        guard nextId < UInt32.max else { throw ArtworkError.corrupt("no free image id") }
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         var locations: [ArtworkLocation] = []
         for format in formats {
@@ -173,23 +174,32 @@ public final class ArtworkDB: @unchecked Sendable {
     public func compact() throws {
         var newOffsets: [Slot: UInt32] = [:]
         let byFile = Dictionary(grouping: images.flatMap(\.locations), by: \.file)
+        var finished = false
+        defer {
+            if !finished {
+                for file in pendingSwaps { try? FileManager.default.removeItem(at: directory.appendingPathComponent(file + Self.tempSuffix)) }
+                pendingSwaps = []
+                pendingRemovals = []
+            }
+        }
         for file in ithmbFiles() {
             let url = directory.appendingPathComponent(file)
             guard let live = byFile[file] else { pendingRemovals.append(file); continue }
             let old = try Data(contentsOf: url)
+            // A file shorter than its images is left as it is.
+            guard live.allSatisfy({ Int($0.offset) + Int($0.size) <= old.count }) else { continue }
             var new = Data()
             for loc in live.sorted(by: { $0.offset < $1.offset }) where newOffsets[Slot(file: file, offset: loc.offset)] == nil {
-                let end = Int(loc.offset) + Int(loc.size)
-                guard end <= old.count else { throw ArtworkError.corrupt("\(file) is shorter than ArtworkDB says") }
                 newOffsets[Slot(file: file, offset: loc.offset)] = UInt32(new.count)
-                new += old.subdata(in: Int(loc.offset)..<end)
+                new += old.subdata(in: Int(loc.offset)..<Int(loc.offset) + Int(loc.size))
             }
             let temp = directory.appendingPathComponent(file + Self.tempSuffix)
+            pendingSwaps.append(file)
             try new.write(to: temp)
             try Self.fullSync(temp)
-            pendingSwaps.append(file)
-            dirtyFiles.remove(file)
         }
+        dirtyFiles.subtract(pendingSwaps)
+        finished = true
         for i in images.indices {
             for j in images[i].locations.indices {
                 let loc = images[i].locations[j]

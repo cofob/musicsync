@@ -200,6 +200,21 @@ private func thumbBytes(_ dir: URL, _ loc: ArtworkLocation) throws -> Data {
         #expect(db.wastedFraction == 0)
     }
 
+    @Test func compactLeavesShortFileAlone() throws {
+        let dir = try tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let db = try ArtworkDB.load(artworkDirectory: dir)
+        let a = try db.addImage(solid(8, 8, r: 1, g: 1, b: 1), sourceSize: 1, songDbid: 1)
+        try db.addImage(solid(8, 8, r: 2, g: 2, b: 2), sourceSize: 2, songDbid: 2)
+        db.removeImage(id: a)
+        let short = dir.appendingPathComponent("F1060_1.ithmb")
+        try Data(contentsOf: short).dropLast().write(to: short)
+        try db.save()
+        #expect(fileSize(short) == 2 * 320 * 320 * 2 - 1)
+        #expect(fileSize(dir.appendingPathComponent("F1061_1.ithmb")) == 56 * 56 * 2)
+        try db.addImage(solid(8, 8, r: 3, g: 3, b: 3), sourceSize: 3, songDbid: 3)
+    }
+
     @Test func rollover() throws {
         let dir = try tempDir()
         defer { try? FileManager.default.removeItem(at: dir) }

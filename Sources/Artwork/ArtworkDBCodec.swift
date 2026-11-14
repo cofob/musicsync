@@ -50,7 +50,7 @@ enum ArtworkDBCodec {
                 try r.expectTag("mhsd", at: pos)
                 let hlen = Int(try r.u32(at: pos + 4)), total = Int(try r.u32(at: pos + 8))
                 if try r.u16(at: pos + 12) == 1 { try parseImageList(r, at: pos + hlen, into: &content) }
-                guard total >= hlen else { throw ArtworkError.corrupt("mhsd length") }
+                guard total >= hlen, total > 0 else { throw ArtworkError.corrupt("mhsd length") }
                 pos += total
             }
             return content
