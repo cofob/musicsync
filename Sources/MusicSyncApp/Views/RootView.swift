@@ -22,6 +22,9 @@ struct RootView: View {
                                     .playerInset()
                                     .navigationDestination(for: Route.self) { destination(for: $0).playerInset() }
                             }
+                            // Hiding the window toolbar for Now Playing can leave the root page drawn over
+                            // a pushed one; a new stack (same path) shows only the top page.
+                            .id(model.showNowPlaying)
                             .softTopEdge()
                         }
                     }
