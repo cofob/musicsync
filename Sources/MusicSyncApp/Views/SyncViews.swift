@@ -200,7 +200,7 @@ struct SyncSheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Label("The FireWire GUID of this iPod is unknown, so its database cannot be signed.",
                           systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-                    SettingsLink { Text("Enter it in Settings ▸ Sync") }.buttonStyle(.link)
+                    SettingsLink { Text("Enter it in Settings ▸ Sync") }.buttonStyle(.link).foregroundStyle(Color.musicAccent)
                 }
             }
             if !plan.skippedForeignAlbums.isEmpty {
