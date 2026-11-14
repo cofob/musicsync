@@ -4,7 +4,7 @@ import Subsonic
 /// Background copy of the server library into the local database. Never throws into the app:
 /// failures show up in `status` and the next scheduled pass tries again.
 public actor LibraryMirror {
-    private nonisolated let hub = StatusHub()
+    private nonisolated let hub = StatusHub(MirrorStatus())
     private let database: LibraryDatabase
     private var settings: MirrorSettings
     private var client: SubsonicClient?

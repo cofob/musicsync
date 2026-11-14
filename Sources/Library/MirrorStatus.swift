@@ -28,15 +28,19 @@ public struct MirrorStatus: Sendable, Equatable {
     public var fraction: Double? { total.map { $0 > 0 ? min(1, Double(done) / Double($0)) : 1 } }
 }
 
+typealias StatusHub = Hub<MirrorStatus>
+
 /// Holds the current status and feeds any number of `AsyncStream`s. Safe to call from any thread.
-final class StatusHub: @unchecked Sendable {
+final class Hub<Value: Equatable & Sendable>: @unchecked Sendable {
     private let lock = NSLock()
-    private var current = MirrorStatus()
-    private var subscribers: [UUID: AsyncStream<MirrorStatus>.Continuation] = [:]
+    private var current: Value
+    private var subscribers: [UUID: AsyncStream<Value>.Continuation] = [:]
 
-    var latest: MirrorStatus { lock.withLock { current } }
+    init(_ initial: Value) { current = initial }
 
-    func update(_ change: (inout MirrorStatus) -> Void) {
+    var latest: Value { lock.withLock { current } }
+
+    func update(_ change: (inout Value) -> Void) {
         lock.withLock {
             let before = current
             change(&current)
@@ -46,7 +50,7 @@ final class StatusHub: @unchecked Sendable {
     }
 
     /// Yields the current status first, then every change. Slow readers only see the newest value.
-    func stream() -> AsyncStream<MirrorStatus> {
+    func stream() -> AsyncStream<Value> {
         AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
             let id = UUID()
             lock.withLock {

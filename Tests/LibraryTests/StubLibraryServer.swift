@@ -42,7 +42,10 @@ final class StubLibraryServer: @unchecked Sendable {
     private var _lyrics: [String: [String: Any]] = [:]
     private var _extensions = ["songLyrics"]
     private var _starred: [String: String] = [:]
+    private var _failDownloads = 0
     private let cover = Data("COVER-BYTES".utf8)
+    /// Body of download and stream replies.
+    let audio = Data(repeating: 7, count: 1000)
     let artists: [(id: String, name: String)] = [("ar-1", "Space Echo"), ("ar-2", "Björk")]
 
     var albums: [StubAlbum] { get { locked { _albums } } set { locked { _albums = newValue } } }
@@ -60,6 +63,8 @@ final class StubLibraryServer: @unchecked Sendable {
     var emptyAlbumList: Bool { get { locked { _emptyAlbumList } } set { locked { _emptyAlbumList = newValue } } }
     /// getAlbum answers with no songs.
     var emptyAlbumReply: Bool { get { locked { _emptyAlbumReply } } set { locked { _emptyAlbumReply = newValue } } }
+    /// The next this many download and stream calls fail with HTTP 500.
+    var failDownloads: Int { get { locked { _failDownloads } } set { locked { _failDownloads = newValue } } }
     var log: [String] { locked { _log } }
     func clearLog() { locked { _log = [] } }
     func requests(_ method: String) -> [String] { log.filter { $0 == method || $0.hasPrefix(method + ":") } }
@@ -131,6 +136,9 @@ final class StubLibraryServer: @unchecked Sendable {
                     "album": _albums.compactMap { star(Self.albumJSON($0)) },
                     "song": _albums.flatMap { a in a.songs.compactMap { star(Self.songJSON($0, album: a)) } },
                 ]])
+            case "download", "stream":
+                if _failDownloads > 0 { _failDownloads -= 1; return (500, Data(), 0) }
+                return (200, audio, _delayMs)
             default: return (404, Data(), 0)
             }
         }
