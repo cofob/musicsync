@@ -22,6 +22,8 @@ final class StubServer: @unchecked Sendable {
     private(set) var requests: [String] = []
     /// Makes every download slow, so tests can cancel mid-run.
     var downloadDelay: TimeInterval = 0
+    /// Network latency of every API reply; requests still run in parallel.
+    var replyDelay: TimeInterval = 0
 
     var session: URLSession {
         let config = URLSessionConfiguration.ephemeral
@@ -115,6 +117,12 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
+        let delay = Registry.shared.server(for: request.url?.host)?.replyDelay ?? 0
+        guard delay > 0 else { return finish() }
+        DispatchQueue.global().asyncAfter(deadline: .now() + delay) { self.finish() }
+    }
+
+    private func finish() {
         let url = request.url!
         let (status, body) = Registry.shared.server(for: url.host)?.respond(to: url) ?? (503, Data())
         let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil)!

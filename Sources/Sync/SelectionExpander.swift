@@ -19,13 +19,20 @@ public enum ExpansionError: Error, LocalizedError, Equatable {
 
 /// Turns a `Selection` into songs through the Subsonic API (8 requests in parallel, cached).
 public actor SelectionExpander {
+    /// An album with its songs from a local copy of the library; nil asks the server.
+    public typealias LocalAlbum = @Sendable (String) async -> Album?
+    /// Albums resolved so far and in all.
+    public typealias Progress = @Sendable (_ done: Int, _ total: Int) -> Void
+
     private let client: SubsonicClient
     private let concurrency: Int
+    private let local: LocalAlbum?
     private var albums: [String: Album] = [:]
 
-    public init(client: SubsonicClient, concurrency: Int = 8) {
+    public init(client: SubsonicClient, concurrency: Int = 8, local: LocalAlbum? = nil) {
         self.client = client
         self.concurrency = concurrency
+        self.local = local
     }
 
     public func clearCache() { albums = [:] }
@@ -33,14 +40,16 @@ public actor SelectionExpander {
     /// Throws on network errors: guessing here would make the planner delete songs.
     /// `fullAlbums`: playlist songs bring their whole albums (the iPod playlist still holds only its own songs).
     public func expand(_ selection: Selection, defaultPresetID: String, soundCheck: SyncSettings.SoundCheckSource,
-                       fullAlbums: Bool = false, presets: [Preset] = Preset.builtIns) async throws -> Expansion {
+                       fullAlbums: Bool = false, presets: [Preset] = Preset.builtIns,
+                       progress: Progress? = nil) async throws -> Expansion {
         var result = Expansion()
         var albumIDs = selection.albums.sorted()
-        let artists = try await fetchAll(selection.artists.sorted()) { try await self.client.getArtist(id: $0) }
+        async let fetchedArtists = fetchAll(selection.artists.sorted()) { try await self.client.getArtist(id: $0) }
+        async let fetchedLists = fetchAll(selection.playlists.sorted()) { try await self.client.getPlaylist(id: $0) }
+        let (artists, lists) = try await (fetchedArtists, fetchedLists)
         for (id, artist) in artists {
             if let artist { albumIDs += (artist.album ?? []).map(\.id).filter { !selection.excludedAlbums.contains($0) } } else { result.missing.append(id) }
         }
-        let lists = try await fetchAll(selection.playlists.sorted()) { try await self.client.getPlaylist(id: $0) }
         var listed: [(Playlist, [Song])] = []
         for (id, list) in lists {
             if let list { listed.append((list, list.entry ?? [])) } else { result.missing.append(id) }
@@ -49,7 +58,7 @@ public actor SelectionExpander {
         // Playlist songs need their album for track/disc totals.
         let extra = listed.flatMap { $0.1.compactMap(\.albumId) }
         let ids = Array(Set(albumIDs + extra)).sorted()
-        let details = try await fetchAll(ids) { try await self.album($0) }
+        let details = try await fetchAll(ids, progress: progress) { try await self.album($0) }
         var known: [String: Album] = [:]
         for (id, album) in details {
             if let album { known[id] = album } else if selection.albums.contains(id) { result.missing.append(id) }
@@ -81,13 +90,13 @@ public actor SelectionExpander {
 
     private func album(_ id: String) async throws -> Album {
         if let cached = albums[id] { return cached }
-        let album = try await client.getAlbum(id: id)
+        let album = if let found = await local?(id) { found } else { try await client.getAlbum(id: id) }
         albums[id] = album
         return album
     }
 
     /// Runs `body` for every id, `concurrency` at a time. A server "not found" gives nil; other errors are thrown.
-    private func fetchAll<T: Sendable>(_ ids: [String], _ body: @escaping @Sendable (String) async throws -> T)
+    private func fetchAll<T: Sendable>(_ ids: [String], progress: Progress? = nil, _ body: @escaping @Sendable (String) async throws -> T)
         async throws -> [(String, T?)]
     {
         try await withThrowingTaskGroup(of: (String, T?).self) { group in
@@ -102,6 +111,7 @@ public actor SelectionExpander {
             for _ in 0..<concurrency { start() }
             while let item = try await group.next() {
                 out.append(item)
+                progress?(out.count, ids.count)
                 start()
             }
             return out.sorted { $0.0 < $1.0 }

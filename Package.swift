@@ -20,7 +20,7 @@ let package = Package(
         .testTarget(name: "ArtworkTests", dependencies: ["Artwork"]),
         .testTarget(name: "TranscodeTests", dependencies: ["Transcode"]),
         .testTarget(name: "DeviceTests", dependencies: ["Device"]),
-        .testTarget(name: "SyncTests", dependencies: ["Sync"]),
+        .testTarget(name: "SyncTests", dependencies: ["Sync", "Library"]),
         .testTarget(name: "LibraryTests", dependencies: ["Library"]),
     ]
 )

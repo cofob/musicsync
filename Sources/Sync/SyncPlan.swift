@@ -1,7 +1,7 @@
 import Foundation
 import Transcode
 
-public struct SyncPlan: Sendable {
+public struct SyncPlan: Sendable, Equatable {
     public struct Removal: Sendable, Equatable {
         public var songID: String
         public var entry: Manifest.Entry
@@ -9,7 +9,7 @@ public struct SyncPlan: Sendable {
     }
 
     /// An existing managed song that changes.
-    public struct Change: Sendable {
+    public struct Change: Sendable, Equatable {
         public var desired: DesiredSong
         public var entry: Manifest.Entry
     }
