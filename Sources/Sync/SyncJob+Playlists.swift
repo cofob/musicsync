@@ -3,9 +3,9 @@ import ITunesDB
 
 extension SyncJob {
     /// Makes the device playlists match the wanted ones. Foreign playlists are never touched.
-    func reconcilePlaylists() throws {
+    func reconcilePlaylists() {
         if usesDB { reconcileStockPlaylists() }
-        try reconcileRockboxPlaylists()
+        reconcileRockboxPlaylists()
     }
 
     private func reconcileStockPlaylists() {
@@ -33,7 +33,7 @@ extension SyncJob {
     }
 
     /// `Playlists/<name>.m3u8` (see `RockboxPaths.playlistPaths`) with paths relative to that folder.
-    private func reconcileRockboxPlaylists() throws {
+    private func reconcileRockboxPlaylists() {
         let fm = FileManager.default
         let m3uPaths = RockboxPaths.playlistPaths(for: plan.desiredPlaylists, recorded: manifest.rockboxPlaylists)
         let written = Set(plan.desiredPlaylists.filter { $0.songIDs.contains { manifest.rockboxEntries[$0] != nil } }
@@ -54,10 +54,15 @@ extension SyncJob {
                 continue
             }
             let url = device.mountURL.appendingPathComponent(path)
-            try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try Data(RockboxPaths.playlistContents(paths).utf8).write(to: url, options: .atomic)
+            let data = Data(RockboxPaths.playlistContents(paths).utf8)
+            let record = Manifest.RockboxPlaylist(path: path, songIDs: present)
+            if manifest.rockboxPlaylists[p.id] == record, (try? Data(contentsOf: url)) == data { continue }
+            do {
+                try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try data.write(to: url, options: .atomic)
+            } catch { warn("Playlist \(p.name) was not written: \(error.localizedDescription)"); continue }
             removeFile(old)
-            manifest.rockboxPlaylists[p.id] = .init(path: path, songIDs: present)
+            manifest.rockboxPlaylists[p.id] = record
             manifestDirty = true
         }
     }

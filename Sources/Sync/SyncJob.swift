@@ -78,7 +78,7 @@ actor SyncJob {
             await artworkPass()
             await rockboxCovers()
             emit(.phase(.playlists))
-            try reconcilePlaylists()
+            reconcilePlaylists()
         }
         emit(.phase(.writing))
         try checkpoint(final: true)
