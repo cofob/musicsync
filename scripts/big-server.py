@@ -6,12 +6,15 @@ Sizes (env): BIG_ARTISTS (2000), BIG_ALBUMS (5000), BIG_SONGS_PER_ALBUM (10), BI
 Playlist pl-0 holds 10000 songs, the others 50; artist ar-0 has every 40th album as well. BIG_MEDIA=1 draws album covers
 in the asked size (up to 1000 px) and streams 30 s of silence for every song. Otherwise covers, streams and lyrics are
 missing, except for the podcasts:
-three channels with drawn covers, bookmarks kept in memory, and silent episode streams (seekable)."""
+three channels with drawn covers, bookmarks kept in memory, and silent episode streams (seekable).
+The user has the jukebox role; the jukebox keeps its playlist in memory and plays no sound."""
 import functools
 import json
 import os
+import random
 import struct
 import sys
+import time
 import zlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
@@ -143,6 +146,49 @@ def podcast(method, q):
     return {}
 
 
+jukebox = {"ids": [], "index": -1, "playing": False, "gain": 0.5, "offset": 0.0, "since": 0.0}
+
+
+def jukebox_position():
+    """Seconds into the current song; it runs on while playing, up to the song's end."""
+    j = jukebox
+    if not 0 <= j["index"] < len(j["ids"]):
+        return 0
+    run = time.time() - j["since"] if j["playing"] else 0
+    return int(min(j["offset"] + run, song_by_id.get(j["ids"][j["index"]], {}).get("duration", 0)))
+
+
+def jukebox_control(q, ids):
+    j, action = jukebox, q.get("action")
+    if action == "start" and 0 <= j["index"] < len(j["ids"]):
+        j.update(playing=True, since=time.time())
+    elif action == "stop":
+        j.update(offset=jukebox_position(), playing=False)
+    elif action in ("set", "clear"):
+        j.update(ids=ids if action == "set" else [], index=0 if ids and action == "set" else -1, playing=False, offset=0)
+    elif action == "add":
+        j["ids"] += ids
+        j["index"] = max(j["index"], 0)
+    elif action == "skip":
+        index = int(q.get("index", -1))
+        if not 0 <= index < len(j["ids"]):
+            return {"error": {"code": 0, "message": "Index out of range"}}
+        j.update(index=index, offset=int(q.get("offset", 0)), since=time.time())
+    elif action == "remove" and 0 <= int(q.get("index", -1)) < len(j["ids"]):
+        del j["ids"][int(q["index"])]
+    elif action == "shuffle":
+        random.shuffle(j["ids"])
+        j.update(index=0 if j["ids"] else -1, offset=0, since=time.time())
+    elif action == "setGain":
+        j["gain"] = min(max(float(q.get("gain", 0.5)), 0), 1)
+    elif action not in ("get", "status"):
+        return {"error": {"code": 0, "message": f"Unknown action {action}"}}
+    status = {"currentIndex": j["index"], "playing": j["playing"], "gain": j["gain"], "position": jukebox_position()}
+    if action == "get":
+        return {"jukeboxPlaylist": dict(status, entry=[song_by_id[i] for i in j["ids"] if i in song_by_id])}
+    return {"jukeboxStatus": status}
+
+
 def page(items, q, size="size", offset="offset", default=50):
     start = int(q.get(offset, 0))
     return items[start:start + int(q.get(size, default))]
@@ -203,7 +249,7 @@ def reply(method, q):
         return search(q)
     if method == "getUser":
         return {"user": {"username": "demo", "adminRole": False, "streamRole": True, "playlistRole": True, "shareRole": False,
-                         "podcastRole": True}}
+                         "podcastRole": True, "jukeboxRole": True}}
     if method == "getOpenSubsonicExtensions":
         return {"openSubsonicExtensions": []}
     if method == "getPlayQueue":
@@ -227,12 +273,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(SILENCE, "audio/wav")
         if method == "stream" and MEDIA and q.get("id", "").startswith("s-"):
             return self.send(SONG, "audio/wav")
-        body = reply(method, q)
+        body = jukebox_control(q, parse_qs(url.query).get("id", [])) if method == "jukeboxControl" else reply(method, q)
         if body is None or body is False:
             self.send_response(404)
             self.end_headers()
             return
-        data = json.dumps({"subsonic-response": {"status": "ok", "version": "1.16.1", "openSubsonic": True, **body}}).encode()
+        data = json.dumps({"subsonic-response": {"status": "failed" if "error" in body else "ok", "version": "1.16.1", "openSubsonic": True, **body}}).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))

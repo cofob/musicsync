@@ -342,6 +342,14 @@ import SwiftUI
             await select(.podcasts, model)
             if scene == "podcast" { model.show(.podcast(channel)) }
             if scene == "podcast-add" { open(AddPodcastSheet(), "Add Podcast", model) }
+        case "jukebox", "jukebox-nowplaying", "jukebox-menu":
+            // Needs `scripts/big-server.py`: an album plays (without sound) on the stub's jukebox.
+            _ = await first({ model.jukebox.isAvailable ? true : nil })
+            await model.jukebox.activate()
+            guard let album = await first({ model.albums.first }), let songs = try? await model.album(album.id)?.song else { break }
+            model.player.play(songs)
+            model.showNowPlaying = scene == "jukebox-nowplaying"
+            if scene == "jukebox-menu" { open(OutputList(), "Output", model) }
         default:
             print("Unknown scene: \(scene)")
             exit(2)

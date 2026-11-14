@@ -29,6 +29,7 @@ import SwiftUI
         case "accessibility": await accessibility(model)
         case "intents": await intents(model)
         case "perf": await perf(model)
+        case "jukebox": await jukebox(model)
         default: check(false, "known check \(name)")
         }
     }
