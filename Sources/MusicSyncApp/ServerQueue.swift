@@ -52,11 +52,13 @@ final class ServerQueue {
                 MainActor.assumeIsolated { self?.becameActive() }
             },
         ]
+        // Every second while playing or a save waits; otherwise until the song or the play state changes.
         Task { [weak self] in
+            var busy = true
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(1))
+                if busy { try? await Task.sleep(for: .seconds(1)) } else { await nextChange { _ = (self?.app.player.current, self?.app.player.isPlaying) } }
                 guard let self else { return }
-                self.tick()
+                busy = self.tick()
             }
         }
     }
@@ -116,15 +118,16 @@ final class ServerQueue {
         Task { await check() }
     }
 
-    private func tick() {
+    /// True while playing or a save waits that can run.
+    private func tick() -> Bool {
         let player = app.player, now = Date()
         let song: String? = if case .server(let s)? = player.current { s.id } else { nil }
         if player.isPlaying { armed = true }
         if armed, song != seen.song || (seen.playing && !player.isPlaying) { throttle.request(now: now) }
         if player.isPlaying { throttle.playing(now: now) }
         seen = (song, player.isPlaying)
-        guard enabled, supported, armed, let song, let client = app.client, throttle.fire(now: now) else { return }
-        save(song, client)
+        if enabled, supported, armed, let song, let client = app.client, throttle.fire(now: now) { save(song, client) }
+        return player.isPlaying || (throttle.due != nil && enabled && supported)
     }
 
     private func save(_ song: String, _ client: SubsonicClient) {

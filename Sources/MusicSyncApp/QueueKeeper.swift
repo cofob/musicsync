@@ -23,11 +23,13 @@ final class QueueKeeper {
         observer = NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) {
             [weak self] _ in MainActor.assumeIsolated { self?.saveNow() }
         }
+        // Every second while playing or a save waits; otherwise until the queue or the play state changes.
         Task { [weak self] in
+            var busy = true
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(1))
+                if busy { try? await Task.sleep(for: .seconds(1)) } else { await nextChange { _ = self?.signature } }
                 guard let self else { return }
-                self.tick()
+                busy = self.tick()
             }
         }
     }
@@ -81,17 +83,20 @@ final class QueueKeeper {
         return (player.index.map { player.line.keys[$0] }, player.isPlaying, player.line.keys, player.shuffle, player.repeatMode)
     }
 
-    private func tick() {
-        guard let server else { return }
+    /// True while playing or a save waits.
+    private func tick() -> Bool {
+        guard let server else { return false }
         let now = Date(), current = signature
         if let seen, seen.key != current.key || seen.playing != current.playing || seen.keys != current.keys
             || seen.shuffle != current.shuffle || seen.repeatMode != current.repeatMode { throttle.request(now: now) }
         if current.playing { throttle.playing(now: now) }
         seen = current
-        guard throttle.fire(now: now) else { return }
-        let snapshot = app.player.snapshot(server: server), url = Self.file
-        Task.detached(priority: .utility) {
-            if let snapshot { try? snapshot.save(to: url) } else { try? FileManager.default.removeItem(at: url) }
+        if throttle.fire(now: now) {
+            let snapshot = app.player.snapshot(server: server), url = Self.file
+            Task.detached(priority: .utility) {
+                if let snapshot { try? snapshot.save(to: url) } else { try? FileManager.default.removeItem(at: url) }
+            }
         }
+        return current.playing || throttle.due != nil
     }
 }
