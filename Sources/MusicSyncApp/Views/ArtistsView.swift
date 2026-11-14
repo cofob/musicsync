@@ -4,14 +4,14 @@ import Subsonic
 /// Artist list on the left, the selected artist on the right.
 struct ArtistsView: View {
     @Environment(AppModel.self) private var model
-    @State private var sorted: [Artist] = []
+    @State private var list: PagedList<Artist>?
     @State private var selectedID: String?
 
     var body: some View {
         HStack(spacing: 0) {
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    if sorted.isEmpty && model.client != nil {
+                    if list == nil && model.client != nil {
                         ForEach(0..<14, id: \.self) { i in
                             HStack(spacing: 12) {
                                 PlaceholderBlock(width: 40, height: 40, cornerRadius: 20)
@@ -22,9 +22,13 @@ struct ArtistsView: View {
                         }
                         .shimmering()
                     }
-                    ForEach(filtered) { artist in
-                        ArtistRow(artist: artist, isSelected: artist.id == selectedID)
-                            .onTapGesture { selectedID = artist.id }
+                    if let list {
+                        ForEach(0..<list.count, id: \.self) { i in
+                            PagedRow(list: list, index: i) { artist in
+                                ArtistRow(artist: artist, isSelected: artist.id == selectedID)
+                                    .onTapGesture { selectedID = artist.id }
+                            } placeholder: { Color.clear.frame(height: 54) }
+                        }
                     }
                 }
                 .padding(.horizontal, 12).padding(.vertical, 8)
@@ -41,16 +45,14 @@ struct ArtistsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationTitle("Artists")
-        .onChange(of: model.libraryVersion, initial: true) {
-            sorted = model.artists.sorted { ($0.sortName ?? $0.name).localizedStandardCompare($1.sortName ?? $1.name) == .orderedAscending }
-            if selectedID == nil { selectedID = sorted.first?.id }
+        .task(id: [String(model.libraryVersion), model.searchText]) {
+            if list != nil { try? await Task.sleep(for: .milliseconds(150)) }  // typing
+            guard !Task.isCancelled else { return }
+            let found = await model.artistPages(query: model.searchText.trimmingCharacters(in: .whitespaces))
+            guard !Task.isCancelled else { return }
+            list = found
+            if selectedID == nil { selectedID = found.item(at: 0)?.id }
         }
-    }
-
-    /// "Find in Artists".
-    private var filtered: [Artist] {
-        let query = model.searchText.trimmingCharacters(in: .whitespaces)
-        return query.isEmpty ? sorted : sorted.filter { $0.name.localizedCaseInsensitiveContains(query) }
     }
 }
 

@@ -1,7 +1,8 @@
+import Library
 import SwiftUI
 import Subsonic
 
-enum AlbumSort: String, CaseIterable, Identifiable {
+enum AlbumOrder: String, CaseIterable, Identifiable {
     case name = "Name", artist = "Artist", year = "Year", added = "Date Added"
     var id: Self { self }
 
@@ -18,19 +19,29 @@ enum AlbumSort: String, CaseIterable, Identifiable {
             return albums.sorted { ($0.created ?? "") > ($1.created ?? "") }
         }
     }
+
+    var database: AlbumSort {
+        switch self {
+        case .name: .name
+        case .artist: .artist
+        case .year: .year
+        case .added: .newest
+        }
+    }
 }
 
 /// Albums grid. `recentlyAdded` fixes the order to newest first (sidebar "Recently Added").
 struct AlbumsView: View {
     @Environment(AppModel.self) private var model
     var recentlyAdded = false
-    @AppStorage("albumSort") private var sort = AlbumSort.name
-    @State private var sorted: [Album] = []
+    @AppStorage("albumSort") private var sort = AlbumOrder.name
+    @State private var list: PagedList<Album>?
 
     var body: some View {
-        let shown = filtered
         Group {
-            if shown.isEmpty {
+            if let list, list.count > 0 {
+                PagedAlbumGrid(list: list)
+            } else {
                 if let error = model.libraryError {
                     LoadFailedView(message: error) { Task { await model.refresh() } }
                 } else if model.isLoading || model.albums.isEmpty && model.client != nil && model.libraryVersion < 2 {
@@ -44,8 +55,6 @@ struct AlbumsView: View {
                 } else {
                     ContentUnavailableView("No Albums", systemImage: "square.stack", description: Text("The library is empty."))
                 }
-            } else {
-                AlbumGrid(albums: shown)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -56,7 +65,7 @@ struct AlbumsView: View {
                 ToolbarItem {
                     Menu {
                         Picker("Sort By", selection: $sort) {
-                            ForEach(AlbumSort.allCases) { Text($0.rawValue).tag($0) }
+                            ForEach(AlbumOrder.allCases) { Text($0.rawValue).tag($0) }
                         }
                         .pickerStyle(.inline)
                     } label: {
@@ -66,15 +75,18 @@ struct AlbumsView: View {
                 }
             }
         }
-        .onChange(of: model.libraryVersion, initial: true) { resort() }
-        .onChange(of: sort) { resort() }
+        .task(id: [String(model.libraryVersion), sort.rawValue, model.searchText]) {
+            if list != nil { try? await Task.sleep(for: .milliseconds(150)) }  // typing
+            guard !Task.isCancelled else { return }
+            let order = recentlyAdded ? AlbumOrder.added : sort
+            let query = model.searchText.trimmingCharacters(in: .whitespaces)
+            let found = await model.albumPages(sort: order.database, query: query) {
+                let sorted = order.sorted(model.albums)
+                return query.isEmpty ? sorted : sorted.filter {
+                    $0.name.localizedCaseInsensitiveContains(query) || ($0.artistName ?? "").localizedCaseInsensitiveContains(query)
+                }
+            }
+            if !Task.isCancelled { list = found }
+        }
     }
-
-    private var filtered: [Album] {
-        let query = model.searchText.trimmingCharacters(in: .whitespaces)
-        guard !query.isEmpty else { return sorted }
-        return sorted.filter { $0.name.localizedCaseInsensitiveContains(query) || ($0.artistName ?? "").localizedCaseInsensitiveContains(query) }
-    }
-
-    private func resort() { sorted = (recentlyAdded ? .added : sort).sorted(model.albums) }
 }

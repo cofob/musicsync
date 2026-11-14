@@ -73,3 +73,19 @@ struct AlbumGrid<Badge: View>: View {
 extension AlbumGrid where Badge == SyncBadge {
     init(albums: [Album]) { self.init(albums: albums) { SyncBadge(album: $0) } }
 }
+
+/// Album grid over a paged list: cards are made as they scroll in, and pages far away are dropped.
+struct PagedAlbumGrid: View {
+    let list: PagedList<Album>
+
+    var body: some View {
+        ScrollView {
+            LazyVGrid(columns: albumGridColumns, spacing: 28) {
+                ForEach(0..<list.count, id: \.self) { i in
+                    PagedRow(list: list, index: i) { album in AlbumCard(album: album) { SyncBadge(album: album) } } placeholder: { PlaceholderCard() }
+                }
+            }
+            .padding(.horizontal, 32).padding(.vertical, 24)
+        }
+    }
+}

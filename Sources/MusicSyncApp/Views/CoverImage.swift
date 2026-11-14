@@ -54,5 +54,7 @@ struct CoverImage: View {
                 }
                 if let full = await covers.image(id: id, size: size), !Task.isCancelled { image = full }
             }
+            // Long lists keep their offscreen views; the image goes, the cache brings it back at once.
+            .onDisappear { image = nil; imageID = nil }
     }
 }

@@ -53,7 +53,6 @@ final class AppModel {
     var errorMessage: String?
     /// Inline messages for failed background loads (library, Home, songs, search).
     private(set) var libraryError: String?
-    private(set) var songsError: String?
 
     var selection: SidebarItem? = .home
     var path: [Route] = []
@@ -74,10 +73,6 @@ final class AppModel {
 
     /// Home shelves, loaded by `loadHome()`.
     private(set) var shelves: [Shelf] = []
-    /// Every song of the library, loaded page by page by `loadSongs()`.
-    private(set) var songs: [Song] = []
-    private(set) var songsLoaded = false
-    @ObservationIgnored private var songsVersion = -1
     /// Star state changed in this session, by song id.
     private var starOverrides: [String: Bool] = [:]
 
@@ -132,7 +127,7 @@ final class AppModel {
 
     private func connect() async {
         path = []
-        shelves = []; songs = []; songsLoaded = false; songsVersion = -1; starOverrides = [:]
+        shelves = []; starOverrides = [:]
         await stopLibrary()
         let client = demo ? config.map { SubsonicClient(baseURL: $0.baseURL, username: $0.username, password: "demo") }
                           : config.flatMap { SubsonicClient(config: $0) }
@@ -278,38 +273,6 @@ final class AppModel {
             libraryError = error.localizedDescription
         } catch { return }
         if client.baseURL == self.client?.baseURL { shelves = result }
-    }
-
-    /// Loads all songs once per library version, 500 per request; the list grows as pages arrive.
-    func loadSongs() async {
-        guard let client, songsVersion != libraryVersion else { return }
-        songsVersion = libraryVersion
-        songsLoaded = false
-        songsError = nil
-        var all: [Song] = []
-        if usesLocalLibrary, let db = library?.database {
-            // Pages keep each actor call short; the list grows like the network one.
-            while true {
-                let page = await db.songs(sort: .title, limit: 5000, offset: all.count)
-                all += page
-                songs = all
-                if page.count < 5000 || Task.isCancelled { break }
-            }
-            if !all.isEmpty { songsLoaded = true; return }
-        }
-        do {
-            while true {
-                // `search3` with an empty query lists the whole library (Navidrome, OpenSubsonic).
-                let page = try await client.search3("", artistCount: 0, albumCount: 0, songCount: 500, songOffset: all.count).song
-                all += page
-                songs = all
-                if page.count < 500 { break }
-            }
-        } catch {
-            songsVersion = -1
-            if !error.isCancellation { songsError = error.localizedDescription }
-        }
-        songsLoaded = true
     }
 
     /// Plays iPod tracks from the local files.
