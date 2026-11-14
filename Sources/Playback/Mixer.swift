@@ -264,7 +264,9 @@ import AVFoundation
         guard let transition else { return }
         loadIdle(next.item)
         let outgoing = decks[active]
-        let start = at.flatMap { outgoing.hostTime(at: $0 - (current?.offset ?? 0)) }
+        let start = at.flatMap { outgoing.hostTime(at: $0 - (current?.offset ?? 0), margin: Self.lead / 2) }
+        // A late start begins the incoming song further in, where it would be by then, so the two stay lined up.
+        let from = max(0, transition.offset - next.offset) + (start?.late ?? 0) * Double(transition.rate / nudge)
         outgoing.setBoundary(nil)
         active = 1 - active
         let incoming = decks[active]
@@ -273,7 +275,7 @@ import AVFoundation
         incoming.fade = Float(volumes.in)
         fade = (outgoing, transition, nudge)
         nudge = transition.rate
-        if isPlaying { incoming.start(rate: rate * nudge, at: start, from: max(0, transition.offset - next.offset)) }
+        if isPlaying { incoming.start(rate: rate * nudge, at: start?.host, from: from) }
         fadeTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.stepFade() }
         }

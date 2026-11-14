@@ -52,13 +52,17 @@ import AVFoundation
         }
     }
 
-    /// Host time at which the playing item reaches `time`; nil when it does not run, or the time has passed or is a second away.
-    func hostTime(at time: TimeInterval) -> CMTime? {
+    /// Host time at which the playing item reaches `time`. When that is less than `margin` away (a late call, e.g. from a
+    /// busy main thread), the host time `margin` from now and how far past `time` the item is then. Nil when the item
+    /// does not run, or `time` is a second away.
+    func hostTime(at time: TimeInterval, margin: TimeInterval) -> (host: CMTime, late: TimeInterval)? {
         guard let timebase = player.currentItem?.timebase, CMTimebaseGetRate(timebase) > 0 else { return nil }
         let clock = CMClockGetHostTimeClock()
         let host = CMSyncConvertTime(CMTime(seconds: time, preferredTimescale: 1_000_000), from: timebase, to: clock)
-        let wait = (host - CMClockGetTime(clock)).seconds
-        return host.isNumeric && wait > 0 && wait < 1 ? host : nil
+        let soon = CMClockGetTime(clock) + CMTime(seconds: margin, preferredTimescale: 1_000_000)
+        guard host.isNumeric, (host - soon).seconds < 1 - margin else { return nil }
+        guard host < soon else { return (host, 0) }
+        return (soon, CMSyncConvertTime(soon, from: clock, to: timebase).seconds - time)
     }
 
     /// Starts the paused item at `rate`: from `time` at `hostTime` when given, to line up with the other deck, else now.
