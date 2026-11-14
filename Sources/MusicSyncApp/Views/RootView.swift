@@ -84,6 +84,7 @@ struct RootView: View {
         .onChange(of: model.player.queue.isEmpty) { if model.player.queue.isEmpty { model.showNowPlaying = false } }
         .onChange(of: model.ipod.version) { model.sync.deviceUpdated() }
         .sheet(item: $model.infoSong) { SongInfoView(song: $0) }
+        .modifier(PlaylistDialogs())
         .sheet(isPresented: $model.showGuide) { GuideView() }
         .task { if !model.demo, !UserDefaults.app.bool(forKey: GuideView.shownKey) { model.showGuide = true } }
         .sheet(isPresented: $sync.showSheet) { SyncSheet() }
@@ -122,6 +123,7 @@ struct RootView: View {
         case .albums: AlbumsView()
         case .artists: ArtistsView()
         case .songs: SongsView()
+        case .favorites: FavoritesView()
         case .playlists: PlaylistsView()
         case .playlist(let id):
             if let playlist = model.playlists.first(where: { $0.id == id }) {

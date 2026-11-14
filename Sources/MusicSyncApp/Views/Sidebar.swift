@@ -4,11 +4,11 @@ import SwiftUI
 /// and a branch in `RootView.content(for:)`.
 enum SidebarItem: Hashable {
     case search, home
-    case recentlyAdded, artists, albums, songs
+    case recentlyAdded, artists, albums, songs, favorites
     case playlists, playlist(String)
     case deviceOverview, deviceAlbums, deviceSongs, devicePlaylists
 
-    static let libraryItems: [SidebarItem] = [.recentlyAdded, .artists, .albums, .songs]
+    static let libraryItems: [SidebarItem] = [.recentlyAdded, .artists, .albums, .songs, .favorites]
     static let deviceItems: [SidebarItem] = [.deviceOverview, .deviceAlbums, .deviceSongs, .devicePlaylists]
 
     var isDevice: Bool { Self.deviceItems.contains(self) }
@@ -21,6 +21,7 @@ enum SidebarItem: Hashable {
         case .albums, .deviceAlbums: "Albums"
         case .artists: "Artists"
         case .songs, .deviceSongs: "Songs"
+        case .favorites: "Favorites"
         case .playlists: "All Playlists"
         case .devicePlaylists, .playlist: "Playlists"
         case .deviceOverview: "Overview"
@@ -35,6 +36,7 @@ enum SidebarItem: Hashable {
         case .albums, .deviceAlbums: "square.stack"
         case .artists: "music.microphone"
         case .songs, .deviceSongs: "music.note"
+        case .favorites: "star"
         case .playlists: "square.grid.3x3"
         case .devicePlaylists, .playlist: "music.note.list"
         case .deviceOverview: "ipod"
@@ -70,21 +72,13 @@ struct Sidebar: View {
                     if model.ipod.current != nil { SyncStatusRow() }
                 } header: { DeviceSectionHeader() }
             }
-            Section("Playlists") {
+            Section {
                 row(.playlists)
                 ForEach(model.playlists) { playlist in
-                    Label {
-                        Text(playlist.name).lineLimit(1).fontWeight(selection == .playlist(playlist.id) ? .semibold : nil)
-                    } icon: {
-                        CoverImage(id: playlist.coverArt, size: 64, cornerRadius: 3, symbol: "music.note.list").frame(width: 20, height: 20)
-                    }
-                    .modifier(Pick(item: .playlist(playlist.id), selection: $selection))
-                    .contextMenu {
-                        Button("Play", systemImage: "play.fill") { model.play(playlist) }
-                        SyncMenuItem(isOn: model.sync.isPlaylistSelected(playlist.id)) { model.sync.togglePlaylist(playlist.id) }
-                    }
+                    PlaylistSidebarRow(playlist: playlist, isSelected: selection == .playlist(playlist.id))
+                        .modifier(Pick(item: .playlist(playlist.id), selection: $selection))
                 }
-            }
+            } header: { PlaylistsHeader() }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if model.client != nil { LibraryStatusView().padding(.horizontal, 10).padding(.bottom, 8) }

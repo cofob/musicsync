@@ -26,6 +26,10 @@ struct PlaylistsView: View {
                         Button("Play", systemImage: "play.fill") { model.play(playlist) }
                         Button("Shuffle", systemImage: "shuffle") { model.play(playlist, shuffled: true) }
                         SyncMenuItem(isOn: model.sync.isPlaylistSelected(playlist.id)) { model.sync.togglePlaylist(playlist.id) }
+                        if model.canEdit(playlist) {
+                            Divider()
+                            Button("Delete Playlist…", systemImage: "trash") { model.playlistPrompt = .delete(playlist) }
+                        }
                     }
                 }
             }

@@ -22,6 +22,7 @@ struct AlbumCard<Badge: View>: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .draggable(DragPayload.album(album.id).text)
         .contextMenu { AlbumMenuItems(album: album) }
     }
 }
@@ -41,6 +42,11 @@ struct AlbumMenuItems: View {
         Divider()
         Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") { songs { model.playNext($0) } }
         Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") { songs { model.addToQueue($0) } }
+        AddToPlaylistMenu { (try? await model.album(album.id))?.song?.map(\.id) ?? [] }
+        Divider()
+        Button(model.isStarred(album) ? "Undo Favorite" : "Favorite", systemImage: model.isStarred(album) ? "star.slash" : "star") {
+            model.toggleStar(album)
+        }
         if let artistId = album.artistId {
             Divider()
             Button("Go to Artist", systemImage: "music.microphone") { model.show(.artist(artistId)) }

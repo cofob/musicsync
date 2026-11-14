@@ -13,16 +13,13 @@ struct SongMenuItems: View {
             Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") { model.playNext([song]) }
             Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") { model.addToQueue([song]) }
         }
-        Menu("Add to Playlist") {
-            ForEach(model.playlists) { playlist in
-                Button(playlist.name) { model.add([song], to: playlist) }
-            }
-        }
+        AddToPlaylistMenu(songs: [song])
         Divider()
         Button("Get Info", systemImage: "info.circle") { model.infoSong = song }
         Button(model.isStarred(song) ? "Undo Favorite" : "Favorite", systemImage: model.isStarred(song) ? "star.slash" : "star") {
             model.toggleStar(song)
         }
+        RatingMenu(song: song)
         Divider()
         Button("Go to Album", systemImage: "square.stack") { model.goToAlbum(song) }.disabled(song.albumId == nil)
         Button("Go to Artist", systemImage: "music.microphone") { model.goToArtist(song) }.disabled(song.artistId == nil)
@@ -42,8 +39,13 @@ struct SongList: View {
     /// Hide the artist when it equals this (album pages).
     var albumArtist: String?
     let onPlay: (Int) -> Void
+    /// Playlist pages: "Remove from Playlist" for the row at this index.
+    var onRemove: ((Int) -> Void)?
+    /// Playlist pages in playlist order: a row dropped on another moves there (from, to).
+    var onMove: ((Int, Int) -> Void)?
     /// Index and id: the id stops a stale index from marking another song after the list changes.
     @State private var selected: (index: Int, id: String)?
+    @State private var dropTarget: Int?
 
     var body: some View {
         LazyVStack(spacing: 0) {
@@ -52,6 +54,13 @@ struct SongList: View {
                     .overlay(alignment: .bottom) {
                         if index < songs.count - 1 { Divider().padding(.leading, leading == .cover ? 64 : 50).padding(.trailing, 10) }
                     }
+                    .overlay { if dropTarget == index { RoundedRectangle(cornerRadius: 8).strokeBorder(Color.musicAccent, lineWidth: 2) } }
+                    .draggable(DragPayload.songs([song.id], index: index).text)
+                    .dropDestination(for: String.self) { items, _ in
+                        guard let onMove, case .songs(_, let from?)? = items.first.flatMap(DragPayload.init) else { return false }
+                        onMove(from, index)
+                        return true
+                    } isTargeted: { dropTarget = $0 && onMove != nil ? index : (dropTarget == index ? nil : dropTarget) }
             }
         }
     }
@@ -59,7 +68,8 @@ struct SongList: View {
     private func row(_ song: Song, _ index: Int) -> some View {
         let isCurrent = model.player.current?.id == song.id
         return TrackRow(title: song.title, subtitle: subtitle(song), time: song.duration.map(TimeInterval.init),
-                        isCurrent: isCurrent, isSelected: selected?.index == index && selected?.id == song.id) {
+                        isCurrent: isCurrent, isSelected: selected?.index == index && selected?.id == song.id,
+                        isStarred: model.isStarred(song)) {
             switch leading {
             case .track:
                 TrackNumber(text: song.track.map(String.init) ?? "", isCurrent: isCurrent)
@@ -68,6 +78,10 @@ struct SongList: View {
             }
         } menu: {
             SongMenuItems(song: song)
+            if let onRemove {
+                Divider()
+                Button("Remove from Playlist", systemImage: "minus.circle") { onRemove(index) }
+            }
         }
         .onTapGesture(count: 2) { onPlay(index) }
         .simultaneousGesture(TapGesture().onEnded { selected = (index, song.id) })
@@ -83,6 +97,7 @@ struct SongList: View {
 
 /// "Get Info" sheet for a song.
 struct SongInfoView: View {
+    @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let song: Song
 
@@ -96,6 +111,9 @@ struct SongInfoView: View {
                 }
             }
             Form {
+                if !model.ratingUnsupported {
+                    LabeledContent("Rating") { RatingStars(rating: model.rating(song)) { model.setRating($0, for: song) } }
+                }
                 ForEach(fields, id: \.0) { LabeledContent($0.0, value: $0.1) }
             }
             .formStyle(.grouped)

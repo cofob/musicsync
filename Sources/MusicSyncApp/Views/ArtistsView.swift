@@ -27,6 +27,7 @@ struct ArtistsView: View {
                             PagedRow(list: list, index: i) { artist in
                                 ArtistRow(artist: artist, isSelected: artist.id == selectedID)
                                     .onTapGesture { selectedID = artist.id }
+                                    .contextMenu { ArtistMenuItems(artist: artist) }
                                     .accessibilityAddTraits(artist.id == selectedID ? [.isButton, .isSelected] : .isButton)
                             } placeholder: { Color.clear.frame(height: 54) }
                         }

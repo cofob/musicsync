@@ -89,6 +89,8 @@ struct MediaHeader<Cover: View, Content: View, Accessory: View>: View {
     @ViewBuilder var cover: Cover
     let title: String
     var canPlay = true
+    /// Set for titles the user may change: the title becomes a text field.
+    var onRename: ((String) -> Void)?
     let onPlay: () -> Void
     let onShuffle: () -> Void
     @ViewBuilder var content: Content
@@ -100,7 +102,11 @@ struct MediaHeader<Cover: View, Content: View, Accessory: View>: View {
                 .frame(width: 260, height: 260)
                 .shadow(color: .black.opacity(0.22), radius: 14, y: 6)
             VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.system(size: 30, weight: .bold)).lineLimit(3)
+                if let onRename {
+                    InlineTextField(text: title, prompt: "Name", font: .system(size: 30, weight: .bold), onCommit: onRename)
+                } else {
+                    Text(title).font(.system(size: 30, weight: .bold)).lineLimit(3)
+                }
                 content
                 HStack(spacing: 10) {
                     PlayShuffleButtons(isEnabled: canPlay, onPlay: onPlay, onShuffle: onShuffle)
@@ -143,6 +149,8 @@ struct TrackRow<Leading: View, MenuItems: View>: View {
     let time: TimeInterval?
     var isCurrent = false
     var isSelected = false
+    /// Small star before the time, as in Apple Music.
+    var isStarred = false
     @ViewBuilder var leading: Leading
     @ViewBuilder var menu: MenuItems
 
@@ -156,6 +164,7 @@ struct TrackRow<Leading: View, MenuItems: View>: View {
                 }
             }
             Spacer(minLength: 8)
+            if isStarred { Image(systemName: "star.fill").font(.caption2).foregroundStyle(Color.musicAccent) }
             Text(time.map(formatTime) ?? "").monospacedDigit().foregroundStyle(.secondary)
             RowMenu { menu }
         }

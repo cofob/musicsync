@@ -19,6 +19,7 @@ struct AlbumDetailView<Accessory: View>: View {
                 ArtistLink(name: album.artistName, id: album.artistId)
                 Text(meta(songs)).font(.callout.weight(.medium)).foregroundStyle(.secondary).textCase(.uppercase)
             } accessory: {
+                FavoriteButton(isOn: model.isStarred(album)) { model.toggleStar(album) }
                 headerAccessory(full ?? album)
             }
             if let loadError {

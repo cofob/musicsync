@@ -13,6 +13,7 @@ struct SongsView: View {
         var artist: String { "" }
         var album: String { "" }
         var plays: Int { 0 }
+        var rating: Int { 0 }
     }
 
     struct Rows: RandomAccessCollection {
@@ -46,6 +47,12 @@ struct SongsView: View {
                 }
             }
             .width(min: 24, ideal: 28, max: 36)
+            TableColumn("Rating", value: \.rating) { row in
+                if let song = song(row), !model.ratingUnsupported {
+                    RatingStars(rating: model.rating(song), size: 10, hidesEmpty: true) { model.setRating($0, for: song) }
+                }
+            }
+            .width(min: 70, ideal: 74, max: 90)
             TableColumn("Plays", value: \.plays) { row in
                 let plays = song(row)?.playCount ?? 0
                 Text(plays > 0 ? String(plays) : "").monospacedDigit()
@@ -54,6 +61,7 @@ struct SongsView: View {
         }
         .contextMenu(forSelectionType: Row.ID.self) { ids in
             if ids.count == 1, let id = ids.first, let song = list?.item(at: id) { SongMenuItems(song: song) }
+            else if ids.count > 1 { AddToPlaylistMenu(songs: ids.sorted().compactMap { list?.item(at: $0) }) }
         } primaryAction: { ids in
             if let id = ids.first { play(id) }
         }
@@ -88,6 +96,7 @@ struct SongsView: View {
         case \Row.duration: return (.duration, reverse)
         case \Row.album: return (.album, reverse)
         case \Row.plays: return (.mostPlayed, reverse)
+        case \Row.rating: return (.rating, reverse)
         default: return (.artist, reverse)
         }
     }

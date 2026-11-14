@@ -69,6 +69,9 @@ struct ArtistDetailView: View {
                 Spacer()
                 Button("Play", systemImage: "play.fill") { play(artist, shuffled: false) }
                 Button("Shuffle", systemImage: "shuffle") { play(artist, shuffled: true) }
+                Button(model.isStarred(artist) ? "Undo Favorite" : "Favorite", systemImage: model.isStarred(artist) ? "star.fill" : "star") {
+                    model.toggleStar(artist)
+                }
                 SyncButton(isOn: model.sync.isArtistSelected(artist.id)) { model.sync.toggleArtist(artist.id) }
                     .help(model.sync.isArtistSelected(artist.id) ? "Remove all albums by this artist from iPod" : "Sync all albums by this artist")
             }
