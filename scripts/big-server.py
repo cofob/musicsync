@@ -3,8 +3,11 @@
 
 Run the app against it with MUSICSYNC_DEMO_SERVER=http://127.0.0.1:<port> (demo mode only).
 Sizes (env): BIG_ARTISTS (2000), BIG_ALBUMS (5000), BIG_SONGS_PER_ALBUM (10), BIG_PLAYLISTS (500).
-Playlist pl-0 holds 5000 songs, the others 50. Covers, streams and lyrics are missing, except for the podcasts:
+Playlist pl-0 holds 10000 songs, the others 50; artist ar-0 has every 40th album as well. BIG_MEDIA=1 draws album covers
+in the asked size (up to 1000 px) and streams 30 s of silence for every song. Otherwise covers, streams and lyrics are
+missing, except for the podcasts:
 three channels with drawn covers, bookmarks kept in memory, and silent episode streams (seekable)."""
+import functools
 import json
 import os
 import struct
@@ -34,7 +37,7 @@ def day(i):
 artists = [{"id": f"ar-{i}", "name": name(i, 2), "albumCount": 0} for i in range(ARTISTS)]
 albums, songs = [], []
 for a in range(ALBUMS):
-    artist = artists[a % ARTISTS]
+    artist = artists[0 if a % 40 == 0 else a % ARTISTS]
     artist["albumCount"] += 1
     genre = GENRES[a % len(GENRES)]
     album = {"id": f"al-{a}", "name": name(a, 3), "artist": artist["name"], "artistId": artist["id"],
@@ -59,7 +62,7 @@ by_album = {a["id"]: songs[i * PER_ALBUM:(i + 1) * PER_ALBUM] for i, a in enumer
 song_by_id = {s["id"]: s for s in songs}
 playlists = []
 for p in range(PLAYLISTS):
-    count = min(5000 if p == 0 else 50, len(songs))
+    count = min(10000 if p == 0 else 50, len(songs))
     ids = [songs[(p * 997 + k * 31) % len(songs)]["id"] for k in range(count)]
     playlists.append({"id": f"pl-{p}", "name": name(p, 2) + " Mix", "owner": "demo", "public": False, "songCount": count,
                       "duration": sum(song_by_id[i]["duration"] for i in ids), "created": day(p), "changed": day(p), "ids": ids})
@@ -92,6 +95,15 @@ def png(top, bottom, size=300):
     chunk = lambda kind, data: struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
     return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0))
             + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
+
+
+MEDIA = os.environ.get("BIG_MEDIA") == "1"
+
+
+@functools.lru_cache(maxsize=None)
+def album_cover(n, size):
+    """One of 24 gradients."""
+    return png(((n * 53) % 256, (n * 97) % 256, (n * 151) % 256), ((n * 29) % 256, 40, (n * 71) % 256), size)
 
 
 def silence(seconds):
@@ -209,8 +221,12 @@ class Handler(BaseHTTPRequestHandler):
         cover = PODCASTS[int(q["id"][4:])] if method == "getCoverArt" and q.get("id", "").startswith("pod-") else None
         if cover:
             return self.send(png(cover[1], cover[2]), "image/png")
+        if method == "getCoverArt" and MEDIA and q.get("id", "").startswith("al-"):
+            return self.send(album_cover(int(q["id"][3:]) % 24, min(int(q.get("size", 1000)), 1000)), "image/png")
         if method == "stream" and q.get("id", "").startswith("st-"):
             return self.send(SILENCE, "audio/wav")
+        if method == "stream" and MEDIA and q.get("id", "").startswith("s-"):
+            return self.send(SONG, "audio/wav")
         body = reply(method, q)
         if body is None or body is False:
             self.send_response(404)
@@ -246,6 +262,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 SILENCE = silence(max(e["duration"] for e in episodes))
+SONG = silence(30)
 port = int(sys.argv[1]) if len(sys.argv) > 1 else 4533
 print(f"{len(artists)} artists, {len(albums)} albums, {len(songs)} songs, {len(playlists)} playlists on port {port}", flush=True)
 ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()

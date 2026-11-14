@@ -28,11 +28,12 @@ import SwiftUI
         case "podcast-resume": await podcastResume(model)
         case "accessibility": await accessibility(model)
         case "intents": await intents(model)
+        case "perf": await perf(model)
         default: check(false, "known check \(name)")
         }
     }
 
-    private static func check(_ ok: Bool, _ what: String) {
+    static func check(_ ok: Bool, _ what: String) {
         FileHandle.standardError.write(Data("CHECK \(ok ? "PASS" : "FAIL") \(what)\n".utf8))
         if !ok { failed = true }
     }
@@ -530,7 +531,7 @@ import SwiftUI
         (view as? NSScrollView).map { [$0] } ?? view.subviews.flatMap(scrollViews)
     }
 
-    private static var mainWindow: NSWindow? { NSApp.windows.first { $0.identifier?.rawValue.hasPrefix(MainWindow.id) == true } }
+    static var mainWindow: NSWindow? { NSApp.windows.first { $0.identifier?.rawValue.hasPrefix(MainWindow.id) == true } }
 
     /// Needs `scripts/big-server.py`, fresh: its episode st-0-1 (21 min) has a bookmark at 7:00.
     private static func podcastResume(_ model: AppModel) async {
@@ -651,7 +652,7 @@ import SwiftUI
         player.pause()
     }
 
-    private static func wait(_ condition: () -> Bool) async -> Bool { await Shot.first { condition() ? true : nil } ?? false }
+    static func wait(_ condition: () -> Bool) async -> Bool { await Shot.first { condition() ? true : nil } ?? false }
 
     private static func titles(_ menu: NSMenu?) -> [String] { menu?.items.map(\.title).filter { !$0.isEmpty } ?? [] }
 
