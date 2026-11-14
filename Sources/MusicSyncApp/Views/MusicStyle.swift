@@ -292,7 +292,8 @@ struct PlaceholderBlock: View {
     var cornerRadius: CGFloat = 4
 
     var body: some View {
-        RoundedRectangle(cornerRadius: cornerRadius).fill(.quaternary).frame(width: width, height: height)
+        // Max width, not a fixed one: in a narrow column the blocks shrink and the page does not overflow.
+        RoundedRectangle(cornerRadius: cornerRadius).fill(.quaternary).frame(maxWidth: width).frame(height: height)
     }
 }
 
