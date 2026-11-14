@@ -60,15 +60,16 @@ extension LibraryDatabase {
 
     // MARK: Lyrics
 
-    /// Songs without lyrics rows (or with an old "none" marker), most played first.
-    func songsMissingLyrics(limit: Int) -> [String] {
+    /// Songs without lyrics rows (or with an old "none" marker), most played first. A pass asks for all of them:
+    /// one reply takes about 50 ms, and a cap made a big library show "Syncing Lyrics" for a day.
+    func songsMissingLyrics(limit: Int = .max) -> [String] {
         let cutoff = Date().timeIntervalSince1970 - Self.retryAfter
         return read([]) {
             try $0.rows("""
                 SELECT id FROM songs WHERE NOT EXISTS (
                   SELECT 1 FROM lyrics l WHERE l.songId = songs.id AND (l.status = 'found' OR l.fetchedAt > ?))
                 ORDER BY playCount DESC, COALESCE(created, '') DESC LIMIT ?
-                """, [cutoff, limit]) { $0.text(0)! }
+                """, [cutoff, min(limit, Int(Int32.max))]) { $0.text(0)! }
         }
     }
 
