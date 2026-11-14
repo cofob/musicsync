@@ -100,7 +100,8 @@ private func request(_ text: String) throws -> HTTPRequest {
         for (path, command) in cases {
             #expect(try route("POST /api/command/\(path) HTTP/1.1\r\n\r\n") == .success(.command(command)), "\(path)")
         }
-        for bad in ["stop", "seek", "seek?time=-1", "seek?time=nan", "volume?value=x", "shuffle?on=maybe", "repeat?mode=x", "queue?offset=-1"] {
+        for bad in ["stop", "seek", "seek?time=-1", "seek?time=nan", "volume?value=x", "shuffle?on=maybe", "repeat?mode=x", "queue?offset=-1",
+                    "queue?offset=9223372036854775807", "seek?time=1e999"] {
             #expect(try route("POST /api/command/\(bad) HTTP/1.1\r\n\r\n") == .failure(.badRequest), "\(bad)")
         }
         let body = "POST /api/command/seek HTTP/1.1\r\nContent-Length: 11\r\n\r\n{\"time\":30}"

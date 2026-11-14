@@ -40,7 +40,8 @@ public enum RemoteCommand: Equatable, Sendable {
             guard let value = p["value"].flatMap(Double.init), value.isFinite else { return nil }
             self = .volume(min(max(value, 0), 1))
         case "queue":
-            guard let offset = p["offset"].flatMap(Int.init), offset >= 0 else { return nil }
+            // Bounded, so `index + 1 + offset` cannot overflow.
+            guard let offset = p["offset"].flatMap(Int.init), (0..<10_000_000).contains(offset) else { return nil }
             self = .playQueue(offset: offset, id: p["id"])
         default: return nil
         }
