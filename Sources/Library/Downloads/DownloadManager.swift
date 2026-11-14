@@ -22,7 +22,7 @@ public actor DownloadManager {
     private let backoff: @Sendable (Int) -> Duration
 
     static let maxAttempts = 3
-    static let coverSize = 600
+    public static let coverSize = 600
     /// Kept free on the disk.
     static let reserveBytes: Int64 = 500_000_000
 

@@ -69,6 +69,10 @@ final class Player {
 
     @ObservationIgnored var client: SubsonicClient?
     @ObservationIgnored var covers: CoverArtCache?
+    /// Downloaded file of a server song; played instead of the stream.
+    @ObservationIgnored var localFile: ((String) -> URL?)?
+    /// False for entries that cannot play now (offline and not downloaded); they are skipped.
+    @ObservationIgnored var canPlay: ((PlayItem) -> Bool)?
 
     var current: PlayItem? { index.flatMap { queue.indices.contains($0) ? queue[$0] : nil } }
     var duration: TimeInterval {
@@ -249,7 +253,7 @@ final class Player {
     // MARK: Queue handling
 
     private func start(at i: Int) {
-        guard queue.indices.contains(i) else { return }
+        guard let i = playable(i) else { return }
         player.removeAllItems()
         slots = [:]
         index = i
@@ -268,6 +272,13 @@ final class Player {
         case .all: queue.isEmpty ? nil : (i + 1) % queue.count
         case .off: i + 1
         }
+    }
+
+    /// First entry from `i` on that can play now, wrapping around with repeat all.
+    private func playable(_ i: Int) -> Int? {
+        guard queue.indices.contains(i) else { return nil }
+        let order = repeatMode == .all ? (0..<queue.count).map { (i + $0) % queue.count } : Array(i..<queue.count)
+        return order.first { canPlay?(queue[$0]) ?? true }
     }
 
     private func queueEdited() {
@@ -289,7 +300,7 @@ final class Player {
 
     /// Appends queue entry `i` to the AVQueuePlayer (no-op if out of range or already preloaded).
     private func enqueue(_ i: Int?) {
-        guard let i, queue.indices.contains(i),
+        guard let i = i.flatMap(playable),
               !slots.contains(where: { $0.value.index == i && $0.key != currentItemID }),
               let item = makeItem(queue[i], at: i) else { return }
         let status = item.observe(\.status) { [weak self] item, _ in
@@ -305,6 +316,7 @@ final class Player {
         case .file(let url, _, _, _):
             return AVPlayerItem(url: url)
         case .server(let song):
+            if !transcoded.contains(i), let url = localFile?(song.id) { return AVPlayerItem(url: url) }
             guard let client else { return nil }
             let raw = Self.rawSuffixes.contains((song.suffix ?? "").lowercased()) && !transcoded.contains(i)
             guard raw else { return AVPlayerItem(url: client.streamURL(id: song.id, format: "mp3", maxBitRate: 320)) }

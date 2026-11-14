@@ -88,6 +88,7 @@ final class AppModel {
     var playlistPrompt: PlaylistPrompt?
 
     let player = Player()
+    let downloads = DownloadsModel()
     /// The connected iPod (read-only snapshot, eject). Sync UI hooks live here.
     let ipod = DeviceModel()
     let sync = SyncModel()
@@ -115,6 +116,7 @@ final class AppModel {
         }
         ipod.manualGuid = { [weak self] device in device.volumeUUID.flatMap { self?.syncSettings.manualGuids[$0] } }
         sync.attach(self)
+        downloads.attach(to: player)
         ipod.start()
         spaceMonitor = SpaceKeyMonitor.install { [weak self] in
             guard let player = self?.player, !player.queue.isEmpty else { return false }
@@ -139,6 +141,7 @@ final class AppModel {
         shelves = []; starOverrides = [:]; ratingOverrides = [:]; ratingUnsupported = false; lyricsCache = [:]
         player.stop()
         await stopLibrary()
+        await downloads.stop()
         let client = demo ? config.map { SubsonicClient(baseURL: $0.baseURL, username: $0.username, password: "demo") }
                           : config.flatMap { SubsonicClient(config: $0) }
         guard let client else {
@@ -148,7 +151,8 @@ final class AppModel {
             return
         }
         let store = LibraryStore(client: client)
-        let covers = CoverArtCache(client: client)
+        downloads.start(client: client)
+        let covers = CoverArtCache(client: client, offline: downloads.manager?.coversDirectory)
         self.client = client; self.store = store; self.covers = covers
         player.client = client; player.covers = covers
         sync.flushScrobbles(client)

@@ -39,6 +39,7 @@ extension AppModel {
                 if finished || (wasRunning && status.state != .running) {
                     self.lastLibrarySync = await library.database.lastFullSync
                     if await self.reloadFromDatabase(library) { await self.loadHome() }
+                    self.refreshDownloadPins()
                 }
             }
         }
@@ -62,12 +63,14 @@ extension AppModel {
     /// Album with songs: local database, else `LibraryStore` (disk cache, then server).
     func album(_ id: String) async throws -> Album? {
         if let local = await library?.database.album(id: id) { return local }
+        if downloads.isOffline, let saved = downloads.savedAlbum(id) { return saved }
         return try await store?.album(id)
     }
 
     /// Playlist with entries: local database, else server.
     func playlist(_ id: String) async throws -> Playlist? {
         if let local = await library?.database.playlist(id: id) { return local }
+        if downloads.isOffline, let saved = downloads.savedPlaylist(id) { return saved }
         return try await store?.playlist(id)
     }
 
@@ -85,6 +88,7 @@ extension AppModel {
         func best(_ list: [StructuredLyrics]) -> Lyrics? { (list.first(where: \.synced) ?? list.first).flatMap(Lyrics.init) }
         let database = library?.database
         if let stored = await database?.storedLyrics(songId: song.id) { return best(stored) }
+        if let saved = await downloads.manager?.store.lyrics(song.id) { return best(saved) }
         guard let client else { return nil }
         if let list = try? await client.getLyricsBySongId(id: song.id) {
             try? await database?.storeLyrics(songId: song.id, lyrics: list)
