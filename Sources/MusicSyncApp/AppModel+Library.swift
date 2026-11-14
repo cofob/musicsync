@@ -56,7 +56,8 @@ extension AppModel {
         let artists = await db.artists(), albums = await db.albums(), playlists = await db.playlists()
         guard self.library?.database === db, !albums.isEmpty else { return false }
         usesLocalLibrary = true
-        apply(artists: artists, albums: albums, playlists: playlists, onlyIfChanged: true)
+        // The first pass lists albums before playlists: until it stores them, the server's list stays.
+        apply(artists: artists, albums: albums, playlists: playlists.isEmpty ? self.playlists : playlists, onlyIfChanged: true)
         return true
     }
 

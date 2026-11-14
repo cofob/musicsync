@@ -14,7 +14,7 @@ struct HomeView: View {
                     Spacer()
                     NavigationLink(value: Route.stats) { Label("Your Stats", systemImage: "chart.bar.fill") }.buttonStyle(FilledCapsuleStyle())
                 }
-                if model.shelves.isEmpty && model.libraryError == nil { placeholder }
+                if model.shelves.isEmpty && model.homeError == nil { placeholder }
                 // The order and the shown sections come from Settings > Library.
                 if !model.shelves.isEmpty {
                     ForEach(AppPreferences.shared.home.visible, id: \.self) { kind in
@@ -31,7 +31,7 @@ struct HomeView: View {
             .padding(.horizontal, 32).padding(.top, 20).padding(.bottom, 32)
         }
         .overlay {
-            if let error = model.libraryError, model.shelves.isEmpty {
+            if let error = model.homeError, model.shelves.isEmpty {
                 LoadFailedView(message: error) { Task { await model.loadHome() } }
             }
         }

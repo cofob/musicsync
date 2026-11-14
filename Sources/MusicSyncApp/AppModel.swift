@@ -61,8 +61,10 @@ final class AppModel {
     private var loadingStore: LibraryStore?
     /// Alert for failed user actions; set through `report(_:)`.
     var errorMessage: String?
-    /// Inline messages for failed background loads (library, Home, songs, search).
+    /// Inline message for a failed load of the library lists.
     private(set) var libraryError: String?
+    /// Separate from `libraryError`: shelves that load must not hide a failed library list.
+    private(set) var homeError: String?
 
     var selection: SidebarItem? = AppPreferences.shared.startPage
     var path: [Route] = []
@@ -211,6 +213,8 @@ final class AppModel {
             let cache = try await store.refresh(force: force)
             guard store === self.store else { return }
             if !usesLocalLibrary { apply(artists: cache.artists, albums: cache.albums, playlists: cache.playlists) }
+            // The mirror's first pass may hold albums but no playlists yet.
+            else if playlists.isEmpty { apply(artists: artists, albums: albums, playlists: cache.playlists) }
             libraryError = nil
         } catch where !error.isCancellation && store === self.store {
             if force { report(error) } else { libraryError = error.friendlyMessage }
@@ -288,7 +292,7 @@ final class AppModel {
                         Shelf(id: "random", title: "Discover", albums: Array(albums.shuffled().prefix(20)))]
                 .filter { !$0.albums.isEmpty }
             shelves = mixes.personalized(base, albums: albums)
-            libraryError = nil
+            homeError = nil
             await mixes.load()
             shelves = mixes.personalized(base, albums: albums)
             return
@@ -304,9 +308,9 @@ final class AppModel {
                 return lists
             }
             result = kinds.compactMap { type, title in lists[type].flatMap { $0.isEmpty ? nil : Shelf(id: type, title: title, albums: $0) } }
-            libraryError = nil
+            homeError = nil
         } catch where !error.isCancellation {
-            libraryError = error.friendlyMessage
+            homeError = error.friendlyMessage
         } catch { return }
         if client.baseURL == self.client?.baseURL { shelves = result }
     }
