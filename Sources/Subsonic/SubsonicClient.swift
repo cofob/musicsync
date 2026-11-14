@@ -177,8 +177,10 @@ public struct SubsonicClient: Sendable {
                 }
                 if let progress {
                     let last = TaskBox.Clock()
-                    box.observation = task.progress.observe(\.completedUnitCount) { p, _ in
-                        if last.tick() { progress(p.completedUnitCount, p.totalUnitCount) }
+                    // Byte counters, not `task.progress`: without Content-Length that one counts percent (of 100).
+                    // Expected is -1 when unknown.
+                    box.observation = task.observe(\.countOfBytesReceived) { t, _ in
+                        if last.tick() { progress(t.countOfBytesReceived, t.countOfBytesExpectedToReceive) }
                     }
                 }
                 box.task = task

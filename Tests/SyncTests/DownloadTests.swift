@@ -8,6 +8,7 @@ struct DownloadTests {
         private var values: [Int64] = []
         func add(_ v: Int64) { lock.withLock { values.append(v) } }
         var last: Int64? { lock.withLock { values.last } }
+        var max: Int64? { lock.withLock { values.max() } }
     }
 
     @Test func downloadReportsProgressAndKeepsTheFile() async throws {
@@ -20,6 +21,7 @@ struct DownloadTests {
         let file = try await server.client.download(id: "s-1") { done, _ in seen.add(done) }
         defer { try? FileManager.default.removeItem(at: file) }
         #expect(try Data(contentsOf: file) == bytes)
-        #expect(seen.last != nil, "last: \(String(describing: seen.last))")
+        // Bytes, not percent: the stub sends no Content-Length, like a chunked server reply.
+        #expect((seen.max ?? 0) > 100, "max: \(String(describing: seen.max))")
     }
 }
