@@ -12,7 +12,8 @@ struct SongsView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            SongsTable(list: list, sort: $sort, descending: $descending, onPlay: play, bottomInset: geometry.safeAreaInsets.bottom)
+            SongsTable(list: list, sort: $sort, descending: $descending, onPlay: play, bottomInset: geometry.safeAreaInsets.bottom,
+                       scrollKey: "\(sort) \(descending) \(model.query)")
                 .ignoresSafeArea(edges: .bottom)
         }
         .overlay {

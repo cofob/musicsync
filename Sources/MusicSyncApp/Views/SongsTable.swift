@@ -15,6 +15,8 @@ struct SongsTable: NSViewRepresentable {
     let onPlay: (Int) -> Void
     /// Rows scroll on under the player at the bottom, as in the SwiftUI table.
     var bottomInset: CGFloat = 0
+    /// A new list scrolls to the top only when this changes (sort, filter); a library refresh keeps the place.
+    var scrollKey = ""
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -54,7 +56,8 @@ struct SongsTable: NSViewRepresentable {
         coordinator.observed = []
         table.deselectAll(nil)
         if table.numberOfRows == 0 { table.reloadData() } else { table.noteNumberOfRowsChanged() }
-        table.scrollRowToVisible(0)
+        if coordinator.scrollKey != scrollKey { table.scrollRowToVisible(0) }
+        coordinator.scrollKey = scrollKey
         coordinator.fillLiveRows()
     }
 
@@ -136,6 +139,7 @@ struct SongsTable: NSViewRepresentable {
         /// Columns with a tracked cell of a loaded song. All cells of a column read the same properties,
         /// so one tracked cell is enough; tracking every cell slows each reload down the longer the app runs.
         var observed: Set<Column> = []
+        var scrollKey: String?
         private var refreshPending = false
 
         func numberOfRows(in tableView: NSTableView) -> Int { list?.count ?? 0 }
