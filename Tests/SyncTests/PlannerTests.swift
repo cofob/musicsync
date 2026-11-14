@@ -58,6 +58,12 @@ import Testing
         #expect(plan.playlistsToCreate.isEmpty && plan.playlistsToUpdate.isEmpty && plan.isEmpty)
     }
 
+    @Test func rockboxPlaylistOfOnlySkippedForeignSongsIsNotPlanned() {
+        let dup = makeDesired(makeSong("f", album: "foreign album!", albumId: "al-f", artist: "Foreign Artist"), preset: .rockboxOpus)
+        let plan = SyncPlanner.plan(fixture(songs: [dup], present: [], playlists: [DesiredPlaylist(id: "p", name: "Mix", songIDs: ["f"])]))
+        #expect(plan.skippedForeignAlbums.count == 1 && plan.isEmpty)
+    }
+
     @Test func duplicateDesiredSongsCountOnce() {
         let d = makeDesired(makeSong("a"))
         #expect(SyncPlanner.plan(fixture(songs: [d, d], present: [])).add.count == 1)

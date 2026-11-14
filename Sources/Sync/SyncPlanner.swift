@@ -60,7 +60,7 @@ public enum SyncPlanner {
         plan.addBytes = (plan.add + plan.reencode.map(\.desired)).reduce(0) { $0 + SizeEstimate.bytes($1) }
         plan.freedBytes = plan.remove.reduce(0) { $0 + $1.entry.outSize } + plan.reencode.reduce(0) { $0 + $1.entry.outSize }
         let stock = desired.filter { $0.preset.target == .stock && !skipped.contains($0.albumID) }
-        let rockbox = desired.filter { $0.preset.target == .rockbox }
+        let rockbox = desired.filter { $0.preset.target == .rockbox && !skipped.contains($0.albumID) }
         planPlaylists(&plan, input, stockSongs: Set(stock.map(\.id)), rockboxSongs: Set(rockbox.map(\.id)))
         return plan
     }
