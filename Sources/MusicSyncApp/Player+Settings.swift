@@ -28,11 +28,17 @@ extension Player {
 
     func pause() { if isPlaying { toggle() } }
 
-    /// Reads the server extensions the player uses.
+    /// Reads the server extensions the player uses. A network failure tries again later, so one bad moment at
+    /// connect does not turn the feature off for the whole session; a server that answers with an error has none.
     func loadFeatures(_ client: SubsonicClient) async {
         supportsTranscodeOffset = false
-        let names = (try? await client.getOpenSubsonicExtensions())?.map(\.name) ?? []
-        guard client.baseURL == self.client?.baseURL else { return }
-        supportsTranscodeOffset = names.contains("transcodeOffset")
+        for delay in [0, 5, 30, 120, 600] {
+            guard (try? await Task.sleep(for: .seconds(delay))) != nil, client.baseURL == self.client?.baseURL else { return }
+            let names: [String]
+            do { names = try await client.getOpenSubsonicExtensions().map(\.name) } catch SubsonicError.api { return } catch { continue }
+            guard client.baseURL == self.client?.baseURL else { return }
+            supportsTranscodeOffset = names.contains("transcodeOffset")
+            return
+        }
     }
 }
