@@ -175,6 +175,16 @@ private struct Fixture {
         #expect(await g.db.songCount() == 2)
     }
 
+    @Test func lyricsTheServerCannotGiveAreRemembered() async {
+        let f = await Fixture(server: makeServer(albums: 1))
+        f.server.lyricsStatus = 503
+        await f.sync()
+        #expect(await f.db.songsMissingLyrics(limit: 10).count == 2)  // transient: retried next pass
+        f.server.lyricsStatus = 0
+        await f.sync()
+        #expect(await f.db.songsMissingLyrics(limit: 10).isEmpty)
+    }
+
     @Test func missingCoverFileIsFetchedAgain() async throws {
         let f = await Fixture(server: makeServer(albums: 1))
         await f.sync()

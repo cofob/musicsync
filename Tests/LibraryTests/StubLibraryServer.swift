@@ -38,6 +38,7 @@ final class StubLibraryServer: @unchecked Sendable {
     private var _emptyAlbumReply = false
     private var _delayMs = 0
     private var _coverStatus = 200
+    private var _lyricsStatus = 200
     private var _lastScan = "scan-1"
     private var _lyrics: [String: [String: Any]] = [:]
     private var _extensions = ["songLyrics"]
@@ -56,6 +57,8 @@ final class StubLibraryServer: @unchecked Sendable {
     var starred: [String: String] { get { locked { _starred } } set { locked { _starred = newValue } } }
     /// HTTP status of getCoverArt replies.
     var coverStatus: Int { get { locked { _coverStatus } } set { locked { _coverStatus = newValue } } }
+    /// 200 answers; 0 sends a Subsonic error; other values are HTTP statuses.
+    var lyricsStatus: Int { get { locked { _lyricsStatus } } set { locked { _lyricsStatus = newValue } } }
     var delayMs: Int { get { locked { _delayMs } } set { locked { _delayMs = newValue } } }
     /// getAlbumList2 answers this many calls, then fails with HTTP 500.
     var failAlbumListAfter: Int? { get { locked { _failAlbumListAfter } } set { locked { _failAlbumListAfter = newValue; _albumListCalls = 0 } } }
@@ -124,6 +127,8 @@ final class StubLibraryServer: @unchecked Sendable {
                 let entries = p.songIDs.compactMap { id in all.first { $0["id"] as? String == id } }
                 return ok(["playlist": ["id": p.id, "name": p.name, "songCount": entries.count, "duration": entries.count * 100, "changed": p.changed, "entry": entries]])
             case "getLyricsBySongId":
+                if _lyricsStatus == 0 { return (200, Self.failed, 0) }
+                if _lyricsStatus != 200 { return (_lyricsStatus, Data(), 0) }
                 let lyrics = param("id").flatMap { _lyrics[$0] }
                 return ok(["lyricsList": lyrics.map { ["structuredLyrics": [$0]] } ?? [:]])
             case "getCoverArt": return (_coverStatus, cover, _delayMs)

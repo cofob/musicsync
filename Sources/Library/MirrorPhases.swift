@@ -82,7 +82,15 @@ extension MirrorPass {
         // Servers without the extension are skipped; so is any failure to ask.
         guard let extensions = try? await client.getOpenSubsonicExtensions(), extensions.contains(where: { $0.name == "songLyrics" }) else { return }
         try await each(await database.songsMissingLyrics(limit: settings.lyricsPerPass), limit: 2, what: "lyrics") { id in
-            try await database.storeLyrics(songId: id, lyrics: try await client.getLyricsBySongId(id: id))
+            let lyrics: [StructuredLyrics]
+            do { lyrics = try await client.getLyricsBySongId(id: id) } catch let error as SubsonicError {
+                // A song the server cannot give lyrics for has none; otherwise it is asked again every pass.
+                switch error {
+                case .api, .badResponse, .badStatus(404): lyrics = []
+                default: throw error
+                }
+            }
+            try await database.storeLyrics(songId: id, lyrics: lyrics)
         }
     }
 }
