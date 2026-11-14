@@ -11,6 +11,13 @@ import SwiftUI
         NSApp.setActivationPolicy(.regular)
         if Shot.output == nil { NSApp.activate(ignoringOtherApps: true) }
         Shot.start(model)
+        if let file = HangWatchdog.logFile {
+            let model = model
+            // The page and the case name of the open route, e.g. "albums album".
+            HangWatchdog.start(file: file) {
+                MainActor.assumeIsolated { "\(model.selection.map { "\($0)" } ?? "-") \(model.path.last.map { Mirror(reflecting: $0).children.first?.label ?? "\($0)" } ?? "")" }
+            }
+        }
         model.system.start()
         model.remote.start()
         // SIGTERM (`kill`, `pkill`) quits like ⌘Q instead of killing the process mid-sync.
