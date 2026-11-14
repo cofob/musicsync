@@ -49,7 +49,7 @@ final class SyncModel {
     private(set) var previewError: String?
     private(set) var isPlanning = false
     /// Albums resolved while planning, for "Checking 40 of 120 albums…".
-    private(set) var checked: (done: Int, total: Int)?
+    var checked: (done: Int, total: Int)?
     /// Nil until there is more than one album to check.
     var checkingText: String? { checked.flatMap { $0.total > 1 ? "Checking \($0.done) of \($0.total) albums…" : nil } }
     @ObservationIgnored private var planID = 0

@@ -40,6 +40,9 @@ import SwiftUI
             await playPaused(model)
             model.showNowPlaying = true
         case "settings": open(SettingsView(), "Settings", model)
+        case "sync-checking":
+            model.sync.checked = (40, 120)
+            open(SyncSheet(), "Sync", model)
         case "menubar":
             await playPaused(model)
             open(MenuBarPlayer(), "Menu Bar", model)
