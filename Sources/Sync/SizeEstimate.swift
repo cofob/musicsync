@@ -27,7 +27,7 @@ enum SizeEstimate {
         switch preset.codec {
         case .aac(.cvbr(let k)), .opus(let k): Double(k)
         case .aac(.tvbr(let q)): max(64, 256 - Double(q) * 12)
-        case .flac: 0.55 * Double(preset.sampleRate * (preset.bitDepth ?? 16) * 2) / 1000
+        case .flac, .alac: 0.55 * Double(preset.sampleRate * (preset.bitDepth ?? 16) * 2) / 1000
         }
     }
 }

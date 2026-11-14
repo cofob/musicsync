@@ -80,7 +80,14 @@ private let resample = "aresample=44100:filter_size=64:phase_shift=10:cutoff=0.9
 @Test func presetsRoundTripThroughJSON() throws {
     let data = try JSONEncoder().encode(Preset.builtIns)
     #expect(try JSONDecoder().decode([Preset].self, from: data) == Preset.builtIns)
-    #expect(Preset.builtIns.map(\.id) == ["stock-aac", "rockbox-flac", "rockbox-opus"])
+    #expect(Preset.builtIns.map(\.id) == ["stock-aac", "stock-alac", "rockbox-flac", "rockbox-opus"])
+}
+
+@Test func stockALACCommand() {
+    let a = args(.stockALAC, flac24x96)
+    #expect(a.contains(resample) && a.contains("s16"))
+    #expect(a.joined(separator: " ").contains("-c:a alac -movflags +faststart"))
+    #expect(a.suffix(3) == ["-f", "ipod", "/out/a.m4a"])
 }
 
 @Test func passthroughDecisionTable() {
@@ -107,6 +114,10 @@ private let resample = "aresample=44100:filter_size=64:phase_shift=10:cutoff=0.9
         (info("flac", rate: 96000, bits: 16, container: "flac"), .rockboxFLAC, true),
         (info("mp3", container: "mp3"), .rockboxFLAC, true),
         (info("flac", bits: 16, container: "flac"), .rockboxOpus, true),
+        (info("alac", bits: 16, container: m4a), .stockALAC, false),
+        (info("alac", bits: 24, container: m4a), .stockALAC, true),
+        (info("aac", profile: "LC", kbps: 256, container: m4a), .stockALAC, false),
+        (info("flac", bits: 16, container: "flac"), .stockALAC, true),
     ]
     for (source, preset, expected) in table {
         #expect(FFmpeg.needsTranscode(source: source, preset: preset) == expected, "\(source.codec) \(source.sampleRate) -> \(preset.id)")

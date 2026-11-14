@@ -142,6 +142,7 @@ extension Preset.Codec {
         case .aac: "aac_at"
         case .flac: "flac"
         case .opus: "libopus"
+        case .alac: "alac"
         }
     }
 }

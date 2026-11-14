@@ -125,6 +125,7 @@ extension Preset.Codec {
         case .aac: "aac_at"
         case .flac: "flac"
         case .opus: "libopus"
+        case .alac: "alac"
         }
     }
 
@@ -135,6 +136,7 @@ extension Preset.Codec {
         case .aac(.tvbr(let quality)): "AAC VBR, quality \(quality)"
         case .flac(let level): "FLAC, lossless (level \(level))"
         case .opus(let kbps): "Opus \(kbps) kbps"
+        case .alac: "Apple Lossless (16-bit)"
         }
     }
 }

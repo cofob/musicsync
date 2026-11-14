@@ -129,6 +129,7 @@ extension Preset.Codec {
         case .aac: "aac_at"
         case .flac: "flac"
         case .opus: "libopus"
+        case .alac: "alac"
         }
     }
 
@@ -142,6 +143,8 @@ extension Preset.Codec {
             ["-c:a", "flac", "-compression_level", "\(level)"]
         case .opus(let kbps):
             ["-c:a", "libopus", "-b:a", "\(kbps)k", "-vbr", "on"]
+        case .alac:
+            ["-c:a", "alac"]
         }
     }
 }

@@ -16,6 +16,8 @@ public struct Preset: Codable, Identifiable, Hashable, Sendable {
         case aac(AACMode)
         case flac(compressionLevel: Int)
         case opus(bitrateKbps: Int)
+        /// Apple Lossless, which the stock iPod firmware plays.
+        case alac
     }
 
     /// Source that can be copied as is. Nil limits are not checked.
@@ -74,6 +76,14 @@ public struct Preset: Codable, Identifiable, Hashable, Sendable {
             PassthroughRule(codec: "aac", profile: "LC", container: "mp4", maxBitrateKbps: 320, maxSampleRate: 48000),
         ])
 
+    /// Lossless for the stock firmware; lossy sources are copied, as converting them gains nothing.
+    public static let stockALAC = Preset(
+        id: "stock-alac", name: "iPod Apple Lossless", target: .stock, codec: .alac,
+        bitDepth: 16, fileExtension: "m4a", format: "ipod",
+        passthrough: stockAAC.passthrough + [
+            PassthroughRule(codec: "alac", container: "mp4", maxSampleRate: 48000, maxBitsPerSample: 16),
+        ])
+
     public static let rockboxFLAC = Preset(
         id: "rockbox-flac", name: "FLAC 16-bit", target: .rockbox, codec: .flac(compressionLevel: 8),
         bitDepth: 16, fileExtension: "flac", format: "flac",
@@ -83,7 +93,7 @@ public struct Preset: Codable, Identifiable, Hashable, Sendable {
         id: "rockbox-opus", name: "Opus 128k", target: .rockbox, codec: .opus(bitrateKbps: 128),
         sampleRate: 48000, bitDepth: nil, fileExtension: "opus", format: "opus")
 
-    public static let builtIns: [Preset] = [stockAAC, rockboxFLAC, rockboxOpus]
+    public static let builtIns: [Preset] = [stockAAC, stockALAC, rockboxFLAC, rockboxOpus]
 
     /// True when `source` can be copied without re-encoding (never more than stereo).
     public func accepts(_ source: MediaInfo) -> Bool {
