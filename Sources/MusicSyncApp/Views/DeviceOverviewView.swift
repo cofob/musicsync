@@ -74,7 +74,7 @@ struct DeviceOverviewView: View {
         Button("Reload", systemImage: "arrow.clockwise") { model.ipod.reload() }
         Button("Eject", systemImage: "eject.fill") { Task { await model.eject() } }
             .disabled(model.ipod.isEjecting || model.ipod.isSyncing)
-        Button("Sync", systemImage: "arrow.triangle.2.circlepath") { model.sync.showSheet = true }
+        Button("Sync", systemImage: "arrow.triangle.2.circlepath") { model.sync.dismissRun(); model.sync.showSheet = true }
             .buttonStyle(.borderedProminent).tint(Color.musicAccent)
     }
 

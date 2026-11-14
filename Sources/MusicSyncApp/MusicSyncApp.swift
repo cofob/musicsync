@@ -73,7 +73,7 @@ struct MusicSyncApp: App {
                     .disabled(model.library == nil || model.isMirrorRunning)
             }
             CommandMenu("Device") {
-                Button("Sync Now") { model.sync.showSheet = true }
+                Button("Sync Now") { model.sync.dismissRun(); model.sync.showSheet = true }
                     .keyboardShortcut("s")
                     .disabled(model.ipod.current == nil)
                 Divider()

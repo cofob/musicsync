@@ -89,7 +89,7 @@ struct SyncStatusRow: View {
 
     var body: some View {
         let sync = model.sync
-        let pending = sync.run == nil && sync.preview?.plan.isEmpty == false
+        let pending = sync.run?.isFinished != false && sync.preview?.plan.isEmpty == false
         HStack(spacing: 8) {
             Button { sync.showSheet = true } label: {
                 VStack(alignment: .leading, spacing: 5) {
@@ -104,7 +104,7 @@ struct SyncStatusRow: View {
             .buttonStyle(.plain)
             // Explicit start: opens the preview, where the sync is confirmed.
             if pending {
-                Button("Sync…", systemImage: "arrow.trianglehead.2.clockwise") { sync.showSheet = true }
+                Button("Sync…", systemImage: "arrow.trianglehead.2.clockwise") { sync.dismissRun(); sync.showSheet = true }
                     .buttonStyle(.borderedProminent).tint(Color.musicAccent).controlSize(.small)
                     .help("Review and start the sync")
             }
@@ -121,6 +121,7 @@ struct SyncStatusRow: View {
             return run.progress.map { "Syncing \($0.itemsDone) of \($0.itemsTotal)…" } ?? "Syncing…"
         }
         if sync.previewError != nil { return "Cannot prepare sync" }
+        if model.client == nil { return "No server connected" }
         guard let plan = sync.preview?.plan else { return "Checking…" }
         if plan.isEmpty { return "Up to date" }
         let parts = [(plan.add.count, "to add"), (plan.reencode.count + plan.retag.count, "to update"), (plan.remove.count, "to remove")]
@@ -215,6 +216,9 @@ struct SyncSheet: View {
                 Button("Sync") { sync.start() }
                     .buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction).disabled(!preview.canRun)
             }
+        } else if model.client == nil {
+            Text("Connect to a server to sync.").foregroundStyle(.secondary)
+            buttons { Button("Sync") {}.buttonStyle(.borderedProminent).disabled(true) }
         } else {
             HStack { ProgressView().controlSize(.small); Text("Preparing…").foregroundStyle(.secondary) }
             buttons { Button("Sync") {}.buttonStyle(.borderedProminent).disabled(true) }
@@ -394,6 +398,8 @@ private struct CoverHoverActions: ViewModifier {
 
 /// Dark glass circle with a white glyph, readable on any cover.
 private struct HoverCircleStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .labelStyle(.iconOnly)
@@ -401,6 +407,7 @@ private struct HoverCircleStyle: ButtonStyle {
             .foregroundStyle(.white)
             .frame(width: 30, height: 30)
             .background(.black.opacity(configuration.isPressed ? 0.7 : 0.5), in: Circle())
+            .opacity(isEnabled ? 1 : 0.4)
             .contentShape(Circle())
     }
 }
