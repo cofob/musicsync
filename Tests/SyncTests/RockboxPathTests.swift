@@ -22,6 +22,8 @@ import Testing
         let path = RockboxPaths.songPath(TrackTags(title: long, artist: "A", album: "B"), ext: "opus")
         let name = path.split(separator: "/").last!
         #expect(name.utf8.count <= 255 && name.hasSuffix(".opus"))
+        let deep = RockboxPaths.songPath(TrackTags(title: long, artist: long, album: long), ext: "opus")
+        #expect(("/" + deep).utf8.count <= RockboxPaths.maxPathBytes && deep.hasSuffix(".opus"))
         #expect(RockboxPaths.component("x. ", maxBytes: 5) == "x")
     }
 

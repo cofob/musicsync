@@ -24,13 +24,17 @@ public enum RockboxPaths {
         return out.isEmpty ? fallback : out
     }
 
-    /// `Music/<AlbumArtist>/<Year> - <Album>/<DD-NN> - <Title>.<ext>`
+    /// Rockbox MAX_PATH is 260 bytes with the NUL; the rest is room for ` (n)`.
+    static let maxPathBytes = 250
+
+    /// `Music/<AlbumArtist>/<Year> - <Album>/<DD-NN> - <Title>.<ext>`, within `maxPathBytes` with the leading `/`.
     public static func songPath(_ tags: TrackTags, ext: String) -> String {
-        let artist = component(tags.albumArtist.isEmpty ? tags.artist : tags.albumArtist, fallback: "Unknown Artist")
+        let artist = component(tags.albumArtist.isEmpty ? tags.artist : tags.albumArtist, fallback: "Unknown Artist", maxBytes: 80)
         let album = tags.album.isEmpty ? "Unknown Album" : tags.album
-        let albumDir = component(tags.year.map { "\($0) - \(album)" } ?? album, fallback: "Unknown Album")
+        let albumDir = component(tags.year.map { "\($0) - \(album)" } ?? album, fallback: "Unknown Album", maxBytes: 80)
         let number = String(format: "%02d-%02d", tags.discNumber ?? 1, tags.trackNumber ?? 0)
-        let name = component("\(number) - \(tags.title)", fallback: number, maxBytes: maxComponentBytes - ext.utf8.count - 1)
+        let budget = maxPathBytes - "/Music///.".utf8.count - artist.utf8.count - albumDir.utf8.count - ext.utf8.count
+        let name = component("\(number) - \(tags.title)", fallback: number, maxBytes: budget)
         return "Music/\(artist)/\(albumDir)/\(name).\(ext)"
     }
 
