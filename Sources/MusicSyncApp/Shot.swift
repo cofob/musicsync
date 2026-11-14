@@ -26,7 +26,7 @@ import SwiftUI
             NSApp.windows.first?.setContentSize(NSSize(width: 1280, height: 820))
             await show(env["MUSICSYNC_SCENE"] ?? "home", model)
             try? await Task.sleep(for: .seconds(delay))
-            let capture: @MainActor @Sendable () -> Void = { exit(save(to: URL(fileURLWithPath: output)) ? 0 : 1) }
+            let capture: @MainActor @Sendable () -> Void = { exit(save(to: URL(fileURLWithPath: output)) && !ShotChecks.failed ? 0 : 1) }
             if menuPath.isEmpty { capture() } else { openMenu(then: capture) }
         }
     }
@@ -303,6 +303,7 @@ import SwiftUI
                 menu.performActionForItem(at: i)
             }
         case "tour": await tour(model)
+        case let s where s.hasPrefix("check:"): await ShotChecks.run(String(s.dropFirst(6)), model)
         case let s where s.hasPrefix("type:"):
             // `type:<page>:<text>`: the filter typed on a list page one letter every 0.7 s, for the hang log.
             let parts = s.split(separator: ":", maxSplits: 2).map(String.init)
@@ -320,7 +321,7 @@ import SwiftUI
     }
 
     /// Waits until the lists come from the local mirror, which takes a few minutes on the first run.
-    private static func mirrored(_ model: AppModel) async {
+    static func mirrored(_ model: AppModel) async {
         for _ in 0..<3000 where !model.usesLocalLibrary { try? await Task.sleep(for: .milliseconds(100)) }
     }
 
@@ -402,7 +403,7 @@ import SwiftUI
     }
 
     /// Loads the first album, paused: a scene needs a song, not sound.
-    private static func playPaused(_ model: AppModel) async {
+    static func playPaused(_ model: AppModel) async {
         guard let album = await first({ model.albums.first }) else { return }
         // Played here, not by `model.play`, which loads the album later: a queue restored at launch may be current until then.
         guard let songs = try? await model.album(album.id)?.song, !songs.isEmpty else { return }
@@ -449,12 +450,12 @@ import SwiftUI
     }
 
     /// The first table view under `view`.
-    private static func tableView(in view: NSView?) -> NSTableView? {
+    static func tableView(in view: NSView?) -> NSTableView? {
         (view as? NSTableView) ?? view?.subviews.lazy.compactMap(tableView).first
     }
 
     /// A new selection clears the path and the search text a moment later, so wait for that first.
-    private static func select(_ item: SidebarItem, _ model: AppModel) async {
+    static func select(_ item: SidebarItem, _ model: AppModel) async {
         model.selection = item
         try? await Task.sleep(for: .milliseconds(300))
     }
@@ -465,7 +466,7 @@ import SwiftUI
     }
 
     /// Polls `value` until it is not nil, for at most 30 s.
-    private static func first<T>(_ value: () -> T?) async -> T? {
+    static func first<T>(_ value: () -> T?) async -> T? {
         for _ in 0..<300 {
             if let found = value() { return found }
             try? await Task.sleep(for: .milliseconds(100))
