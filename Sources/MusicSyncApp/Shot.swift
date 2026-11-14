@@ -1,9 +1,9 @@
 import AppKit
+import Carbon.HIToolbox
+import Integration
 import Library
 import Recommend
 import Subsonic
-import Carbon.HIToolbox
-import Integration
 import SwiftUI
 
 /// Development only: `MUSICSYNC_SHOT=<png>` opens `MUSICSYNC_SCENE`, waits `MUSICSYNC_SHOT_DELAY` seconds (default 6),
