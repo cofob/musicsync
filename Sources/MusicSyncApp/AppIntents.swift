@@ -47,7 +47,7 @@ import Subsonic
 }
 
 enum IntentError: Error, CustomLocalizedStringResourceConvertible {
-    case notConnected, nothingPlaying, notFound(String), noSongs, readOnly(String), needsLibrary
+    case notConnected, nothingPlaying, notFound(String), noSongs, readOnly(String), serverRefused(String), needsLibrary
 
     var localizedStringResource: LocalizedStringResource {
         switch self {
@@ -56,6 +56,7 @@ enum IntentError: Error, CustomLocalizedStringResourceConvertible {
         case .notFound(let text): "MusicSync found nothing for “\(text)”."
         case .noSongs: "There are no songs to play."
         case .readOnly(let name): "You cannot add songs to the playlist “\(name)”."
+        case .serverRefused(let name): "The server did not add the song to the playlist “\(name)”."
         case .needsLibrary: "Stations need the library on this Mac. Turn it on in MusicSync Settings > Library."
         }
     }
@@ -225,7 +226,7 @@ struct AddCurrentSongToPlaylistIntent: AppIntent {
     @MainActor func perform() async throws -> some IntentResult {
         let app = try await IntentHost.connected().app, song = try IntentHost.currentSong()
         guard let list = app.playlists.first(where: { $0.id == playlist.id }), app.canEdit(list) else { throw IntentError.readOnly(playlist.name) }
-        await app.append([song.id], to: list)
+        guard await app.append([song.id], to: list) else { throw IntentError.serverRefused(playlist.name) }
         return .result()
     }
 }

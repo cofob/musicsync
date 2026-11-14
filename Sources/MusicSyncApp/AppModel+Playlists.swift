@@ -41,12 +41,14 @@ extension AppModel {
     }
 
     /// Adds without the duplicate check.
-    func append(_ songIds: [String], to playlist: Playlist) async {
-        guard !songIds.isEmpty else { return }
+    /// False when the server refused; the error is reported.
+    @discardableResult func append(_ songIds: [String], to playlist: Playlist) async -> Bool {
+        guard !songIds.isEmpty else { return true }
         do {
             try await client?.updatePlaylist(id: playlist.id, songIdsToAdd: songIds)
             await reloadPlaylist(playlist.id)
-        } catch { report(error) }
+            return true
+        } catch { report(error); return false }
     }
 
     /// Creates the playlist and opens it.
