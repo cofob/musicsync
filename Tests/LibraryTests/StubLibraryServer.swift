@@ -179,7 +179,7 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
     override func startLoading() {
         let url = request.url!
         let (status, body, delay) = Registry.shared.server(for: url.host)?.respond(to: url) ?? (503, Data(), 0)
-        let deliver = { [self] in
+        nonisolated(unsafe) let deliver = { [self] in
             let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil)!
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: body)
