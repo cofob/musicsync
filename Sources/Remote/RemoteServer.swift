@@ -15,8 +15,8 @@ public final class RemoteServer: @unchecked Sendable {
     public typealias Handler = @Sendable @MainActor (HTTPRequest) async -> Reply
 
     static let maxConnections = 32, maxStreams = 16
-    /// Time a client gets to send its request.
-    static let requestTimeout: TimeInterval = 10
+    /// Time a client gets to send its request; the answer itself may take longer (a cover from a slow server).
+    var requestTimeout: TimeInterval = 10
 
     private let queue = DispatchQueue(label: "dev.cofob.musicsync.remote")
     private let port: UInt16
@@ -26,6 +26,8 @@ public final class RemoteServer: @unchecked Sendable {
     private var connections: [ObjectIdentifier: NWConnection] = [:]
     /// Open event streams in start order, with their owners.
     private var streams: [(connection: NWConnection, owner: String)] = []
+    /// Connections whose request came in and is being answered.
+    private var answering: Set<ObjectIdentifier> = []
     private var adverts: [DNSServiceRef] = []
     private var ping: DispatchSourceTimer?
 
@@ -102,14 +104,15 @@ public final class RemoteServer: @unchecked Sendable {
         }
         c.start(queue: queue)
         receive(c, Data())
-        queue.asyncAfter(deadline: .now() + Self.requestTimeout) { [weak self] in
-            guard let self, !self.streams.contains(where: { $0.connection === c }) else { return }
+        queue.asyncAfter(deadline: .now() + requestTimeout) { [weak self] in
+            guard let self, !answering.contains(id), !streams.contains(where: { $0.connection === c }) else { return }
             c.cancel()  // a slow or stuck client; a finished request is closed already
         }
     }
 
     private func forget(_ id: ObjectIdentifier) {
         connections[id] = nil
+        answering.remove(id)
         streams.removeAll { ObjectIdentifier($0.connection) == id }
     }
 
@@ -121,6 +124,7 @@ public final class RemoteServer: @unchecked Sendable {
             case .incomplete: if done || error != nil { c.cancel() } else { self.receive(c, buffer) }
             case .invalid(let status): self.send(.error(status), on: c)
             case .request(let request, _):
+                self.answering.insert(ObjectIdentifier(c))
                 let handler = self.handler
                 Task {
                     let reply = await handler(request)

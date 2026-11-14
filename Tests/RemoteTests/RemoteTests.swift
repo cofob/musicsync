@@ -247,3 +247,37 @@ private func request(_ text: String) throws -> HTTPRequest {
         }
     }
 }
+
+@Suite struct RemoteServerTests {
+    @Test func slowAnswerOutlivesTheRequestTimeout() async throws {
+        let port = UInt16.random(in: 42000...48000)
+        let server = RemoteServer(port: port, name: "Test") { _ in
+            try? await Task.sleep(for: .milliseconds(600))  // a cover from a slow music server
+            return .response(HTTPResponse(headers: [("Content-Type", "text/plain")], body: Data("ok".utf8)))
+        }
+        server.requestTimeout = 0.2
+        try server.start { _ in }
+        defer { server.stop() }
+        try await Task.sleep(for: .milliseconds(200))
+        let (data, response) = try await URLSession.shared.data(from: URL(string: "http://127.0.0.1:\(port)/manifest.webmanifest")!)
+        #expect((response as? HTTPURLResponse)?.statusCode == 200)
+        #expect(String(decoding: data, as: UTF8.self) == "ok")
+    }
+
+    @Test func silentClientIsClosed() async throws {
+        let port = UInt16.random(in: 48001...54000)
+        let server = RemoteServer(port: port, name: "Test") { _ in .response(.error(.notFound)) }
+        server.requestTimeout = 0.2
+        try server.start { _ in }
+        defer { server.stop() }
+        try await Task.sleep(for: .milliseconds(200))
+        let fd = socket(AF_INET, SOCK_STREAM, 0)
+        defer { close(fd) }
+        var addr = sockaddr_in(sin_len: UInt8(MemoryLayout<sockaddr_in>.size), sin_family: sa_family_t(AF_INET),
+                               sin_port: port.bigEndian, sin_addr: in_addr(s_addr: inet_addr("127.0.0.1")), sin_zero: (0, 0, 0, 0, 0, 0, 0, 0))
+        let connected = withUnsafePointer(to: &addr) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, socklen_t(MemoryLayout<sockaddr_in>.size)) } }
+        #expect(connected == 0)
+        var byte: UInt8 = 0
+        #expect(read(fd, &byte, 1) == 0)  // the server closes the connection after the timeout
+    }
+}
