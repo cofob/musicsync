@@ -61,6 +61,17 @@ import Subsonic
         #expect(files(m) == [file.lastPathComponent])
     }
 
+    /// A part longer than the file (416): it is deleted and the whole file comes in the same call.
+    @Test func unsatisfiableRangeStartsOver() async throws {
+        let dir = TempDir(), server = makeServer()
+        let part = dir.url.appendingPathComponent("part.flac")
+        try Data(count: 2000).write(to: part)
+        try await server.client.download(id: "a", resuming: part)
+        #expect(server.ranges == ["bytes=2000-"])
+        #expect(server.requests("download:a").count == 2)
+        #expect(try Data(contentsOf: part) == server.audio)
+    }
+
     @Test func droppedDownloadIsTriedAgain() async throws {
         let dir = TempDir(), server = makeServer()
         server.dropDownloads = 2

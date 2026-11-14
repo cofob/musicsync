@@ -107,7 +107,9 @@ final class StubLibraryServer: @unchecked Sendable {
         Registry.shared.register(self)
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [StubProtocol.self]
-        return SubsonicClient(baseURL: URL(string: "http://\(host)")!, username: "demo", password: "pw", session: URLSession(configuration: config))
+        var client = SubsonicClient(baseURL: URL(string: "http://\(host)")!, username: "demo", password: "pw", session: URLSession(configuration: config))
+        client.retry = RetryPolicy(attempts: RetryPolicy.standard.attempts, sleep: { _ in })  // the tries, not the waits
+        return client
     }
 
     private func locked<T>(_ body: () -> T) -> T {
@@ -215,9 +217,10 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
         // Download and stream bodies: byte ranges, and dropped connections.
         let media = ["download.view", "stream.view"].contains(url.lastPathComponent) && status == 200
         let range = media ? request.value(forHTTPHeaderField: "Range") : nil
-        if let start = range.flatMap({ Int($0.dropFirst(6).prefix { $0 != "-" }) }), start < body.count {
-            headers["Content-Range"] = "bytes \(start)-\(body.count - 1)/\(body.count)"
-            status = 206
+        if let start = range.flatMap({ Int($0.dropFirst(6).prefix { $0 != "-" }) }) {
+            // A range past the end is not satisfiable.
+            headers["Content-Range"] = start < body.count ? "bytes \(start)-\(body.count - 1)/\(body.count)" : "bytes */\(body.count)"
+            status = start < body.count ? 206 : 416
             body = body.dropFirst(start)
         }
         headers["Content-Length"] = String(body.count)

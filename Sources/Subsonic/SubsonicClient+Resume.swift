@@ -5,10 +5,18 @@ extension SubsonicClient {
     /// is asked for (HTTP Range); a server that ignores the range sends the whole file again. After a failure `part`
     /// keeps what arrived, so the next call goes on from there. The caller moves or deletes `part`.
     /// `progress` gets bytes received (with those already in `part`) and expected (-1 when unknown).
+    /// A part the server cannot go on from (416: longer than the file) is deleted and the download starts over at once.
     public func download(id: String, format: String? = nil, maxBitRate: Int? = nil, resuming part: URL,
                          progress: (@Sendable (Int64, Int64) -> Void)? = nil) async throws {
+        do { try await transfer(id: id, format: format, maxBitRate: maxBitRate, part: part, progress: progress) } catch SubsonicError.badStatus(416) {
+            try await transfer(id: id, format: format, maxBitRate: maxBitRate, part: part, progress: progress)
+        }
+    }
+
+    private func transfer(id: String, format: String?, maxBitRate: Int?, part: URL, progress: (@Sendable (Int64, Int64) -> Void)?) async throws {
         let url = format == nil ? downloadURL(id: id) : streamURL(id: id, format: format, maxBitRate: maxBitRate)
-        let have = Int64((try? part.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+        // Not `resourceValues`: a URL keeps those, so it would still see a part deleted since.
+        let have = ((try? FileManager.default.attributesOfItem(atPath: part.path))?[.size] as? NSNumber)?.int64Value ?? 0
         var request = URLRequest(url: url)
         if have > 0 { request.setValue("bytes=\(have)-", forHTTPHeaderField: "Range") }
         let writer = PartWriter(part: part, have: have, progress: progress)
