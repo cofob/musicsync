@@ -1,18 +1,37 @@
 import AppKit
 import SwiftUI
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+@MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
+    let model = AppModel()
+    private var sigterm: DispatchSourceSignal?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Needed when run unbundled via `swift run`.
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+        // SIGTERM (`kill`, `pkill`) quits like ⌘Q instead of killing the process mid-sync.
+        signal(SIGTERM, SIG_IGN)
+        sigterm = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+        sigterm?.setEventHandler { NSApp.terminate(nil) }
+        sigterm?.resume()
+    }
+
+    /// A running sync stops first, so the iPod database is written before the app quits.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard model.ipod.isSyncing else { return .terminateNow }
+        model.sync.cancel()
+        Task {
+            while model.ipod.isSyncing { try? await Task.sleep(for: .milliseconds(200)) }
+            NSApp.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
     }
 }
 
 @main
 struct MusicSyncApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
-    @State private var model = AppModel()
+    private var model: AppModel { delegate.model }
 
     var body: some Scene {
         WindowGroup("MusicSync") {
