@@ -35,14 +35,20 @@ swift test
 
 ## Install
 
-Download `MusicSync.zip` from [Releases](https://github.com/cofob/musicsync/releases), or install your own build:
+Install the latest release from the terminal. The app is not notarized; this downloads it with `curl` and clears the quarantine flag, so Gatekeeper does not block it:
+
+```sh
+cd "$(mktemp -d)" && curl -fsSLO https://github.com/cofob/musicsync/releases/latest/download/MusicSync.zip && ditto -xk MusicSync.zip . && rm -rf /Applications/MusicSync.app && mv MusicSync.app /Applications/ && xattr -dr com.apple.quarantine /Applications/MusicSync.app && open /Applications/MusicSync.app
+```
+
+Run the same command to update. Or install your own build:
 
 ```sh
 cp -R build/MusicSync.app /Applications/
 open /Applications/MusicSync.app
 ```
 
-The app is not notarized. If macOS blocks a downloaded copy, run `xattr -dr com.apple.quarantine /Applications/MusicSync.app`.
+If you download `MusicSync.zip` from [Releases](https://github.com/cofob/musicsync/releases) in a browser and macOS blocks it, run `xattr -dr com.apple.quarantine /Applications/MusicSync.app`.
 
 Open Settings, enter your server address, user name and password, and click Save. The password is kept in the Keychain.
 
