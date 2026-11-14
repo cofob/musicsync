@@ -21,7 +21,7 @@ struct ToolbarSearchField: View {
                 .onExitCommand { search.showsSuggestions = false }
             if !model.searchText.isEmpty {
                 Button("Clear", systemImage: "xmark.circle.fill") { model.searchText = "" }
-                    .labelStyle(.iconOnly).buttonStyle(.plain).foregroundStyle(.secondary)
+                    .labelStyle(.iconOnly).buttonStyle(HitAreaButtonStyle(width: 24, height: 24)).foregroundStyle(.secondary)
             }
         }
         .padding(.horizontal, 10)

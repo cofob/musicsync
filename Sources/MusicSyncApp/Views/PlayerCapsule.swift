@@ -16,7 +16,7 @@ struct PlayerCapsule: View {
                 VolumeButton()
             }
             .font(.system(size: 16))
-            .buttonStyle(.plain).labelStyle(.iconOnly)
+            .buttonStyle(HitAreaButtonStyle(width: 24, height: 24)).labelStyle(.iconOnly)
         }
         .padding(.horizontal, 22)
         .frame(height: 56)

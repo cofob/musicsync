@@ -106,7 +106,8 @@ private struct Pick: ViewModifier {
     func body(content: Content) -> some View {
         content
             .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
+            // Grows into the row insets, so the whole gray shape takes clicks, not only the label.
+            .contentShape(Rectangle().inset(by: -10))
             .onTapGesture { selection = item }
             .listRowBackground(RoundedRectangle(cornerRadius: 8)
                 .fill(selection == item ? Color.primary.opacity(0.1) : .clear)
