@@ -55,6 +55,7 @@ import Testing
 
     @Test func equalizerTapRunsOnBothDecks() async throws {
         mixer.equalizer.set(EqualizerGains(preamp: -3, bands: [6, 0, 0, 0, 0, 0, 0, 0, 0, -6]))
+        mixer.usesEqualizer = true
         mixer.play(try cue(2))
         mixer.setNext(try cue(2), transition: Transition(at: 0.8, duration: 0.8, curve: .linear))
         _ = try #require(await time(of: .advanced(skipped: false)))
@@ -63,6 +64,10 @@ import Testing
         #expect(mixer.decks.allSatisfy { $0.player.currentItem?.audioMix?.inputParameters.first?.audioTapProcessor != nil })
         // 1.2 s of two decks at 44.1 kHz; the tap gets the audio ahead of the clock.
         #expect(mixer.equalizer.processedFrames > 44100)
+        // Off: the current song plays without the tap; the outgoing one keeps it until the fade ends.
+        mixer.usesEqualizer = false
+        await sleep(0.2)
+        #expect(mixer.decks.contains { $0.player.currentItem != nil && $0.player.currentItem?.audioMix == nil })
     }
 
     @Test func crossfadeOverlapsTwoDecks() async throws {

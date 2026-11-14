@@ -6,5 +6,6 @@ extension Player {
         guard equalizer != old else { return }
         equalizer.save()
         mixer.equalizer.set(equalizer.gains)
+        mixer.usesEqualizer = equalizer.isOn
     }
 }

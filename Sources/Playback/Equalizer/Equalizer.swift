@@ -18,6 +18,7 @@ public final class Equalizer: Sendable {
     public var processedFrames: Int { frames.load(ordering: .relaxed) }
 
     /// An audio tap for one track that runs the equalizer; nil when MediaToolbox cannot make one.
+    /// After the mix volume, as it adds less start delay there than before it.
     public func makeTap() -> MTAudioProcessingTap? {
         let context = Unmanaged.passRetained(TapContext(self))
         var callbacks = MTAudioProcessingTapCallbacks(
@@ -31,7 +32,7 @@ public final class Equalizer: Sendable {
                 TapContext.of(tap).process(buffers, frames: framesOut.pointee)
             })
         var tap: MTAudioProcessingTap?
-        guard MTAudioProcessingTapCreate(kCFAllocatorDefault, &callbacks, kMTAudioProcessingTapCreationFlag_PreEffects, &tap) == noErr else {
+        guard MTAudioProcessingTapCreate(kCFAllocatorDefault, &callbacks, kMTAudioProcessingTapCreationFlag_PostEffects, &tap) == noErr else {
             context.release()
             return nil
         }
