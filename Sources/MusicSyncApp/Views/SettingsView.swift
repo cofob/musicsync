@@ -16,6 +16,7 @@ private struct ServerSettingsView: View {
     @State private var url = ""
     @State private var username = ""
     @State private var password = ""
+    @State private var hasStoredPassword = false
     @State private var status: Status = .idle
 
     private enum Status {
@@ -28,7 +29,7 @@ private struct ServerSettingsView: View {
                 TextField("Server URL", text: $url, prompt: Text("https://music.example.com"))
                     .textContentType(.URL).autocorrectionDisabled()
                 TextField("Username", text: $username).autocorrectionDisabled()
-                SecureField("Password", text: $password, prompt: Text(model.config?.password == nil ? "" : "Stored in Keychain"))
+                SecureField("Password", text: $password, prompt: Text(hasStoredPassword ? "Stored in Keychain" : ""))
             }
             Section {
                 HStack {
@@ -44,6 +45,7 @@ private struct ServerSettingsView: View {
         .onAppear {
             url = model.config?.baseURL.absoluteString ?? ""
             username = model.config?.username ?? ""
+            hasStoredPassword = model.config?.password != nil
         }
     }
 
@@ -83,6 +85,7 @@ private struct ServerSettingsView: View {
         guard let config else { return }
         await model.save(config, password: password)
         password = ""
+        hasStoredPassword = model.config?.password != nil
         status = .ok("Saved")
     }
 }
