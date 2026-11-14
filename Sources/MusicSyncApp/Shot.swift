@@ -278,13 +278,23 @@ import SwiftUI
                 click(CGPoint(x: 700, y: 393 + row * 42), flags)
                 try? await Task.sleep(for: .milliseconds(700))  // no double-click
             }
+        case "songs-scroll":
+            // The Songs table scrolled down 150 rows every 50 ms for 15 s, for the hang log.
+            await mirrored(model)
+            await select(.songs, model)
+            try? await Task.sleep(for: .seconds(3))
+            guard let scroll = tableView(in: NSApp.windows.first(where: \.isVisible)?.contentView)?.enclosingScrollView else { break }
+            for _ in 0..<300 {
+                scroll.contentView.scroll(to: NSPoint(x: 0, y: scroll.contentView.bounds.minY + 150 * 24))
+                scroll.reflectScrolledClipView(scroll.contentView)
+                try? await Task.sleep(for: .milliseconds(50))
+            }
         case "songs-select":
             // Songs table with several rows selected, for the gray selection. Posted ⌘- and ⇧-clicks do not
             // select in a background window, so the rows are selected directly.
             model.selection = .songs
             try? await Task.sleep(for: .seconds(3))
-            func table(in view: NSView?) -> NSTableView? { (view as? NSTableView) ?? view?.subviews.lazy.compactMap(table).first }
-            table(in: NSApp.windows.first(where: \.isVisible)?.contentView)?.selectRowIndexes([1, 3, 4, 5, 6], byExtendingSelection: false)
+            tableView(in: NSApp.windows.first(where: \.isVisible)?.contentView)?.selectRowIndexes([1, 3, 4, 5, 6], byExtendingSelection: false)
         case "miniplayer", "miniplayer-queue":
             // Through the Window menu, as the user does; the main window hides.
             await playPaused(model)
@@ -436,6 +446,11 @@ import SwiftUI
                                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
                                eventNumber: 0, clickCount: 1, pressure: 1).map { NSApp.postEvent($0, atStart: false) }
         }
+    }
+
+    /// The first table view under `view`.
+    private static func tableView(in view: NSView?) -> NSTableView? {
+        (view as? NSTableView) ?? view?.subviews.lazy.compactMap(tableView).first
     }
 
     /// A new selection clears the path and the search text a moment later, so wait for that first.
