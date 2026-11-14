@@ -4,7 +4,7 @@
 
 <p align="center">Native macOS app that syncs a Navidrome / OpenSubsonic library to an iPod classic.</p>
 
-![MusicSync main window](docs/screenshot.png)
+![MusicSync main window](docs/screenshot.webp)
 
 ## Features
 
