@@ -138,7 +138,7 @@ private func allDone(_ m: DownloadManager, _ count: Int) async -> Bool {
         #expect(await eventually { await m.running.isEmpty })
         let entry = try #require(await m.store.entry("a"))
         #expect(entry.isCancelled && entry.fileName == nil)
-        #expect(server.requests("download:a").count == 1)
+        #expect(server.requests("download:a").count <= 1)  // no retry; the cancel can come before the request reaches the stub
         #expect(await m.waiting.isEmpty)
 
         server.delayMs = 0
