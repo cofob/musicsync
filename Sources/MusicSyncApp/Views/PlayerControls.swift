@@ -95,7 +95,8 @@ struct BarMouseArea: NSViewRepresentable {
     }
 }
 
-/// Song progress with elapsed and remaining time; seeks on release.
+/// Song progress with elapsed and remaining time; seeks on release. The VoiceOver step is 10 s, the whole bar for short
+/// or unknown lengths: a zero step traps in `Slider`.
 struct ScrubBar: View {
     @Environment(AppModel.self) private var model
     var height: CGFloat = 4
@@ -113,7 +114,7 @@ struct ScrubBar: View {
         let bar = LevelBar(value: duration > 0 ? elapsed / duration : 0, height: height, tint: tint,
                            onChange: { scrub = $0 * duration },
                            onCommit: { player.seek(to: $0 * duration); scrub = nil },
-                           label: "Position", valueText: "\(spokenTime(elapsed)) of \(spokenTime(duration))", step: duration > 0 ? 10 / duration : 0)
+                           label: "Position", valueText: "\(spokenTime(elapsed)) of \(spokenTime(duration))", step: duration > 10 ? 10 / duration : 1)
         let start = Text(formatTime(elapsed))
         let end = Text("−" + formatTime(max(0, duration - elapsed)))
         Group {
