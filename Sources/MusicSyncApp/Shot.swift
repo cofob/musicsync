@@ -387,9 +387,10 @@ import SwiftUI
     /// Loads the first album, paused: a scene needs a song, not sound.
     private static func playPaused(_ model: AppModel) async {
         guard let album = await first({ model.albums.first }) else { return }
-        model.play(album)
-        _ = await first({ model.player.current })
-        model.player.toggle()
+        // Played here, not by `model.play`, which loads the album later: a queue restored at launch may be current until then.
+        guard let songs = try? await model.album(album.id)?.song, !songs.isEmpty else { return }
+        model.player.play(songs)
+        if model.player.isPlaying { model.player.toggle() }
     }
 
     /// A paused queue of three albums: two songs of the first in the history, two Play Next songs, AutoPlay songs,
