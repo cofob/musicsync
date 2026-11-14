@@ -33,6 +33,7 @@ import SwiftUI
         case "jukebox": await jukebox(model)
         case "appearance": await appearance(model)
         case "mixes": await mixRules(model)
+        case "soak": await soak(model)
         default: check(false, "known check \(name)")
         }
     }
