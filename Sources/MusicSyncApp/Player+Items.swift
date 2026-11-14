@@ -13,7 +13,7 @@ extension Player {
         case .server(let song):
             if !transcoded.contains(i), let url = localFile?(song.id) { return Self.cue(url, gain: gain) }
             guard let client else { return nil }
-            let stream = settings.stream(for: song, fallback: transcoded.contains(i))
+            let stream = streamSettings.stream(for: song, fallback: transcoded.contains(i))
             let seeksOnServer = stream.isConverted && supportsTranscodeOffset && settings.transcodeOffset
             return Self.streamCue(song.id, stream, client, gain: gain, from: 0, seeksOnServer: seeksOnServer)
         }

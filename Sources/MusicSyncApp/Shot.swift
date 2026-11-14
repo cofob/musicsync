@@ -164,6 +164,17 @@ import SwiftUI
             PlaybackSettings().save()  // the demo defaults stay unchanged
             _ = await first({ model.player.supportsTranscodeOffset ? true : nil })
             open(PlaybackSettingsView(), "Playback", model)
+        case "settings-metered":
+            model.player.settings.quality = .aac
+            model.player.settings.meteredQuality = .mp3
+            model.player.isMetered = true
+            PlaybackSettings().save()
+            open(PlaybackSettingsView(), "Playback", model)
+        case "info-playing":
+            await playPaused(model)
+            model.player.settings.quality = .mp3
+            PlaybackSettings().save()
+            if case .server(let song) = model.player.current { model.infoSong = song }
         case "settings-automix":
             model.player.settings.transitions = .autoMix
             PlaybackSettings().save()

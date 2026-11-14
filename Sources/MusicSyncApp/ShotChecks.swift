@@ -34,6 +34,7 @@ import SwiftUI
         case "appearance": await appearance(model)
         case "mixes": await mixRules(model)
         case "soak": await soak(model)
+        case "quality": await quality(model)
         default: check(false, "known check \(name)")
         }
     }

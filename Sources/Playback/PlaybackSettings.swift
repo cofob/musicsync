@@ -23,6 +23,9 @@ public struct PlaybackSettings: Codable, Equatable, Sendable {
     public var quality = StreamQuality.original
     /// For converted streams, in kbps.
     public var maxBitRate = 256
+    /// Quality on a metered network (Low Data Mode, a phone hotspot); nil streams as on any other network.
+    public var meteredQuality: StreamQuality?
+    public var meteredMaxBitRate = 128
     /// Seeks in converted streams with a new stream from that time (OpenSubsonic `transcodeOffset`).
     public var transcodeOffset = true
     /// Playback rate, 0.5–2; the pitch stays.
@@ -46,6 +49,8 @@ public struct PlaybackSettings: Codable, Equatable, Sendable {
         preventClipping = try c.decodeIfPresent(Bool.self, forKey: .preventClipping) ?? d.preventClipping
         quality = try c.decodeIfPresent(StreamQuality.self, forKey: .quality) ?? d.quality
         maxBitRate = try c.decodeIfPresent(Int.self, forKey: .maxBitRate) ?? d.maxBitRate
+        meteredQuality = try c.decodeIfPresent(StreamQuality.self, forKey: .meteredQuality)
+        meteredMaxBitRate = try c.decodeIfPresent(Int.self, forKey: .meteredMaxBitRate) ?? d.meteredMaxBitRate
         transcodeOffset = try c.decodeIfPresent(Bool.self, forKey: .transcodeOffset) ?? d.transcodeOffset
         speed = try c.decodeIfPresent(Double.self, forKey: .speed) ?? d.speed
     }

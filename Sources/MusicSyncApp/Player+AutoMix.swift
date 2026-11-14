@@ -29,7 +29,7 @@ extension Player {
     func canSeek(_ i: Int) -> Bool {
         guard case .server(let song) = queue[i] else { return true }
         let fallback = transcoded.contains(i)
-        return (!fallback && localFile?(song.id) != nil) || !settings.stream(for: song, fallback: fallback).isConverted
+        return (!fallback && localFile?(song.id) != nil) || !streamSettings.stream(for: song, fallback: fallback).isConverted
     }
 
     private func analysis(at i: Int) -> SongAnalysis? {
@@ -43,7 +43,7 @@ extension Player {
         let key = AnalysisCache.key(for: song), fallback = transcoded.contains(i)
         if !fallback, let url = localFile?(song.id) { return .init(key: key, source: url) }
         guard let client else { return nil }
-        let stream = settings.stream(for: song, fallback: fallback)
+        let stream = streamSettings.stream(for: song, fallback: fallback)
         return .init(key: key, source: client.streamURL(id: song.id, format: stream.format, maxBitRate: stream.maxBitRate),
                      contentType: stream.contentType)
     }

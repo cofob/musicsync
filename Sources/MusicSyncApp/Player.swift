@@ -75,6 +75,8 @@ final class Player {
     var sleepTimer: SleepTimer? { didSet { sleepTimerChanged() } }
     /// The server has the OpenSubsonic `transcodeOffset` extension.
     var supportsTranscodeOffset = false
+    /// Low Data Mode or a hotspot: streams use the metered quality (`Player+Network`).
+    var isMetered = false { didSet { if isMetered != oldValue { resetUpcoming() } } }
     /// An AutoMix transition is running: two songs play. Not set for a plain crossfade.
     var isMixing = false
     /// Plays the queue somewhere else (the server's jukebox); the mixer stays silent meanwhile.
@@ -124,6 +126,7 @@ final class Player {
         mixer.onEvent = { [weak self] in self?.mixerEvent($0) }
         mixer.onTime = { [weak self] in self?.tick($0) }
         setupRemoteCommands()
+        watchNetwork()
     }
 
     // MARK: Controls

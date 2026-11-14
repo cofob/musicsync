@@ -72,7 +72,7 @@ final class PlaybackCacheModel {
         }
         // Downloads play from their own file; the cache is only for streams.
         guard player.isPlaying, !offline, writing == nil, player.localFile?(song.id) == nil, let client = player.client else { return }
-        let stream = player.settings.stream(for: song, fallback: player.transcoded.contains(index))
+        let stream = player.streamSettings.stream(for: song, fallback: player.transcoded.contains(index))
         let task = Task { [weak self] in
             // Best effort: a failed write only means the song streams again next time.
             _ = try? await cache.store(song, format: stream.format, maxBitRate: stream.maxBitRate, client: client)

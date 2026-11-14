@@ -48,6 +48,7 @@ struct PlaybackSettingsView: View {
                         ForEach([128, 192, 256, 320], id: \.self) { Text("\($0) kbps").tag($0) }
                     }
                 }
+                MeteredQualityRows(settings: $player.settings, isMetered: player.isMetered)
                 if player.supportsTranscodeOffset {
                     Toggle("Seek in converted streams on the server", isOn: $player.settings.transcodeOffset)
                 }

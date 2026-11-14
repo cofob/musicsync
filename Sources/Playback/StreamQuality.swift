@@ -20,11 +20,25 @@ public struct StreamRequest: Equatable, Sendable {
     }
 
     public var isConverted: Bool { format != "raw" }
+
+    /// "Original", "AAC 256 kbps".
+    public var title: String {
+        isConverted ? [format.uppercased(), maxBitRate.map { "\($0) kbps" }].compactMap { $0 }.joined(separator: " ") : "Original"
+    }
 }
 
 public extension PlaybackSettings {
     /// Suffixes AVFoundation plays; other originals are converted to mp3.
     static let playableSuffixes: Set<String> = ["mp3", "m4a", "aac", "alac", "flac", "wav", "aif", "aiff"]
+
+    /// The settings to stream with: on a metered network the metered quality, when one is set.
+    func network(metered: Bool) -> PlaybackSettings {
+        guard metered, let meteredQuality else { return self }
+        var settings = self
+        settings.quality = meteredQuality
+        settings.maxBitRate = meteredMaxBitRate
+        return settings
+    }
 
     /// What to stream for `song`. `fallback` is set after the first choice failed to play: mp3 then.
     func stream(for song: Song, fallback: Bool = false) -> StreamRequest {

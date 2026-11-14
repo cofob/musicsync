@@ -215,6 +215,9 @@ struct SongInfoView: View {
                     LabeledContent("Rating") { RatingStars(rating: model.rating(song)) { model.setRating($0, for: song) } }
                 }
                 ForEach(fields, id: \.0) { LabeledContent($0.0, value: $0.1) }
+                if model.player.current?.id == song.id, let quality = model.player.activeQuality {
+                    LabeledContent("Playing As", value: quality + (model.player.isMetered ? " · Metered network" : ""))
+                }
             }
             .formStyle(.grouped)
             HStack { Spacer(); Button("Done") { dismiss() }.keyboardShortcut(.defaultAction) }
