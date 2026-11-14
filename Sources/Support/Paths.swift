@@ -5,7 +5,9 @@ public enum Paths {
     public static let appName = "MusicSync"
     /// Development only: `MUSICSYNC_DEMO=1` keeps all app files under `<tmp>/musicsync-demo`.
     public static let isDemo = ProcessInfo.processInfo.environment["MUSICSYNC_DEMO"] == "1"
-    public static let demoDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("musicsync-demo")
+    /// `MUSICSYNC_DEMO_DIR` moves it, so that parallel demo instances do not share files.
+    public static let demoDirectory = ProcessInfo.processInfo.environment["MUSICSYNC_DEMO_DIR"].map { URL(fileURLWithPath: $0) }
+        ?? FileManager.default.temporaryDirectory.appendingPathComponent("musicsync-demo")
 
     public static var appSupport: URL { ensure(.applicationSupportDirectory) }
     public static var caches: URL { ensure(.cachesDirectory) }
