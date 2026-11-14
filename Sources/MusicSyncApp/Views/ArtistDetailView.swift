@@ -15,7 +15,7 @@ struct ArtistDetailView: View {
     var body: some View {
         ScrollView {
             if let artist {
-                VStack(alignment: .leading, spacing: 0) {
+                LazyVStack(alignment: .leading, spacing: 0) {
                     header(artist)
                     ForEach(albums) { album in
                         ArtistAlbumSection(album: album).padding(.top, 36)
@@ -84,7 +84,7 @@ struct ArtistDetailView: View {
 
     private func summary(_ artist: Artist) -> String {
         let songs = albums.reduce(0) { $0 + ($1.songCount ?? 0) }
-        return "\(albums.count) \(albums.count == 1 ? "album" : "albums"), \(songs) \(songs == 1 ? "song" : "songs")"
+        return "\(albums.count) \(albums.count == 1 ? "album" : "albums"), \(formatSongs(songs))"
     }
 
     private func play(_ artist: Artist, shuffled: Bool) {
@@ -101,6 +101,7 @@ private struct ArtistAlbumSection: View {
     @Environment(AppModel.self) private var model
     let album: Album
     @State private var songs: [Song]?
+    @State private var loadError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -122,10 +123,14 @@ private struct ArtistAlbumSection: View {
             Divider()
             if let songs {
                 SongList(songs: songs, albumArtist: album.artistName) { model.player.play(songs, startAt: $0) }
+            } else if let loadError {
+                Label(loadError, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
             } else {
                 ProgressView().frame(maxWidth: .infinity)
             }
         }
-        .task(id: album.id) { songs = (try? await model.album(album.id))?.song ?? [] }
+        .task(id: album.id) {
+            do { songs = try await model.album(album.id)?.song ?? [] } catch where !error.isCancellation { loadError = error.localizedDescription } catch {}
+        }
     }
 }
