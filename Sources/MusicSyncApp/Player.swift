@@ -5,7 +5,7 @@ import Playback
 import Subsonic
 
 /// One queue entry: a server track or a local file (e.g. a track read from an iPod).
-enum PlayItem: Identifiable, Sendable {
+enum PlayItem: Identifiable, Codable, Sendable {
     case server(Song)
     case file(URL, title: String, artist: String?, album: String?)
 
@@ -46,7 +46,7 @@ enum PlayItem: Identifiable, Sendable {
 
 private struct ImageBox: @unchecked Sendable { let image: NSImage }
 
-enum RepeatMode: CaseIterable, Sendable {
+enum RepeatMode: String, CaseIterable, Sendable {
     case off, all, one
     var next: RepeatMode { self == .off ? .all : self == .all ? .one : .off }
     var symbol: String { self == .one ? "repeat.1" : "repeat" }
@@ -54,8 +54,10 @@ enum RepeatMode: CaseIterable, Sendable {
 
 @MainActor @Observable
 final class Player {
-    private(set) var queue: [PlayItem] = []
-    private(set) var index: Int?
+    /// Entries, their sections and the history (`Player+Queue`).
+    var line = PlayQueue<PlayItem>()
+    var queue: [PlayItem] { line.items }
+    private(set) var index: Int? { get { line.index } set { line.index = newValue } }
     private(set) var isPlaying = false
     private(set) var elapsed: TimeInterval = 0
     private(set) var artwork: NSImage?
@@ -100,8 +102,6 @@ final class Player {
     @ObservationIgnored private var failures = 0
     @ObservationIgnored private var startedAt = Date()
     @ObservationIgnored private var scrobbled = false
-    /// Queue order before shuffling; nil after manual queue edits.
-    @ObservationIgnored private var unshuffled: [PlayItem]?
     /// Cover id `artwork` shows; the same cover is not loaded again.
     @ObservationIgnored private var artworkID: String?
     /// Last seek: ticks far from it (stale, from before the seek) are ignored until one lands near it or the deadline passes.
@@ -124,17 +124,7 @@ final class Player {
         if let shuffled { shuffle = shuffled }
         transcoded = []
         failures = 0
-        if shuffle, !items.isEmpty {
-            unshuffled = items
-            var rest = items
-            let first = shuffled == true ? rest.remove(at: Int.random(in: rest.indices)) : rest.remove(at: min(startAt, rest.count - 1))
-            queue = [first] + rest.shuffled()
-            start(at: 0)
-        } else {
-            unshuffled = nil
-            queue = items
-            start(at: startAt)
-        }
+        start(at: line.replace(items, startAt: startAt, shuffle: shuffle, randomStart: shuffled == true))
     }
 
     func play(_ songs: [Song], startAt: Int = 0, shuffled: Bool? = nil) { play(songs.map(PlayItem.server), startAt: startAt, shuffled: shuffled) }
@@ -143,45 +133,32 @@ final class Player {
     func setShuffle(_ on: Bool) {
         guard on != shuffle else { return }
         shuffle = on
-        guard let index, let current else { return }
-        if on {
-            unshuffled = queue
-            var rest = queue
-            rest.remove(at: index)
-            queue = [current] + rest.shuffled()
-            self.index = 0
-        } else if let original = unshuffled {
-            queue = original
-            self.index = original.firstIndex { $0.id == current.id } ?? 0
-            unshuffled = nil
-        }
+        line.setShuffle(on)
         resetUpcoming()
     }
 
     func playNext(_ items: [PlayItem]) {
-        guard let index else { return play(items) }
-        queue.insert(contentsOf: items, at: index + 1)
-        queueEdited()
+        guard index != nil else { return play(items) }
+        line.insertNext(items)
+        resetUpcoming()
     }
 
     func addToQueue(_ items: [PlayItem]) {
         guard index != nil else { return play(items) }
-        queue += items
-        queueEdited()
+        line.insertLast(items)
+        resetUpcoming()
     }
 
     /// `offsets` are positions in `upcoming`.
     func removeUpcoming(at offsets: IndexSet) {
         let base = (index ?? -1) + 1
-        queue.remove(atOffsets: IndexSet(offsets.map { $0 + base }))
-        queueEdited()
+        remove(at: IndexSet(offsets.map { $0 + base }))
     }
 
     /// `offsets` and `destination` are positions in `upcoming`.
     func moveUpcoming(from offsets: IndexSet, to destination: Int) {
         let base = (index ?? -1) + 1
-        queue.move(fromOffsets: IndexSet(offsets.map { $0 + base }), toOffset: destination + base)
-        queueEdited()
+        move(from: IndexSet(offsets.map { $0 + base }), to: destination + base)
     }
 
     /// Jumps to entry `offset` of `upcoming`.
@@ -207,9 +184,7 @@ final class Player {
     func stop() {
         mixer.stop()
         nextIndex = nil
-        queue = []
-        unshuffled = nil
-        index = nil
+        line = PlayQueue()
         elapsed = 0
         updateNowPlaying()
     }
@@ -236,7 +211,7 @@ final class Player {
 
     // MARK: Queue handling
 
-    private func start(at i: Int, paused: Bool = false) {
+    func start(at i: Int, paused: Bool = false) {
         guard let i = playable(i) else { return }
         index = i
         elapsed = 0
@@ -260,11 +235,6 @@ final class Player {
         guard queue.indices.contains(i) else { return nil }
         let order = repeatMode == .all ? (0..<queue.count).map { (i + $0) % queue.count } : Array(i..<queue.count)
         return order.first { canPlay?(queue[$0]) ?? true }
-    }
-
-    private func queueEdited() {
-        unshuffled = nil
-        resetUpcoming()
     }
 
     /// Re-syncs the preloaded next song with `queue` after it changed.
@@ -347,6 +317,7 @@ final class Player {
         seekTarget = nil
         scrobbled = false
         startedAt = Date()
+        line.recordStart()
         updateNowPlaying()
         onTrackStart?()
         // A song loaded paused (after the sleep timer) is not playing yet.

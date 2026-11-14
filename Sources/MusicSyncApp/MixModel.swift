@@ -129,7 +129,7 @@ final class MixModel {
             // Extend only the queue this was made for.
             guard !list.isEmpty, player.queue.last?.id == last, app.library?.database === db else { return }
             recorder.tagAutoPlay(list)
-            player.addToQueue(list.map(PlayItem.server))
+            player.addAutoPlay(list.map(PlayItem.server))
         }
     }
 
