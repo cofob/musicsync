@@ -3,10 +3,13 @@
 
 Run the app against it with MUSICSYNC_DEMO_SERVER=http://127.0.0.1:<port> (demo mode only).
 Sizes (env): BIG_ARTISTS (2000), BIG_ALBUMS (5000), BIG_SONGS_PER_ALBUM (10), BIG_PLAYLISTS (500).
-Playlist pl-0 holds 5000 songs, the others 50. Covers, streams and lyrics are missing."""
+Playlist pl-0 holds 5000 songs, the others 50. Covers, streams and lyrics are missing, except for the podcasts:
+three channels with drawn covers, bookmarks kept in memory, and silent episode streams (seekable)."""
 import json
 import os
+import struct
 import sys
+import zlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -62,6 +65,72 @@ for p in range(PLAYLISTS):
                       "duration": sum(song_by_id[i]["duration"] for i in ids), "created": day(p), "changed": day(p), "ids": ids})
 
 
+PODCASTS = [("Night Talks", (214, 52, 71), (88, 24, 69)), ("The Long Read", (36, 99, 176), (20, 40, 90)),
+            ("Field Recordings", (46, 140, 87), (16, 64, 48))]
+TITLES = ["The Quiet Hours", "What the River Knew", "Letters From Nowhere", "A Short History of Maps", "Night Shift",
+          "The Last Lighthouse", "Small Machines", "How Cities Sleep", "Paper Trails", "Under the Ice", "The Sound of Rain",
+          "Northern Lines", "Glass Houses", "Signals", "The Long Way Home", "Old Radios", "Morning Birds", "Salt and Stone"]
+channels, episodes = [], []
+for c, (title, _, _) in enumerate(PODCASTS):
+    channels.append({"id": f"ch-{c}", "url": f"https://example.com/{c}/feed.xml", "title": title, "coverArt": f"pod-{c}",
+                     "status": "completed", "description": f"<p>Weekly conversations from <b>{title}</b> &amp; friends.</p>"
+                                                           "<p>New episodes every Monday.</p>"})
+    for e in range(6):
+        on_server = e < 4
+        episodes.append({"id": f"ep-{c}-{e}", "channelId": f"ch-{c}", "title": TITLES[(c * 6 + e) % len(TITLES)],
+                         "description": f"Episode {6 - e}: <i>{title}</i> on long walks, old letters and what comes next.",
+                         "publishDate": f"2026-{11 - e:02d}-{10 - c:02d}T08:00:00.000Z", "status": "completed" if on_server else "new",
+                         "duration": 660 + e * 600, "coverArt": f"pod-{c}", "album": title, "artist": title, "suffix": "wav",
+                         "contentType": "audio/wav", "size": 5_280_044, **({"streamId": f"st-{c}-{e}"} if on_server else {})})
+episodes[2]["playCount"] = 1
+bookmarks = {"st-0-1": 420_000}
+
+
+def png(top, bottom, size=300):
+    """A square with a vertical gradient."""
+    rows = b"".join(b"\0" + bytes(round(t + (b - t) * y / size) for t, b in zip(top, bottom)) * size for y in range(size))
+    chunk = lambda kind, data: struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
+
+
+def silence(seconds):
+    """8 kHz mono 8-bit WAV."""
+    n = seconds * 8000
+    return b"RIFF" + struct.pack("<I", 36 + n) + b"WAVEfmt " + struct.pack("<IHHIIHH", 16, 1, 1, 8000, 8000, 1, 8) \
+        + b"data" + struct.pack("<I", n) + b"\x80" * n
+
+
+def podcast(method, q):
+    if method == "getPodcasts":
+        found = [c for c in channels if q.get("id") in (None, c["id"])]
+        with_episodes = q.get("includeEpisodes", "true") == "true"
+        return {"podcasts": {"channel": [dict(c, episode=[e for e in episodes if e["channelId"] == c["id"]]) if with_episodes else c
+                                         for c in found]}}
+    if method == "getNewestPodcasts":
+        on_server = sorted((e for e in episodes if "streamId" in e), key=lambda e: e["publishDate"], reverse=True)
+        return {"newestPodcasts": {"episode": on_server[:int(q.get("count", 20))]}}
+    if method == "createPodcastChannel":
+        channels.append({"id": f"ch-{len(channels)}", "url": q.get("url", ""), "title": q.get("url", ""), "status": "new"})
+    if method == "deletePodcastChannel":
+        channels[:] = [c for c in channels if c["id"] != q.get("id")]
+    episode = next((e for e in episodes if e["id"] == q.get("id")), {})
+    if method == "downloadPodcastEpisode" and episode:
+        episode.update(status="completed", streamId="st-" + episode["id"][3:])
+    if method == "deletePodcastEpisode" and episode:
+        episode["status"] = "deleted"
+        episode.pop("streamId", None)
+    if method == "getBookmarks":
+        by_stream = {e.get("streamId"): e for e in episodes}
+        return {"bookmarks": {"bookmark": [{"position": p, "username": "demo", "created": day(0), "changed": day(0),
+                                            "entry": dict(by_stream[i], id=i, isDir=False)} for i, p in bookmarks.items() if i in by_stream]}}
+    if method == "createBookmark":
+        bookmarks[q.get("id")] = int(q.get("position", 0))
+    if method == "deleteBookmark":
+        bookmarks.pop(q.get("id"), None)
+    return {}
+
+
 def page(items, q, size="size", offset="offset", default=50):
     start = int(q.get(offset, 0))
     return items[start:start + int(q.get(size, default))]
@@ -115,21 +184,28 @@ def reply(method, q):
     if method == "search3":
         return search(q)
     if method == "getUser":
-        return {"user": {"username": "demo", "adminRole": False, "streamRole": True, "playlistRole": True, "shareRole": False}}
+        return {"user": {"username": "demo", "adminRole": False, "streamRole": True, "playlistRole": True, "shareRole": False,
+                         "podcastRole": True}}
     if method == "getOpenSubsonicExtensions":
         return {"openSubsonicExtensions": []}
     if method == "getPlayQueue":
         return {}
     if method in ("getCoverArt", "stream", "download", "getLyricsBySongId"):
         return None
-    return {}
+    return podcast(method, q)
 
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urlparse(self.path)
         method = url.path.rsplit("/", 1)[-1].removesuffix(".view")
-        body = reply(method, {k: v[0] for k, v in parse_qs(url.query).items()})
+        q = {k: v[0] for k, v in parse_qs(url.query).items()}
+        cover = PODCASTS[int(q["id"][4:])] if method == "getCoverArt" and q.get("id", "").startswith("pod-") else None
+        if cover:
+            return self.send(png(cover[1], cover[2]), "image/png")
+        if method == "stream" and q.get("id", "").startswith("st-"):
+            return self.send(SILENCE, "audio/wav")
+        body = reply(method, q)
         if body is None or body is False:
             self.send_response(404)
             self.end_headers()
@@ -141,12 +217,29 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def send(self, data, kind):
+        """Whole file or one byte range, so the player can seek."""
+        start, end = 0, len(data) - 1
+        spec = self.headers.get("Range", "")
+        if spec.startswith("bytes="):
+            first, _, last = spec[6:].partition("-")
+            start, end = int(first or 0), min(int(last) if last else end, end)
+        self.send_response(206 if spec else 200)
+        self.send_header("Content-Type", kind)
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Content-Length", str(end - start + 1))
+        if spec:
+            self.send_header("Content-Range", f"bytes {start}-{end}/{len(data)}")
+        self.end_headers()
+        self.wfile.write(data[start:end + 1])
+
     do_POST = do_GET
 
     def log_message(self, *args):
         pass
 
 
+SILENCE = silence(max(e["duration"] for e in episodes))
 port = int(sys.argv[1]) if len(sys.argv) > 1 else 4533
 print(f"{len(artists)} artists, {len(albums)} albums, {len(songs)} songs, {len(playlists)} playlists on port {port}", flush=True)
 ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
