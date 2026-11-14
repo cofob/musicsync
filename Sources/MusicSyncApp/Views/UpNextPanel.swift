@@ -63,11 +63,14 @@ struct UpNextPanel: View {
         let player = model.player
         header(title, clear: clear)
         ForEach(slots) { slot in
-            row(player.queue[slot.index], selected: selected == slot.id)
-                .onTapGesture(count: 2) { player.play(at: slot.index) }
-                .onTapGesture { selected = slot.id }
-                .contextMenu { menu(slot) }
-                .swipeActions { Button("Remove", systemImage: "minus.circle", role: .destructive) { player.remove(at: [slot.index]) } }
+            // A row may draw once more with its old slot after the queue got shorter.
+            if player.queue.indices.contains(slot.index) {
+                row(player.queue[slot.index], selected: selected == slot.id)
+                    .onTapGesture(count: 2) { player.play(at: slot.index) }
+                    .onTapGesture { selected = slot.id }
+                    .contextMenu { menu(slot) }
+                    .swipeActions { Button("Remove", systemImage: "minus.circle", role: .destructive) { player.remove(at: [slot.index]) } }
+            }
         }
         .onMove { offsets, destination in
             let target = destination < slots.count ? slots[destination].index : slots[slots.count - 1].index + 1
