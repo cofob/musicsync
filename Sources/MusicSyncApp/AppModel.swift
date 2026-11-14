@@ -76,6 +76,7 @@ final class AppModel {
     @ObservationIgnored private(set) lazy var mixes = MixModel(app: self)
     @ObservationIgnored private(set) lazy var browse = BrowseModel(app: self)
     @ObservationIgnored private(set) lazy var radio = RadioModel(app: self)
+    @ObservationIgnored private(set) lazy var bookmarks = BookmarkKeeper(app: self)
     @ObservationIgnored private(set) lazy var smartDownloads = SmartDownloads(app: self)
     /// Sharing, deep links, Spotlight, global shortcuts, notifications.
     @ObservationIgnored private(set) lazy var system = SystemServices(app: self)
@@ -185,7 +186,7 @@ final class AppModel {
         sync.deviceUpdated()  // the manifest belongs to the server
         let library = makeLibrary(client.config)
         startLibrary(library, client: client)
-        Task { await queueKeeper.restore(client, library: library); await serverQueue.connected(client) }
+        Task { await queueKeeper.restore(client, library: library); await serverQueue.connected(client); await bookmarks.connected(client) }
         if await reloadFromDatabase(library) { return }
         let cache = await store.load()
         guard store === self.store else { return }
