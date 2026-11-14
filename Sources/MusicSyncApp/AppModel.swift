@@ -48,7 +48,9 @@ final class AppModel {
     private(set) var playlists: [Playlist] = []
     /// Bumped on every library update; cheap change signal for sorted/grouped copies.
     private(set) var libraryVersion = 0
-    private(set) var isLoading = false
+    var isLoading: Bool { loadingStore != nil }
+    /// Store whose refresh runs; a refresh for another server is not blocked by it.
+    private var loadingStore: LibraryStore?
     /// Alert for failed user actions; set through `report(_:)`.
     var errorMessage: String?
     /// Inline messages for failed background loads (library, Home, songs, search).
@@ -130,7 +132,8 @@ final class AppModel {
 
     private func connect() async {
         path = []
-        shelves = []; starOverrides = [:]
+        shelves = []; starOverrides = [:]; lyricsCache = [:]
+        player.stop()
         await stopLibrary()
         let client = demo ? config.map { SubsonicClient(baseURL: $0.baseURL, username: $0.username, password: "demo") }
                           : config.flatMap { SubsonicClient(config: $0) }
@@ -145,10 +148,12 @@ final class AppModel {
         self.client = client; self.store = store; self.covers = covers
         player.client = client; player.covers = covers
         sync.flushScrobbles(client)
+        sync.deviceUpdated()  // the manifest belongs to the server
         let library = makeLibrary(client.config)
         startLibrary(library, client: client)
         if await reloadFromDatabase(library) { return }
         let cache = await store.load()
+        guard store === self.store else { return }
         apply(artists: cache.artists, albums: cache.albums, playlists: cache.playlists)
         await refresh()
     }
@@ -156,14 +161,15 @@ final class AppModel {
     /// Reads lists from the local database when it is complete, else from the server (`LibraryStore`).
     func refresh(force: Bool = false) async {
         if !force, let library, await reloadFromDatabase(library) { return }
-        guard let store, !isLoading else { return }
-        isLoading = true
-        defer { isLoading = false }
+        guard let store, loadingStore !== store else { return }
+        loadingStore = store
+        defer { if loadingStore === store { loadingStore = nil } }
         do {
             let cache = try await store.refresh(force: force)
-            if store === self.store, !usesLocalLibrary { apply(artists: cache.artists, albums: cache.albums, playlists: cache.playlists) }
+            guard store === self.store else { return }
+            if !usesLocalLibrary { apply(artists: cache.artists, albums: cache.albums, playlists: cache.playlists) }
             libraryError = nil
-        } catch where !error.isCancellation {
+        } catch where !error.isCancellation && store === self.store {
             if force { report(error) } else { libraryError = error.localizedDescription }
         } catch {}
     }
