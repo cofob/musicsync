@@ -48,7 +48,7 @@ struct RootView: View {
                 .frame(minWidth: 680, minHeight: 560)
             }
             if model.showNowPlaying {
-                NowPlayingView().transition(.move(edge: .bottom))
+                NowPlayingView().transition(.move(edge: .bottom)).zIndex(1)
             }
         }
         .animation(.smooth(duration: 0.35), value: model.showNowPlaying)
