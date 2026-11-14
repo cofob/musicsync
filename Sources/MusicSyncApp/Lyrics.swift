@@ -9,6 +9,8 @@ struct Lyrics: Sendable {
     }
 
     let lines: [Line]
+    /// Shown under the lyrics when they are not from the server.
+    var source: String?
     var isSynced: Bool { lines.first?.start != nil }
 
     /// Nil when there are no lines.

@@ -86,7 +86,16 @@ extension AppModel {
         } catch { return nil }  // a failed request is not kept as "none"
     }
 
+    /// Server lyrics, else LRCLIB lyrics when Settings allows it.
     private func fetchLyrics(_ song: Song) async throws -> Lyrics? {
+        var failure: Error?
+        do { if let found = try await serverLyrics(song) { return found } } catch { failure = error }
+        if let found = try await lrclibLyrics(song) { return found }
+        if let failure { throw failure }
+        return nil
+    }
+
+    private func serverLyrics(_ song: Song) async throws -> Lyrics? {
         func best(_ list: [StructuredLyrics]) -> Lyrics? { (list.first(where: \.synced) ?? list.first).flatMap(Lyrics.init) }
         let database = library?.database
         if let stored = await database?.storedLyrics(songId: song.id) { return best(stored) }

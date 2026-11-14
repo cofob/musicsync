@@ -53,6 +53,20 @@ import SwiftUI
         case "nowplaying":
             await playPaused(model)
             model.showNowPlaying = true
+        case "nowplaying-lrclib":
+            // A canned LRCLIB reply: the scene never asks lrclib.net.
+            await playPaused(model)
+            let lrc = ["[offset:+0]"] + (0..<8).map { "[00:\(String(format: "%02d", $0 * 4)).50]LRCLIB line \($0 + 1)" }
+            let reply = try? JSONSerialization.data(withJSONObject: ["syncedLyrics": lrc.joined(separator: "\n")])
+            if case .server(let song)? = model.player.current {
+                model.lyricsCache[song.id] = Lyrics(lrclib: reply.flatMap { try? LRCLIBClient.decode($0) })
+            }
+            model.player.seek(to: 29)  // the last line, so the source note under it is on screen
+            model.nowPlayingPanel = .lyrics
+            model.showNowPlaying = true
+        case "settings-lyrics":
+            // The Lyrics section sits below the fold of Settings > Library.
+            open(Form { HomeAndListeningSections() }.formStyle(.grouped).frame(width: 480, height: 900), "Settings", model)
         case "settings": open(SettingsView(), "Settings", model)
         case let s where s.hasPrefix("settings:"):
             // `settings:<page>`, or `settings:?<query>` for the search.

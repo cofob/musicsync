@@ -200,6 +200,9 @@ struct LyricsPanel: View {
                             .onTapGesture { if let start = line.start { model.player.seek(to: start) } }
                             .id(i)
                     }
+                    if let source = lyrics.source {
+                        Text("Lyrics from \(source)").font(.footnote).foregroundStyle(.secondary)
+                    }
                 }
                 // Room for the blur on the left: the scroll view clips at its edge.
                 .padding(.vertical, 220).padding(.leading, 16).padding(.trailing, 40)

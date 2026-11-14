@@ -46,5 +46,13 @@ struct HomeAndListeningSections: View {
         } message: {
             Text("The plays recorded on this Mac are deleted, so Your Stats and the mixes start over. Play counts on the server stay.")
         }
+        Section {
+            Toggle("Find missing lyrics on LRCLIB", isOn: $prefs.listening.lrclibLyrics)
+                .onChange(of: prefs.listening.lrclibLyrics) { model.lyricsCache = [:] }
+        } header: {
+            Text("Lyrics")
+        } footer: {
+            SettingsFooter("When the server has no lyrics for the song in Now Playing, its title, artist, album and length are sent to lrclib.net.")
+        }
     }
 }

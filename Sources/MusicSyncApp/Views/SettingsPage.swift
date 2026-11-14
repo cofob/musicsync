@@ -53,7 +53,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .playback: ["crossfade", "sound check", "replaygain", "volume", "streaming quality", "bitrate", "speed", "gapless", "autoplay"]
         case .server: ["navidrome", "subsonic", "url", "address", "username", "password", "connection", "account"]
         case .library: ["background sync", "mirror", "lyrics", "covers", "home", "shelves", "top picks", "made for you", "recently played",
-                        "because you listened", "most played", "discover", "scrobble", "play counts", "history", "stats", "recommendations"]
+                        "because you listened", "most played", "discover", "scrobble", "play counts", "history", "stats", "recommendations", "lrclib"]
         case .downloads: ["offline", "storage", "cache", "smart downloads", "space"]
         case .sync: ["ipod", "preset", "format", "aac", "alac", "apple lossless", "flac", "opus", "rockbox", "bitrate", "ffmpeg", "workers",
                      "sound check", "eject", "whole albums", "playlists", "lyrics", "convert on the server", "free space", "capacity",
