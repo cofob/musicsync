@@ -285,6 +285,15 @@ import SwiftUI
             if let menu = NSApp.mainMenu?.item(withTitle: "Window")?.submenu, let i = menu.items.firstIndex(where: { $0.title == "Switch to MiniPlayer" }) {
                 menu.performActionForItem(at: i)
             }
+        case "tour": await tour(model)
+        case let s where s.hasPrefix("type:"):
+            // `type:<page>:<text>`: the filter typed on a list page one letter every 0.7 s, for the hang log.
+            let parts = s.split(separator: ":", maxSplits: 2).map(String.init)
+            guard parts.count == 3 else { break }
+            await mirrored(model)
+            await select([SidebarItem.songs, .albums, .artists, .search].first { $0.title.lowercased() == parts[1] } ?? .songs, model)
+            try? await Task.sleep(for: .seconds(3))
+            for end in parts[2].indices { model.searchText = String(parts[2][...end]); try? await Task.sleep(for: .milliseconds(700)) }
         case "radio-editor":
             open(StationEditor(station: RadioStation(id: "1", name: "Groove Salad", streamUrl: "https://ice1.somafm.com/groovesalad-128-mp3")), "Station", model)
         default:
@@ -296,6 +305,29 @@ import SwiftUI
     /// Waits until the lists come from the local mirror, which takes a few minutes on the first run.
     private static func mirrored(_ model: AppModel) async {
         for _ in 0..<3000 where !model.usesLocalLibrary { try? await Task.sleep(for: .milliseconds(100)) }
+    }
+
+    /// Walks the main pages for the hang log (`HangWatchdog`), best with the big library of `scripts/big-server.py`:
+    /// 3 s per page, the biggest playlist, and the filter and the search typed one letter at a time.
+    private static func tour(_ model: AppModel) async {
+        await mirrored(model)
+        func type(_ text: String) async {
+            for end in text.indices { model.searchText = String(text[...end]); try? await Task.sleep(for: .milliseconds(150)) }
+            try? await Task.sleep(for: .seconds(2))
+        }
+        let biggest = model.playlists.max { ($0.songCount ?? 0) < ($1.songCount ?? 0) }
+        for item in [SidebarItem.home, .albums, .artists, .songs, .genres, .favorites, .downloaded] + (biggest.map { [.playlist($0.id)] } ?? []) {
+            await select(item, model)
+            try? await Task.sleep(for: .seconds(3))
+        }
+        model.show(.stats)
+        try? await Task.sleep(for: .seconds(3))
+        for item in [SidebarItem.albums, .songs, .search] {
+            await select(item, model)
+            await type("night echo")
+        }
+        model.searchText = ""
+        await select(.home, model)
     }
 
     /// Demo only: a month of made-up listening (favorite albums, some skips), so the mixes have a history.

@@ -13,9 +13,9 @@ import SwiftUI
         Shot.start(model)
         if let file = HangWatchdog.logFile {
             let model = model
-            // The page and the case name of the open route, e.g. "albums album".
+            // The page and the case name of the open route, e.g. "albums album", and the search text.
             HangWatchdog.start(file: file) {
-                MainActor.assumeIsolated { "\(model.selection.map { "\($0)" } ?? "-") \(model.path.last.map { Mirror(reflecting: $0).children.first?.label ?? "\($0)" } ?? "")" }
+                MainActor.assumeIsolated { "\(model.selection.map { "\($0)" } ?? "-") \(model.path.last.map { Mirror(reflecting: $0).children.first?.label ?? "\($0)" } ?? "") \(model.searchText)" }
             }
         }
         model.system.start()

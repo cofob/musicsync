@@ -115,12 +115,14 @@ final class AppModel {
     }
     @ObservationIgnored private var spaceMonitor: Any?
 
-    /// Development only: `MUSICSYNC_DEMO=1` uses the public Navidrome demo (see `Paths.isDemo`).
+    /// Development only: `MUSICSYNC_DEMO=1` uses the public Navidrome demo (see `Paths.isDemo`),
+    /// or `MUSICSYNC_DEMO_SERVER`, e.g. the big library of `scripts/big-server.py`.
     @ObservationIgnored let demo = Paths.isDemo
 
     init() {
         if demo {
-            config = ServerConfig(baseURL: URL(string: "https://demo.navidrome.org")!, username: "demo")
+            let server = ProcessInfo.processInfo.environment["MUSICSYNC_DEMO_SERVER"].flatMap(URL.init(string:))
+            config = ServerConfig(baseURL: server ?? URL(string: "https://demo.navidrome.org")!, username: "demo")
         } else if let data = UserDefaults.app.data(forKey: Self.configKey) {
             config = try? JSONDecoder().decode(ServerConfig.self, from: data)
         }
