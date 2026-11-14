@@ -35,6 +35,7 @@ public struct User: Codable, Hashable, Sendable {
     public let username: String
     public let adminRole: Bool?
     public let podcastRole: Bool?
+    public let jukeboxRole: Bool?
 }
 
 struct GenresBody: Decodable, Sendable { let genre: [Genre]? }
