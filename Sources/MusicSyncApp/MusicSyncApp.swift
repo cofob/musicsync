@@ -46,6 +46,7 @@ struct MusicSyncApp: App {
         }
         .commands {
             SidebarCommands()
+            MiniPlayerCommands()
             CommandGroup(replacing: .newItem) {
                 Button("New Playlist") { model.playlistPrompt = .create(songIds: []) }
                     .keyboardShortcut("n")
@@ -102,6 +103,12 @@ struct MusicSyncApp: App {
                     .disabled(model.ipod.current == nil)
             }
         }
+
+        Window("MiniPlayer", id: MiniPlayer.id) {
+            MiniPlayerView().environment(model).tint(Color.musicAccent)
+        }
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 300, height: 300)
 
         Settings {
             SettingsView().environment(model).tint(Color.musicAccent)

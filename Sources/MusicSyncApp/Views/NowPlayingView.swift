@@ -21,7 +21,7 @@ struct NowPlayingView: View {
                 PlayerColumn().frame(maxWidth: 440)
                 if panel != .none {
                     Group {
-                        if panel == .lyrics { LyricsPanel(lyrics: lyrics) } else { UpNextPanel() }
+                        if panel == .lyrics { LyricsPanel(lyrics: lyrics) } else { UpNextPanel().padding(.trailing, 20).padding(.bottom, 50) }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .transition(.opacity)
@@ -126,7 +126,7 @@ private struct RoundGlassStyle: ButtonStyle {
 }
 
 /// Gradient made from the cover's colors (a 3×3 sample), with a soft dark veil for contrast.
-private struct ArtworkBackground: View {
+struct ArtworkBackground: View {
     let image: NSImage?
     @State private var colors: [Color] = ArtworkBackground.fallback
 

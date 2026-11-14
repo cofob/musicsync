@@ -268,6 +268,13 @@ import SwiftUI
                 click(CGPoint(x: 700, y: 393 + row * 42), flags)
                 try? await Task.sleep(for: .milliseconds(700))  // no double-click
             }
+        case "miniplayer", "miniplayer-queue":
+            // Through the Window menu, as the user does; the main window hides.
+            await playPaused(model)
+            UserDefaults.app.set(scene.hasSuffix("queue"), forKey: MiniPlayer.queueKey)
+            if let menu = NSApp.mainMenu?.item(withTitle: "Window")?.submenu, let i = menu.items.firstIndex(where: { $0.title == "Switch to MiniPlayer" }) {
+                menu.performActionForItem(at: i)
+            }
         case "radio-editor":
             open(StationEditor(station: RadioStation(id: "1", name: "Groove Salad", streamUrl: "https://ice1.somafm.com/groovesalad-128-mp3")), "Station", model)
         default:

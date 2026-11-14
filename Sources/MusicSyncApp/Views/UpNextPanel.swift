@@ -55,7 +55,6 @@ struct UpNextPanel: View {
                 .onChange(of: player.current?.id) { proxy.scrollTo("now", anchor: .top) }
             }
         }
-        .padding(.trailing, 20).padding(.bottom, 50)
     }
 
     @ViewBuilder
