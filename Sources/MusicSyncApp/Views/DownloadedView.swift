@@ -39,7 +39,17 @@ struct DownloadedView: View {
                         }
                     }
                 }
-                if !songs.isEmpty {
+                if filter == .smart {
+                    // One section per rule; a song kept by several rules is under the first.
+                    ForEach(SmartRule.allCases, id: \.self) { rule in
+                        let group = songs.filter { downloads.entries[$0.id]?.smartRules.first == rule }
+                        if !group.isEmpty {
+                            section(rule.title) {
+                                SongList(songs: group, leading: .cover, onPlay: { model.player.play(group, startAt: $0) }, tag: tag)
+                            }
+                        }
+                    }
+                } else if !songs.isEmpty {
                     section("Songs") {
                         SongList(songs: songs, leading: .cover, onPlay: { model.player.play(songs, startAt: $0) }, tag: tag)
                     }
@@ -105,9 +115,9 @@ struct DownloadedView: View {
         }
     }
 
-    /// The rule that keeps a smart song; under "All" only for songs the user does not keep too.
+    /// The rule that keeps a smart song, under "All" for songs the user does not keep too; "Smart" has a section per rule.
     private func tag(_ song: Song) -> String? {
-        guard let entry = model.downloads.entries[song.id], filter == .smart || !entry.isUserKept else { return nil }
+        guard let entry = model.downloads.entries[song.id], filter == .all, !entry.isUserKept else { return nil }
         return entry.smartRules.first?.badge
     }
 
