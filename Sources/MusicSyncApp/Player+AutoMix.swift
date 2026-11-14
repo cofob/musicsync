@@ -6,12 +6,17 @@ import Support
 /// AutoMix: the current and the next two songs are analyzed in the background, and the transition into the next
 /// song is planned again when an analysis comes in. Until then the songs crossfade.
 extension Player {
-    /// Asks for the analyses of the current, the next and the one after; none when AutoMix is off.
+    /// Asks for the analyses of the current, the next and the one after, when they mix into each other (not an album
+    /// in order); none when AutoMix is off.
     func analyzeUpcoming() {
         guard settings.transitions == .autoMix, let index else { return analyses.want([]) }
         analyses.onResult = { [weak self] _ in self?.retimeNext() }
         let next = nextIndex ?? index + 1
-        analyses.want([index, next, next + 1].filter(queue.indices.contains).compactMap(analysisJob(at:)))
+        let mixed = [(index, next), (next, next + 1)].filter { a, b in
+            queue.indices.contains(b) && settings.transition(from: queue[a].song, to: queue[b].song, duration: queue[a].duration) != nil
+        }
+        var seen = Set<Int>()
+        analyses.want(mixed.flatMap { [$0.0, $0.1] }.filter { seen.insert($0).inserted }.compactMap(analysisJob(at:)))
     }
 
     /// Analyses of the current entry and entry `i`, when both are ready.
@@ -46,6 +51,10 @@ extension Player {
     private func retimeNext() {
         if let nextIndex, let transition = transition(to: nextIndex) { mixer.retime(transition) }
     }
+}
+
+private extension PlayItem {
+    var song: Song? { if case .server(let song) = self { song } else { nil } }
 }
 
 extension AnalysisQueue {

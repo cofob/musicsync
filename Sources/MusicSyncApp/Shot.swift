@@ -134,6 +134,18 @@ import SwiftUI
             PlaybackSettings().save()  // the demo defaults stay unchanged
             _ = await first({ model.player.supportsTranscodeOffset ? true : nil })
             open(PlaybackSettingsView(), "Playback", model)
+        case "settings-automix":
+            model.player.settings.transitions = .autoMix
+            PlaybackSettings().save()
+            // Songs of three albums, paused: they mix, so AutoMix analyzes them in the background.
+            var songs: [Song] = []
+            for album in (await first({ model.albums.count > 2 ? model.albums : nil }) ?? []).prefix(3) {
+                if let song = try? await model.album(album.id)?.song?.first { songs.append(song) }
+            }
+            model.player.play(songs)
+            _ = await first({ model.player.current })
+            model.player.toggle()
+            open(PlaybackSettingsView(), "Playback", model)
         case "offline":
             await select(.albums, model)
             guard let album = await first({ model.albums.first }) else { break }
