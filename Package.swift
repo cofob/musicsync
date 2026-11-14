@@ -14,8 +14,9 @@ let package = Package(
         .target(name: "Recommend"),
         .target(name: "Library", dependencies: ["Support", "Subsonic", "Recommend"], linkerSettings: [.linkedLibrary("sqlite3")]),
         .target(name: "Integration", dependencies: ["Subsonic"]),
+        .target(name: "Remote"),
         .target(name: "Sync", dependencies: ["Support", "Subsonic", "ITunesDB", "Artwork", "Transcode", "Device"]),
-        .executableTarget(name: "MusicSyncApp", dependencies: ["Support", "Subsonic", "ITunesDB", "Artwork", "Transcode", "Device", "Sync", "Library", "Recommend", "Integration"]),
+        .executableTarget(name: "MusicSyncApp", dependencies: ["Support", "Subsonic", "ITunesDB", "Artwork", "Transcode", "Device", "Sync", "Library", "Recommend", "Integration", "Remote"]),
         .testTarget(name: "SupportTests", dependencies: ["Support"]),
         .testTarget(name: "SubsonicTests", dependencies: ["Subsonic"]),
         .testTarget(name: "ITunesDBTests", dependencies: ["ITunesDB"]),
@@ -26,5 +27,6 @@ let package = Package(
         .testTarget(name: "LibraryTests", dependencies: ["Library"]),
         .testTarget(name: "RecommendTests", dependencies: ["Recommend"]),
         .testTarget(name: "IntegrationTests", dependencies: ["Integration"]),
+        .testTarget(name: "RemoteTests", dependencies: ["Remote"]),
     ]
 )
