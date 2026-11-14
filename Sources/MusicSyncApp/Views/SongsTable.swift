@@ -51,9 +51,11 @@ struct SongsTable: NSViewRepresentable {
         scroll.scrollerInsets.bottom = bottomInset
         guard coordinator.list !== list, let table = coordinator.table else { return }
         coordinator.list = list
+        coordinator.observed = []
         table.deselectAll(nil)
-        table.reloadData()
+        table.noteNumberOfRowsChanged()
         table.scrollRowToVisible(0)
+        coordinator.fillLiveRows()
     }
 
     /// The columns, as on the SwiftUI table before. A sortable column names its database order.
@@ -129,17 +131,39 @@ struct SongsTable: NSViewRepresentable {
         var parent: SongsTable?
         var list: PagedList<Song>?
         weak var table: Table?
+        /// Columns with a tracked cell of a loaded song. All cells of a column read the same properties,
+        /// so one tracked cell is enough; tracking every cell slows each reload down the longer the app runs.
+        var observed: Set<Column> = []
         private var refreshPending = false
 
         func numberOfRows(in tableView: NSTableView) -> Int { list?.count ?? 0 }
 
         func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? { RowView() }
 
-        /// Reads are tracked: a page that loads, a new star or rating redraws the shown rows.
         func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
             guard let id = tableColumn?.identifier, let column = Column(rawValue: id.rawValue) else { return nil }
+            return view(column, row: row, reusing: tableView.makeView(withIdentifier: column.cellID, owner: nil))
+        }
+
+        /// Fills the rows the table holds again, in place: adding new cell views to a big window is slow,
+        /// and `reloadData` makes new ones each time.
+        func fillLiveRows() {
+            guard let table else { return }
+            table.enumerateAvailableRowViews { rowView, row in
+                for (index, tableColumn) in table.tableColumns.enumerated() {
+                    guard let column = Column(rawValue: tableColumn.identifier.rawValue), let old = rowView.view(atColumn: index) as? NSView else { continue }
+                    _ = view(column, row: row, reusing: old)
+                }
+            }
+        }
+
+        /// Reads are tracked: a page that loads, a new star or rating redraws the shown rows.
+        private func view(_ column: Column, row: Int, reusing reused: NSView?) -> NSView {
+            guard !observed.contains(column) else { return cell(column, list?.item(at: row), reusing: reused) }
             return withObservationTracking {
-                cell(column, list?.item(at: row), in: tableView)
+                let song = list?.item(at: row)
+                if song != nil { observed.insert(column) }
+                return cell(column, song, reusing: reused)
             } onChange: { [weak self] in
                 Task { @MainActor in self?.refresh() }
             }
@@ -172,25 +196,22 @@ struct SongsTable: NSViewRepresentable {
             return NSHostingMenu(rootView: items.environment(parent.model))
         }
 
-        /// Reloads the shown rows once per change, however many cells saw it.
+        /// Fills the rows again once per change, however many cells saw it.
         private func refresh() {
+            observed = []
             guard let table, !refreshPending else { return }
             refreshPending = true
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 refreshPending = false
                 // Without a known total (server search), a loaded page may add rows.
-                guard table.numberOfRows == list?.count ?? 0 else { return table.reloadData() }
-                let rows = table.rows(in: table.visibleRect)
-                guard rows.length > 0 else { return }
-                table.reloadData(forRowIndexes: IndexSet(integersIn: rows.location..<NSMaxRange(rows)),
-                                 columnIndexes: IndexSet(integersIn: 0..<table.numberOfColumns))
+                if table.numberOfRows != list?.count ?? 0 { table.noteNumberOfRowsChanged() }
+                fillLiveRows()
             }
         }
 
-        private func cell(_ column: Column, _ song: Song?, in tableView: NSTableView) -> NSView {
+        private func cell(_ column: Column, _ song: Song?, reusing reused: NSView?) -> NSView {
             guard let model = parent?.model else { return NSView() }
-            let reused = tableView.makeView(withIdentifier: column.cellID, owner: nil)
             let accent = NSColor(Color.musicAccent)
             switch column {
             case .title:
