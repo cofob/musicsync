@@ -114,13 +114,13 @@ actor DeviceCopier {
         let url = URL(fileURLWithPath: wanted)
         let stem = wanted.dropLast(url.pathExtension.isEmpty ? 0 : url.pathExtension.count + 1)
         var path = wanted, n = 1
-        while path != replacing,
+        while path.lowercased() != replacing?.lowercased(),
               folded.contains(path.lowercased()) || FileManager.default.fileExists(atPath: device.mountURL.appendingPathComponent(path).path) {
             n += 1
             path = "\(stem) (\(n))" + (url.pathExtension.isEmpty ? "" : ".\(url.pathExtension)")
         }
         used.insert(path)
-        try copy(file, to: path, overwrite: path == replacing)
+        try copy(file, to: path, overwrite: path.lowercased() == replacing?.lowercased())
         return path
     }
 

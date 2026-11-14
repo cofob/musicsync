@@ -141,7 +141,7 @@ extension SyncJob {
     }
 
     private func applyRockbox(_ t: Transferred) {
-        if let old = t.work.old, old.relativePath != t.path { pendingDeletes.append(old.relativePath) }
+        if let old = t.work.old, old.relativePath.lowercased() != t.path.lowercased() { pendingDeletes.append(old.relativePath) }
         manifest.rockboxEntries[t.work.desired.id] = entry(t, dbid: 0, trackID: 0)
     }
 }
