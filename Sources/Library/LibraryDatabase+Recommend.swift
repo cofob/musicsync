@@ -13,6 +13,14 @@ extension LibraryDatabase {
         }
     }
 
+    /// The songs with these ids, in this order; unknown ids are left out.
+    public func songs(ids: [String]) -> [Song] {
+        read([]) { db in
+            let lookup = try db.prepare("SELECT json FROM songs WHERE id = ?")
+            return try ids.compactMap { try lookup.first([$0]) { decode(Song.self, $0) } ?? nil }
+        }
+    }
+
     /// Song ids of each mirrored playlist, in playlist order.
     public func playlistMembers() -> [[String]] {
         read([]) { db in

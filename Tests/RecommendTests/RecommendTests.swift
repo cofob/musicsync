@@ -69,6 +69,7 @@ private func isSpaced(_ ids: [String]) -> Bool {
         #expect(listed.similarity("a0-b0-0", "a5-b2-7") >= base + 0.8)
         #expect(heard.similarity("a5-b2-7", "a0-b0-0") > base)
         #expect(server.similarity("a5-b2-7", "a0-b0-0") >= base + 0.5)
+        #expect(plain.adding(similar: ["a5-b2-7": ["a0-b0-0"]]).similarity("a0-b0-0", "a5-b2-7") == server.similarity("a0-b0-0", "a5-b2-7"))
         // Plays far apart are separate sessions; a big playlist counts less than a small one.
         let apart = Catalog(tracks: tracks, history: [play("a0-b0-0", 10 * day), play("a5-b2-7", day)], now: now)
         #expect(apart.similarity("a0-b0-0", "a5-b2-7") == base)
@@ -122,6 +123,13 @@ private func isSpaced(_ ids: [String]) -> Bool {
         #expect(list.count == 20)
         #expect(Set(list).isDisjoint(with: recent))
         #expect(!list.contains("a0-b1-0") && !list.contains("a0-b1-1"))
+    }
+
+    @Test func seedsAreTheFavoritesOfAGroup() {
+        let catalog = Catalog(tracks: library(starred: ["a2-b1-5"], plays: ["a2-b1-3": 4]), now: now)
+        let album = catalog.songs(albumId: "a2-b1")
+        #expect(album.count == 8 && catalog.songs(artist: " ARTIST 2").count == 24)
+        #expect(catalog.seeds(album + ["unknown"], limit: 3) == ["a2-b1-5", "a2-b1-3", "a2-b1-0"])
     }
 
     @Test func playlistNeighborsComeEarly() {

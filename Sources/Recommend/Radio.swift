@@ -39,6 +39,16 @@ public extension Catalog {
         radio(seeds: Array(queue.suffix(5)), count: count, seed: seed, exclude: Set(queue), includeSeed: false)
     }
 
+    /// Station seeds from many songs (an album, artist or playlist): the ones the listener likes most.
+    func seeds(_ ids: [String], limit: Int = 10) -> [String] {
+        let scored: [(id: String, score: Double)] = ids.filter { tracks[$0] != nil }.map { ($0, affinity($0)) }
+        let best = scored.sorted { $0.score != $1.score ? $0.score > $1.score : $0.id < $1.id }
+        return best.prefix(limit).map(\.id)
+    }
+
+    func songs(albumId: String) -> [String] { byAlbum[albumId] ?? [] }
+    func songs(artist: String) -> [String] { byArtist[Track.key(artist)] ?? [] }
+
     /// One of the six best, the better ones more often.
     private func choose(_ ids: [String], _ score: (String) -> Double, _ rng: inout SeededRandom) -> String? {
         let top = ids.map { ($0, score($0)) }.sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.0 < $1.0 }.prefix(6)

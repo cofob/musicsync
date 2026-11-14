@@ -21,7 +21,7 @@ public struct Catalog: Sendable {
     let sessions: [Group]
     let playlistsOf: [String: [Int]]
     let sessionsOf: [String: [Int]]
-    let similar: [String: Set<String>]
+    private(set) var similar: [String: Set<String>]
     /// Played in the last two days; radio and mixes pick them only when nothing else fits.
     let recent: Set<String>
     /// Completed plays in the last 30 days.
@@ -61,6 +61,13 @@ public struct Catalog: Sendable {
         var seen = Set<String>()
         lastListened = events.reversed().filter(\.completed).map(\.songId).filter { seen.insert($0).inserted }
         maxPlays = tracks.values.map { max($0.serverPlays, stats[$0.id]?.plays ?? 0) }.max() ?? 0
+    }
+
+    /// The same catalog with more server similar songs (fetched for a station seed).
+    public func adding(similar more: [String: [String]]) -> Catalog {
+        var copy = self
+        for (id, list) in more { copy.similar[id, default: []].formUnion(list) }
+        return copy
     }
 
     /// 1 for up to 20 songs, then less: a 40-song playlist 0.5, an 80-song one 0.33.

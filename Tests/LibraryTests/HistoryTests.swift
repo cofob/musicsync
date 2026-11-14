@@ -52,6 +52,7 @@ import Testing
         #expect(loved.starred && loved.rating == 4 && loved.genres == ["rock", "pop"] && loved.year == 2001 && loved.albumId == "a2")
         #expect(abs((loved.created?.timeIntervalSince1970 ?? 0) - 1_709_287_200.123) < 0.001)
         #expect(loved.lastPlayed == Date(timeIntervalSince1970: 1_735_787_045))
+        #expect(await db.songs(ids: ["s3", "gone", "s1"]).map(\.id) == ["s3", "s1"])
 
         let playlist: Playlist = decode(["id": "p1", "name": "Mix"])
         try await db.storePlaylist(playlist.withEntries([starred, song("s1", "A", albumId: "a1")]))
