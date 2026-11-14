@@ -15,7 +15,7 @@ extension LibraryDatabase {
         try perform { db in try db.transaction { try body(db) } }
     }
 
-    private func json<T: Encodable>(_ value: T) throws -> String {
+    func json<T: Encodable>(_ value: T) throws -> String {
         String(decoding: try encoder.encode(value), as: UTF8.self)
     }
 

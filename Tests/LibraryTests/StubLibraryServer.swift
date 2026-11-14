@@ -41,6 +41,7 @@ final class StubLibraryServer: @unchecked Sendable {
     private var _lastScan = "scan-1"
     private var _lyrics: [String: [String: Any]] = [:]
     private var _extensions = ["songLyrics"]
+    private var _starred: [String: String] = [:]
     private let cover = Data("COVER-BYTES".utf8)
     let artists: [(id: String, name: String)] = [("ar-1", "Space Echo"), ("ar-2", "Björk")]
 
@@ -48,6 +49,8 @@ final class StubLibraryServer: @unchecked Sendable {
     var playlists: [StubPlaylist] { get { locked { _playlists } } set { locked { _playlists = newValue } } }
     var lastScan: String { get { locked { _lastScan } } set { locked { _lastScan = newValue } } }
     var extensions: [String] { get { locked { _extensions } } set { locked { _extensions = newValue } } }
+    /// Starred song, album or artist ids -> star date, for getStarred2.
+    var starred: [String: String] { get { locked { _starred } } set { locked { _starred = newValue } } }
     /// HTTP status of getCoverArt replies.
     var coverStatus: Int { get { locked { _coverStatus } } set { locked { _coverStatus = newValue } } }
     var delayMs: Int { get { locked { _delayMs } } set { locked { _delayMs = newValue } } }
@@ -114,11 +117,20 @@ final class StubLibraryServer: @unchecked Sendable {
                 guard let p = _playlists.first(where: { $0.id == param("id") }) else { return (200, Self.failed, 0) }
                 let all = _albums.flatMap { a in a.songs.map { Self.songJSON($0, album: a) } }
                 let entries = p.songIDs.compactMap { id in all.first { $0["id"] as? String == id } }
-                return ok(["playlist": ["id": p.id, "name": p.name, "songCount": entries.count, "changed": p.changed, "entry": entries]])
+                return ok(["playlist": ["id": p.id, "name": p.name, "songCount": entries.count, "duration": entries.count * 100, "changed": p.changed, "entry": entries]])
             case "getLyricsBySongId":
                 let lyrics = param("id").flatMap { _lyrics[$0] }
                 return ok(["lyricsList": lyrics.map { ["structuredLyrics": [$0]] } ?? [:]])
             case "getCoverArt": return (_coverStatus, cover, _delayMs)
+            case "getStarred2":
+                func star(_ item: [String: Any]) -> [String: Any]? {
+                    (item["id"] as? String).flatMap { _starred[$0] }.map { item.merging(["starred": $0]) { $1 } }
+                }
+                return ok(["starred2": [
+                    "artist": artists.compactMap { star(["id": $0.id, "name": $0.name]) },
+                    "album": _albums.compactMap { star(Self.albumJSON($0)) },
+                    "song": _albums.flatMap { a in a.songs.compactMap { star(Self.songJSON($0, album: a)) } },
+                ]])
             default: return (404, Data(), 0)
             }
         }

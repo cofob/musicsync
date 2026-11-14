@@ -63,6 +63,7 @@ enum LibraryStatusText {
         case .albums?: "Syncing Albums"
         case .tracks?: "Syncing Songs"
         case .playlists?: "Syncing Playlists"
+        case .favorites?: "Syncing Favorites"
         case .covers?: "Syncing Covers"
         case .lyrics?: "Syncing Lyrics"
         }

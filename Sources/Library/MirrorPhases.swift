@@ -55,6 +55,11 @@ extension MirrorPass {
         }
     }
 
+    /// Stars set elsewhere (web UI, other apps) do not change an album, so they are read in one call each pass.
+    func favorites() async throws {
+        try await database.replaceStarred(try await client.getStarred2())
+    }
+
     func covers() async throws {
         let client = client, database = database
         try await each(await database.coversToFetch(), what: "cover") { id in

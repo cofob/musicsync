@@ -9,7 +9,7 @@ public enum MirrorState: Sendable, Equatable {
 }
 
 public enum MirrorPhase: String, Sendable, CaseIterable {
-    case scan, artists, albums, tracks, playlists, covers, lyrics
+    case scan, artists, albums, tracks, playlists, favorites, covers, lyrics
 }
 
 /// Progress snapshot for the UI.

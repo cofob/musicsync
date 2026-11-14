@@ -24,6 +24,8 @@ public enum SongSort: Sendable {
     /// Recently added first.
     case newest
     case mostPlayed
+    /// Highest rated first.
+    case rating
 
     var sql: String { terms.joined(separator: ", ") }
 
@@ -36,6 +38,7 @@ public enum SongSort: Sendable {
         case .duration: ["COALESCE(duration, 0)", "titleKey", "id"]
         case .newest: ["COALESCE(created, '') DESC", "id"]
         case .mostPlayed: ["playCount DESC", "titleKey", "id"]
+        case .rating: ["COALESCE(json_extract(json, '$.userRating'), 0) DESC", "titleKey", "id"]
         }
     }
 }

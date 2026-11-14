@@ -44,6 +44,7 @@ struct MirrorPass: Sendable {
         }
         _ = await attempt(.tracks, tracks)
         _ = await attempt(.playlists, playlists)
+        _ = await attempt(.favorites, favorites)
         if settings.includeCovers { _ = await attempt(.covers, covers) }
         if settings.includeLyrics { _ = await attempt(.lyrics, lyrics) }
 
