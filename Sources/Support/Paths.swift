@@ -3,6 +3,9 @@ import Foundation
 /// App-wide local directories. Created on first access.
 public enum Paths {
     public static let appName = "MusicSync"
+    /// Development only: `MUSICSYNC_DEMO=1` keeps all app files under `<tmp>/musicsync-demo`.
+    public static let isDemo = ProcessInfo.processInfo.environment["MUSICSYNC_DEMO"] == "1"
+    public static let demoDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("musicsync-demo")
 
     public static var appSupport: URL { ensure(.applicationSupportDirectory) }
     public static var caches: URL { ensure(.cachesDirectory) }
@@ -11,7 +14,8 @@ public enum Paths {
     public static func caches(_ components: String...) -> URL { make(caches, components) }
 
     private static func ensure(_ dir: FileManager.SearchPathDirectory) -> URL {
-        let base = FileManager.default.urls(for: dir, in: .userDomainMask)[0].appendingPathComponent(appName)
+        let base = isDemo ? demoDirectory.appendingPathComponent(dir == .cachesDirectory ? "Caches" : "Application Support")
+                          : FileManager.default.urls(for: dir, in: .userDomainMask)[0].appendingPathComponent(appName)
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         return base
     }
@@ -21,6 +25,11 @@ public enum Paths {
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
+}
+
+public extension UserDefaults {
+    /// The app settings; a separate suite in demo mode. `UserDefaults` is thread-safe.
+    nonisolated(unsafe) static let app = Paths.isDemo ? UserDefaults(suiteName: "dev.cofob.musicsync.demo")! : .standard
 }
 
 public extension FileManager {

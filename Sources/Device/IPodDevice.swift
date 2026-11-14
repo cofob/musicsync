@@ -113,6 +113,7 @@ public struct IPodDevice: Sendable, Equatable, Identifiable {
 
     /// Unmounts and ejects the disk (same call Finder uses).
     public func eject() async throws {
+        guard DeviceMonitor.fakeVolumes == nil else { return }  // a fake tree is a plain folder
         let url = mountURL
         try await Task.detached { try NSWorkspace.shared.unmountAndEjectDevice(at: url) }.value
     }

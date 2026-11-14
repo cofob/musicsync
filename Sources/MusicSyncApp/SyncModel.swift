@@ -66,7 +66,6 @@ final class SyncModel {
     }
 
     @ObservationIgnored private weak var app: AppModel?
-    @ObservationIgnored private let demo = AppModel.isDemo
     @ObservationIgnored private let locations: SyncLocations
     @ObservationIgnored private let scrobbler: Scrobbler
     @ObservationIgnored private let engine: SyncEngine
@@ -78,20 +77,14 @@ final class SyncModel {
     private static let lastDeviceKey = "lastSyncDevice"
 
     init() {
-        if demo {
-            let base = AppModel.demoDirectory
-            locations = SyncLocations(appSupport: base.appendingPathComponent("sync"), caches: base.appendingPathComponent("sync-cache"))
-            scrobbler = Scrobbler(queueURL: locations.scrobbleQueue)
-        } else {
-            locations = .standard
-            scrobbler = .shared
-        }
+        locations = .standard
+        scrobbler = .shared
         engine = SyncEngine(locations: locations, scrobbler: scrobbler)
     }
 
     func attach(_ app: AppModel) {
         self.app = app
-        if !demo, let key = UserDefaults.standard.string(forKey: Self.lastDeviceKey) { setKey(key) }
+        if let key = UserDefaults.app.string(forKey: Self.lastDeviceKey) { setKey(key) }
     }
 
     var isAvailable: Bool { deviceKey != nil }
@@ -135,7 +128,7 @@ final class SyncModel {
         guard key != deviceKey else { return }
         deviceKey = key
         selection = SelectionStore(locations: locations).load(deviceKey: key)
-        if !demo { UserDefaults.standard.set(key, forKey: Self.lastDeviceKey) }
+        UserDefaults.app.set(key, forKey: Self.lastDeviceKey)
     }
 
     private func updateMatcher() {

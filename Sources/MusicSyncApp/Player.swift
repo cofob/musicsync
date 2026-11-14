@@ -109,6 +109,7 @@ final class Player {
     @ObservationIgnored private var seekTarget: (time: TimeInterval, deadline: Date)?
 
     init() {
+        if ProcessInfo.processInfo.environment["MUSICSYNC_MUTE"] == "1" { volume = 0; player.volume = 0 }
         observations = [
             player.observe(\.currentItem) { [weak self] _, _ in Task { @MainActor in self?.currentItemChanged() } },
             player.observe(\.timeControlStatus) { [weak self] _, _ in Task { @MainActor in self?.statusChanged() } },

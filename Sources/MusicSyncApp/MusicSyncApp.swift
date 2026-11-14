@@ -8,7 +8,8 @@ import SwiftUI
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Needed when run unbundled via `swift run`.
         NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
+        if Shot.output == nil { NSApp.activate(ignoringOtherApps: true) }
+        Shot.start(model)
         // SIGTERM (`kill`, `pkill`) quits like ⌘Q instead of killing the process mid-sync.
         signal(SIGTERM, SIG_IGN)
         sigterm = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)

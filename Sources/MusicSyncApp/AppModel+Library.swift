@@ -6,11 +6,7 @@ import Subsonic
 /// Mirror and database problems only change `mirrorStatus`; they never raise alerts.
 extension AppModel {
     func makeLibrary(_ server: ServerConfig) -> Library {
-        guard demo else { return Library(server: server, settings: mirrorSettings) }
-        let base = Self.demoDirectory
-        try? FileManager.default.createDirectory(at: base.appendingPathComponent("library"), withIntermediateDirectories: true)
-        return Library(server: server, settings: mirrorSettings, directory: base.appendingPathComponent("library"),
-                       coversDirectory: base.appendingPathComponent("covers-small"))
+        Library(server: server, settings: mirrorSettings)
     }
 
     /// Starts the mirror for `client` and follows its status; a finished pass reloads the lists.

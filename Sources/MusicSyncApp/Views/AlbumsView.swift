@@ -34,7 +34,7 @@ enum AlbumOrder: String, CaseIterable, Identifiable {
 struct AlbumsView: View {
     @Environment(AppModel.self) private var model
     var recentlyAdded = false
-    @AppStorage("albumSort") private var sort = AlbumOrder.name
+    @AppStorage("albumSort", store: .app) private var sort = AlbumOrder.name
     @State private var list: PagedList<Album>?
 
     var body: some View {

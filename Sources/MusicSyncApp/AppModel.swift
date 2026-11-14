@@ -2,6 +2,7 @@ import AppKit
 import Library
 import Observation
 import Subsonic
+import Support
 import Sync
 
 /// Navigation targets pushed on the detail stack.
@@ -32,11 +33,11 @@ final class AppModel {
     var lastLibrarySync: Date?
     /// True when lists come from the local database instead of the network.
     var usesLocalLibrary = false
-    /// Settings > Library; saved on every change (not in demo mode).
+    /// Settings > Library; saved on every change.
     var mirrorSettings = MirrorSettings() {
         didSet {
             guard mirrorSettings != oldValue else { return }
-            if !demo { UserDefaults.standard.set(try? JSONEncoder().encode(mirrorSettings), forKey: Self.mirrorKey) }
+            UserDefaults.app.set(try? JSONEncoder().encode(mirrorSettings), forKey: Self.mirrorKey)
             let settings = mirrorSettings
             Task { await library?.mirror.update(settings: settings) }
         }
@@ -93,19 +94,16 @@ final class AppModel {
     }
     @ObservationIgnored private var spaceMonitor: Any?
 
-    /// Development only: `MUSICSYNC_DEMO=1` uses the public Navidrome demo and stores nothing in the Keychain or defaults.
-    @ObservationIgnored let demo = AppModel.isDemo
-    nonisolated static let isDemo = ProcessInfo.processInfo.environment["MUSICSYNC_DEMO"] == "1"
-    /// Demo mode keeps the library and its covers here and removes nothing else.
-    nonisolated static let demoDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("musicsync-demo")
+    /// Development only: `MUSICSYNC_DEMO=1` uses the public Navidrome demo (see `Paths.isDemo`).
+    @ObservationIgnored let demo = Paths.isDemo
 
     init() {
         if demo {
             config = ServerConfig(baseURL: URL(string: "https://demo.navidrome.org")!, username: "demo")
-        } else if let data = UserDefaults.standard.data(forKey: Self.configKey) {
+        } else if let data = UserDefaults.app.data(forKey: Self.configKey) {
             config = try? JSONDecoder().decode(ServerConfig.self, from: data)
         }
-        if !demo, let data = UserDefaults.standard.data(forKey: Self.mirrorKey),
+        if let data = UserDefaults.app.data(forKey: Self.mirrorKey),
            let saved = try? JSONDecoder().decode(MirrorSettings.self, from: data) {
             mirrorSettings = saved
         }
@@ -126,7 +124,7 @@ final class AppModel {
     func save(_ config: ServerConfig, password: String) async {
         if !password.isEmpty { config.setPassword(password) }
         self.config = config
-        UserDefaults.standard.set(try? JSONEncoder().encode(config), forKey: Self.configKey)
+        UserDefaults.app.set(try? JSONEncoder().encode(config), forKey: Self.configKey)
         await connect()
     }
 
@@ -143,7 +141,7 @@ final class AppModel {
             apply(artists: [], albums: [], playlists: [])
             return
         }
-        let store = demo ? LibraryStore(client: client, directory: Self.demoDirectory) : LibraryStore(client: client)
+        let store = LibraryStore(client: client)
         let covers = CoverArtCache(client: client)
         self.client = client; self.store = store; self.covers = covers
         player.client = client; player.covers = covers

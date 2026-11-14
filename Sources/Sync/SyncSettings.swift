@@ -1,4 +1,5 @@
 import Foundation
+import Support
 
 /// User-tunable sync options. Persisted by the app (UserDefaults key `syncSettings`, JSON).
 public struct SyncSettings: Codable, Sendable, Equatable {
@@ -41,13 +42,13 @@ public struct SyncSettings: Codable, Sendable, Equatable {
 
     public static let defaultsKey = "syncSettings"
 
-    public static func load(from defaults: UserDefaults = .standard) -> SyncSettings {
+    public static func load(from defaults: UserDefaults = .app) -> SyncSettings {
         guard let data = defaults.data(forKey: defaultsKey),
               let value = try? JSONDecoder().decode(SyncSettings.self, from: data) else { return SyncSettings() }
         return value
     }
 
-    public func save(to defaults: UserDefaults = .standard) {
+    public func save(to defaults: UserDefaults = .app) {
         if let data = try? JSONEncoder().encode(self) { defaults.set(data, forKey: Self.defaultsKey) }
     }
 }

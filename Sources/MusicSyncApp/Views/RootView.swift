@@ -79,13 +79,13 @@ struct RootView: View {
             model.path = []
             model.searchText = ""
             model.search.clear()
-            if model.selection == .search { model.searchFocusRequest += 1 }
+            if model.selection == .search, Shot.output == nil { model.searchFocusRequest += 1 }  // focus activates the app
         }
         .onChange(of: model.player.queue.isEmpty) { if model.player.queue.isEmpty { model.showNowPlaying = false } }
         .onChange(of: model.ipod.version) { model.sync.deviceUpdated() }
         .sheet(item: $model.infoSong) { SongInfoView(song: $0) }
         .sheet(isPresented: $model.showGuide) { GuideView() }
-        .task { if !model.demo, !UserDefaults.standard.bool(forKey: GuideView.shownKey) { model.showGuide = true } }
+        .task { if !model.demo, !UserDefaults.app.bool(forKey: GuideView.shownKey) { model.showGuide = true } }
         .sheet(isPresented: $sync.showSheet) { SyncSheet() }
         .alert("Already on This iPod", isPresented: Binding(get: { model.sync.foreignAlbum != nil },
                                                             set: { if !$0 { model.sync.foreignAlbum = nil } })) {

@@ -20,6 +20,7 @@ public enum Keychain {
 
     @discardableResult
     public static func set(_ value: String, for account: String) -> Bool {
+        guard !Paths.isDemo else { return false }  // demo mode writes nothing
         let base: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -36,6 +37,7 @@ public enum Keychain {
     }
 
     public static func delete(_ account: String) {
+        guard !Paths.isDemo else { return }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,

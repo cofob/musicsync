@@ -93,7 +93,7 @@ struct GuideView: View {
     }
 
     private func close() {
-        if !model.demo { UserDefaults.standard.set(true, forKey: Self.shownKey) }
+        UserDefaults.app.set(true, forKey: Self.shownKey)
         dismiss()
     }
 }
