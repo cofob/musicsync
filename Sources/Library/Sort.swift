@@ -25,14 +25,17 @@ public enum SongSort: Sendable {
     case newest
     case mostPlayed
 
-    var sql: String {
+    var sql: String { terms.joined(separator: ", ") }
+
+    /// ORDER BY terms, kept apart so a descending sort can flip each one.
+    var terms: [String] {
         switch self {
-        case .title: "titleKey, id"
-        case .artist: "artistKey, albumKey, COALESCE(disc, 1), COALESCE(track, 0), id"
-        case .album: "albumKey, COALESCE(disc, 1), COALESCE(track, 0), id"
-        case .duration: "COALESCE(duration, 0), titleKey, id"
-        case .newest: "COALESCE(created, '') DESC, id"
-        case .mostPlayed: "playCount DESC, titleKey, id"
+        case .title: ["titleKey", "id"]
+        case .artist: ["artistKey", "albumKey", "COALESCE(disc, 1)", "COALESCE(track, 0)", "id"]
+        case .album: ["albumKey", "COALESCE(disc, 1)", "COALESCE(track, 0)", "id"]
+        case .duration: ["COALESCE(duration, 0)", "titleKey", "id"]
+        case .newest: ["COALESCE(created, '') DESC", "id"]
+        case .mostPlayed: ["playCount DESC", "titleKey", "id"]
         }
     }
 }

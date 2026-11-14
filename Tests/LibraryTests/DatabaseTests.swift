@@ -147,6 +147,11 @@ import Subsonic
         let forward = await db.songs(sort: .title, matching: "", limit: 20_000, offset: 0)
         let backward = await db.songs(sort: .title, descending: true, matching: "", limit: 20_000, offset: 0)
         #expect(backward.map(\.id) == forward.reversed().map(\.id))
+        for sort in [SongSort.duration, .artist, .album, .newest, .mostPlayed] {
+            let ascending = await db.songs(sort: sort, matching: "", limit: 20_000, offset: 0).map(\.id)
+            let descending = await db.songs(sort: sort, descending: true, matching: "", limit: 20_000, offset: 0).map(\.id)
+            #expect(ascending.count == 20_000 && descending == ascending.reversed())
+        }
         #expect(await db.albums(sort: .name, matching: "album 7", limit: 5, offset: 0).map(\.name) == ["Album 7", "Album 70", "Album 700", "Album 701", "Album 702"])
     }
 }

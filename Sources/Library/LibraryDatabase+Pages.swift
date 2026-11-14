@@ -4,7 +4,7 @@ import Subsonic
 /// Windowed reads for long lists (Songs, Albums, Artists): one page and the total, narrowed by an optional search.
 extension LibraryDatabase {
     public func songs(sort: SongSort, descending: Bool = false, matching query: String, limit: Int, offset: Int) -> [Song] {
-        page(Song.self, "songs", order: descending ? Self.reversed(sort.sql) : sort.sql, query, limit, offset)
+        page(Song.self, "songs", order: descending ? Self.reversed(sort.terms) : sort.sql, query, limit, offset)
     }
 
     public func albums(sort: AlbumSort, matching query: String, limit: Int, offset: Int) -> [Album] {
@@ -35,8 +35,8 @@ extension LibraryDatabase {
         return ("WHERE rowid IN (SELECT rowid FROM \(table)_fts WHERE \(table)_fts MATCH ?)", [match])
     }
 
-    /// "a, b DESC" -> "a DESC, b".
-    static func reversed(_ order: String) -> String {
-        order.components(separatedBy: ", ").map { $0.hasSuffix(" DESC") ? String($0.dropLast(5)) : $0 + " DESC" }.joined(separator: ", ")
+    /// ["a", "b DESC"] -> "a DESC, b".
+    static func reversed(_ terms: [String]) -> String {
+        terms.map { $0.hasSuffix(" DESC") ? String($0.dropLast(5)) : $0 + " DESC" }.joined(separator: ", ")
     }
 }
