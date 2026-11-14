@@ -7,8 +7,10 @@ import Synchronization
 public final class Equalizer: Sendable {
     private let shared = Mutex((generation: 0, gains: EqualizerGains.flat))
     private let frames = Atomic<Int>(0)
+    let recorder: TapRecorder?
 
-    public init() {}
+    /// `recorder` keeps what the taps put out (tests and dev tools).
+    public init(recorder: TapRecorder? = nil) { self.recorder = recorder }
 
     public func set(_ gains: EqualizerGains) {
         shared.withLock { if $0.gains != gains { $0.generation += 1; $0.gains = gains } }
@@ -18,9 +20,9 @@ public final class Equalizer: Sendable {
     public var processedFrames: Int { frames.load(ordering: .relaxed) }
 
     /// An audio tap for one track that runs the equalizer; nil when MediaToolbox cannot make one.
-    /// After the mix volume, as it adds less start delay there than before it.
-    public func makeTap() -> MTAudioProcessingTap? {
-        let context = Unmanaged.passRetained(TapContext(self))
+    /// After the mix volume, as it adds less start delay there than before it. `item` names the recorded audio.
+    public func makeTap(for item: AVPlayerItem? = nil) -> MTAudioProcessingTap? {
+        let context = Unmanaged.passRetained(TapContext(self, item: item.map(ObjectIdentifier.init)))
         var callbacks = MTAudioProcessingTapCallbacks(
             version: kMTAudioProcessingTapCallbacksVersion_0, clientInfo: context.toOpaque(),
             init: { _, info, storage in storage.pointee = info },
@@ -28,8 +30,9 @@ public final class Equalizer: Sendable {
             prepare: { tap, _, format in TapContext.of(tap).prepare(format.pointee) },
             unprepare: { tap in TapContext.of(tap).processor = nil },
             process: { tap, frames, _, buffers, framesOut, flagsOut in
-                guard MTAudioProcessingTapGetSourceAudio(tap, frames, buffers, flagsOut, nil, framesOut) == noErr else { return }
-                TapContext.of(tap).process(buffers, frames: framesOut.pointee)
+                var range = CMTimeRange.invalid
+                guard MTAudioProcessingTapGetSourceAudio(tap, frames, buffers, flagsOut, &range, framesOut) == noErr else { return }
+                TapContext.of(tap).process(buffers, frames: framesOut.pointee, time: range.start.seconds)
             })
         var tap: MTAudioProcessingTap?
         guard MTAudioProcessingTapCreate(kCFAllocatorDefault, &callbacks, kMTAudioProcessingTapCreationFlag_PostEffects, &tap) == noErr else {
@@ -57,10 +60,14 @@ public final class Equalizer: Sendable {
 /// Tap storage: the filters for the format the tap reports. Its callbacks come one at a time.
 private final class TapContext {
     let equalizer: Equalizer
+    let item: ObjectIdentifier?
     var processor: EqualizerProcessor?
     var generation = 0
 
-    init(_ equalizer: Equalizer) { self.equalizer = equalizer }
+    init(_ equalizer: Equalizer, item: ObjectIdentifier?) {
+        self.equalizer = equalizer
+        self.item = item
+    }
 
     static func of(_ tap: MTAudioProcessingTap) -> TapContext {
         Unmanaged<TapContext>.fromOpaque(MTAudioProcessingTapGetStorage(tap)).takeUnretainedValue()
@@ -75,10 +82,14 @@ private final class TapContext {
         processor = EqualizerProcessor(sampleRate: format.mSampleRate, channels: Int(format.mChannelsPerFrame), gains: now.gains)
     }
 
-    func process(_ buffers: UnsafeMutablePointer<AudioBufferList>, frames: CMItemCount) {
+    func process(_ buffers: UnsafeMutablePointer<AudioBufferList>, frames: CMItemCount, time: TimeInterval) {
         guard let processor else { return }
+        let list = UnsafeMutableAudioBufferListPointer(buffers)
         equalizer.sync(processor, &generation)
-        processor.process(UnsafeMutableAudioBufferListPointer(buffers), frames: frames)
+        processor.process(list, frames: frames)
         equalizer.count(frames)
+        if let recorder = equalizer.recorder, let item {
+            recorder.record(list, frames: frames, item: item, tap: ObjectIdentifier(self), time: time, sampleRate: processor.sampleRate)
+        }
     }
 }

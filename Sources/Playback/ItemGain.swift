@@ -11,7 +11,7 @@ public extension AVPlayerItem {
         mix.inputParameters = tracks.map { track in
             let parameters = AVMutableAudioMixInputParameters(track: track)
             parameters.setVolume(gain, at: .zero)
-            parameters.audioTapProcessor = equalizer?.makeTap()
+            parameters.audioTapProcessor = equalizer?.makeTap(for: self)
             return parameters
         }
         audioMix = mix

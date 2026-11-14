@@ -51,7 +51,7 @@ import AVFoundation
     /// A transition is running: two songs play.
     public var isFading: Bool { fade != nil }
     /// Runs on every song through its audio mix while `usesEqualizer` is on.
-    public let equalizer = Equalizer()
+    public let equalizer: Equalizer
     /// The equalizer tap delays the start of a song and of a seek, so songs get it only when it is on.
     /// Measured on local files: start and seek take 0.30 and 0.26 s with an empty PostEffects tap, against
     /// 0.15 and 0.13 s with no tap (0.51 s with PreEffects); the same when the mix is set before the item is queued,
@@ -85,7 +85,8 @@ import AVFoundation
     private var rampTimer: Timer?
     var rampDuration: TimeInterval = 8
 
-    public init() {
+    public init(equalizer: Equalizer = Equalizer()) {
+        self.equalizer = equalizer
         decks.forEach { $0.mixer = self }
     }
 
