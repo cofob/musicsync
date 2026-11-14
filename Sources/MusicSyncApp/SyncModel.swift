@@ -128,7 +128,7 @@ final class SyncModel {
     /// Server data changed: drop cached albums and plan again.
     func libraryChanged() {
         expander = nil
-        deviceUpdated()
+        schedulePlan()
     }
 
     private func setKey(_ key: String) {
@@ -257,6 +257,7 @@ final class SyncModel {
     private func execute(_ plan: SyncPlan) {
         guard let app, let client = app.client, let device = app.ipod.current, !isRunning else { return }
         run = Run()
+        planTask?.cancel()
         itemIndex = [:]
         app.ipod.isSyncing = true
         let settings = app.syncSettings
