@@ -30,6 +30,7 @@ import SwiftUI
         case "intents": await intents(model)
         case "perf": await perf(model)
         case "jukebox": await jukebox(model)
+        case "appearance": await appearance(model)
         default: check(false, "known check \(name)")
         }
     }
@@ -102,7 +103,7 @@ import SwiftUI
     }
 
     /// The table once its first rows have loaded.
-    private static func songs() async -> (SongsTable.Table, SongsTable.Coordinator)? {
+    static func songs() async -> (SongsTable.Table, SongsTable.Coordinator)? {
         let found = await Shot.first { () -> (SongsTable.Table, SongsTable.Coordinator)? in
             guard let table = Shot.tableView(in: mainWindow?.contentView) as? SongsTable.Table,
                   let coordinator = table.delegate as? SongsTable.Coordinator, let list = coordinator.list,

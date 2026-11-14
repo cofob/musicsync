@@ -80,13 +80,24 @@ import SwiftUI
             // A settings page alone at its full height, to see its lower sections.
             open(SettingsView.content(SettingsPage(rawValue: String(s.dropFirst(5))) ?? .general), "Settings", model)
         case let s where s.hasPrefix("look:"):
-            // `look:<accent>:<density>:<scene>`, e.g. `look:pink:large:albums`; the saved settings stay unchanged.
+            // `look:<accent>:<density>[:<rows>][:<background>][:playing]:<scene>`, e.g. `look:pink:large:albums` or
+            // `look:purple:small:compact:playing:album`; the saved settings stay unchanged.
             let parts = s.split(separator: ":").map(String.init)
-            guard parts.count == 4 else { break }
+            guard parts.count >= 4 else { break }
             AppPreferences.shared.appearance.accent = .init(rawValue: parts[1]) ?? .red
             AppPreferences.shared.appearance.density = .init(rawValue: parts[2]) ?? .medium
+            for option in parts.dropFirst(3).dropLast() {
+                if let rows = AppearanceSettings.ListDensity(rawValue: option) { AppPreferences.shared.appearance.listDensity = rows }
+                if let background = AppearanceSettings.NowPlayingBackground(rawValue: option) { AppPreferences.shared.appearance.nowPlayingBackground = background }
+                if option == "playing" { await playPaused(model) }
+            }
             AppearanceSettings().save()
-            await show(parts[3], model)
+            await show(parts[parts.count - 1], model)
+        case "songs-columns":
+            // Every column, # and Year moved to the front; the saved settings stay unchanged.
+            AppPreferences.shared.appearance.setTableColumns([.track, .title, .year] + AppearanceSettings.SongsTableColumn.allCases)
+            AppearanceSettings().save()
+            model.selection = .songs
         case "sync-checking":
             model.sync.checked = (40, 120)
             open(SyncSheet(), "Sync", model)
