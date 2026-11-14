@@ -41,7 +41,8 @@ import Testing
     private var playingDecks: Int { mixer.decks.count { $0.player.currentItem != nil && $0.player.rate != 0 } }
     private var loadedDecks: Int { mixer.decks.count { $0.player.currentItem != nil } }
 
-    @Test func gaplessInOneDeck() async throws {
+    @Test(arguments: [false, true]) func gaplessInOneDeck(equalizer: Bool) async throws {
+        mixer.usesEqualizer = equalizer
         mixer.play(try cue(1.5))
         mixer.setNext(try cue(1.5))
         let advanced = try #require(await time(of: .advanced(skipped: false)))
@@ -106,7 +107,8 @@ import Testing
         #expect(playingDecks == 1)
     }
 
-    @Test func seekEndsTheFade() async throws {
+    @Test(arguments: [false, true]) func seekEndsTheFade(equalizer: Bool) async throws {
+        mixer.usesEqualizer = equalizer
         mixer.play(try cue(3))
         mixer.setNext(try cue(3), transition: Transition(at: 0.5, duration: 2))
         _ = try #require(await time(of: .advanced(skipped: false)))
@@ -114,12 +116,13 @@ import Testing
         mixer.seek(to: 2)
         #expect(!mixer.isFading)
         #expect(loadedDecks == 1)
-        await sleep(0.3)
+        await sleep(equalizer ? 0.5 : 0.3)  // the tap delays a seek, see `Mixer.usesEqualizer`
         #expect(mixer.time > 2)
         #expect(playingDecks == 1)
     }
 
-    @Test func fastSkipsLeaveOneDeck() async throws {
+    @Test(arguments: [false, true]) func fastSkipsLeaveOneDeck(equalizer: Bool) async throws {
+        mixer.usesEqualizer = equalizer
         mixer.play(try cue(3))
         mixer.setNext(try cue(3), transition: Transition(at: 0.3, duration: 2))
         _ = try #require(await time(of: .advanced(skipped: false)))

@@ -52,8 +52,10 @@ import AVFoundation
     public var isFading: Bool { fade != nil }
     /// Runs on every song through its audio mix while `usesEqualizer` is on.
     public let equalizer = Equalizer()
-    /// The equalizer tap delays the start of a song and of a seek by about 0.2 s, so songs get it only when it is on.
-    /// A change rebuilds the mix of the current and the next song.
+    /// The equalizer tap delays the start of a song and of a seek, so songs get it only when it is on.
+    /// Measured on local files: start and seek take 0.30 and 0.26 s with an empty PostEffects tap, against
+    /// 0.15 and 0.13 s with no tap (0.51 s with PreEffects); the same when the mix is set before the item is queued,
+    /// with `preroll` or without waiting to minimize stalling. A change rebuilds the mix of the current and the next song.
     public var usesEqualizer = false {
         didSet {
             guard usesEqualizer != oldValue else { return }
