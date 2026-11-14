@@ -84,10 +84,7 @@ struct Sidebar: View {
             }
             Section {
                 if SidebarItem.playlists.isShown { row(.playlists) }
-                ForEach(model.playlists) { playlist in
-                    PlaylistSidebarRow(playlist: playlist, isSelected: selection == .playlist(playlist.id))
-                        .modifier(Pick(item: .playlist(playlist.id), selection: $selection))
-                }
+                PlaylistRows(selected: selection?.playlistID)
             } header: { PlaylistsHeader() }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -99,24 +96,44 @@ struct Sidebar: View {
 
     private func row(_ item: SidebarItem) -> some View {
         AccentLabel(title: item.title, symbol: item.symbol, isSelected: selection == item)
-            .modifier(Pick(item: item, selection: $selection))
+            .modifier(Pick(item: item, isSelected: selection == item))
     }
 }
 
+/// The playlist rows in a view of their own: other sidebar updates (each search keystroke, other pages) skip them.
+private struct PlaylistRows: View {
+    @Environment(AppModel.self) private var model
+    /// Id of the selected playlist.
+    let selected: String?
+
+    var body: some View {
+        ForEach(model.playlists) { playlist in
+            PlaylistSidebarRow(playlist: playlist, isSelected: selected == playlist.id)
+                .modifier(Pick(item: .playlist(playlist.id), isSelected: selected == playlist.id))
+        }
+    }
+}
+
+private extension SidebarItem {
+    var playlistID: String? { if case .playlist(let id) = self { id } else { nil } }
+}
+
 /// Click selects the row; the selected row gets a neutral gray background, as in Apple Music.
+/// Plain values, no binding: a new selection then redraws only the two rows it changes, not every playlist.
 private struct Pick: ViewModifier {
+    @Environment(AppModel.self) private var model
     let item: SidebarItem
-    @Binding var selection: SidebarItem?
+    let isSelected: Bool
 
     func body(content: Content) -> some View {
         content
             .frame(maxWidth: .infinity, alignment: .leading)
             // Grows into the row insets, so the whole gray shape takes clicks, not only the label.
             .contentShape(Rectangle().inset(by: -10))
-            .onTapGesture { selection = item }
-            .accessibilityAddTraits(selection == item ? [.isButton, .isSelected] : .isButton)
+            .onTapGesture { model.selection = item }
+            .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
             .listRowBackground(RoundedRectangle(cornerRadius: 8)
-                .fill(selection == item ? Color.primary.opacity(0.1) : .clear)
+                .fill(isSelected ? Color.primary.opacity(0.1) : .clear)
                 .padding(.horizontal, 10))
     }
 }
