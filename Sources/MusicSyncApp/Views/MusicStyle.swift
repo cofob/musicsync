@@ -86,6 +86,7 @@ struct PlayShuffleButtons: View {
 }
 
 /// Big cover on the left; bold title, free-form details, Play / Shuffle and an accessory on the right.
+/// When the page is too narrow for both, the details go under the cover.
 struct MediaHeader<Cover: View, Content: View, Accessory: View>: View {
     @ViewBuilder var cover: Cover
     let title: String
@@ -98,10 +99,16 @@ struct MediaHeader<Cover: View, Content: View, Accessory: View>: View {
     @ViewBuilder var accessory: Accessory
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 30) {
-            cover
-                .frame(width: 260, height: 260)
-                .shadow(color: .black.opacity(0.22), radius: 14, y: 6)
+        let art = cover.frame(width: 260, height: 260).shadow(color: .black.opacity(0.22), radius: 14, y: 6)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .bottom, spacing: 30) { art; info; Spacer(minLength: 0) }
+            VStack(alignment: .leading, spacing: 24) { art; info }.frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, 32).padding(.top, 28).padding(.bottom, 24)
+    }
+
+    private var info: some View {
+        VStack(alignment: .leading, spacing: 4) {
             VStack(alignment: .leading, spacing: 4) {
                 if let onRename {
                     InlineTextField(text: title, prompt: "Name", font: .system(size: 30, weight: .bold), onCommit: onRename)
@@ -109,15 +116,15 @@ struct MediaHeader<Cover: View, Content: View, Accessory: View>: View {
                     Text(title).font(.system(size: 30, weight: .bold)).lineLimit(3)
                 }
                 content
-                HStack(spacing: 10) {
-                    PlayShuffleButtons(isEnabled: canPlay, onPlay: onPlay, onShuffle: onShuffle)
-                    accessory
-                }
-                .padding(.top, 14)
             }
-            Spacer(minLength: 0)
+            // A long title wraps, so only the buttons decide whether the details fit beside the cover.
+            .frame(idealWidth: 0, maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 10) {
+                PlayShuffleButtons(isEnabled: canPlay, onPlay: onPlay, onShuffle: onShuffle)
+                accessory
+            }
+            .padding(.top, 14)
         }
-        .padding(.horizontal, 32).padding(.top, 28).padding(.bottom, 24)
     }
 }
 

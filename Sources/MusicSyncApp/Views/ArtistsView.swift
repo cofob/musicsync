@@ -44,7 +44,8 @@ struct ArtistsView: View {
                     ContentUnavailableView("No Artist Selected", systemImage: "music.microphone")
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // A zero minimum keeps a wide artist page from pushing the list under the sidebar.
+            .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationTitle("Artists")
         .task(id: [String(model.libraryVersion), model.searchText]) {
@@ -78,8 +79,7 @@ private struct ArtistRow: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 8).frame(height: 54)
-        .foregroundStyle(isSelected ? .white : .primary)
-        .background(isSelected ? Color.musicAccent : .clear, in: RoundedRectangle(cornerRadius: 8))
+        .background(isSelected ? Color.primary.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: 8))
         .overlay(alignment: .bottom) { if !isSelected { Divider().padding(.leading, 60) } }
         .contentShape(Rectangle())
     }

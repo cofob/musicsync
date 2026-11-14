@@ -21,6 +21,7 @@ import SwiftUI
         case "playlist-keys", "playlist-keys-pushed": await playlistKeys(model, pushed: name.hasSuffix("pushed"))
         case "miniplayer": await miniPlayer(model)
         case "equalizer": await equalizer(model)
+        case "artists": await artists(model)
         default: check(false, "known check \(name)")
         }
     }
@@ -306,7 +307,28 @@ import SwiftUI
               "preset Rock turns the equalizer on with its gains: \(player.equalizer.preset ?? "Manual") \(player.equalizer.gains)")
     }
 
+    // MARK: Artists
+
+    /// The 280 pt artist list starts right of the sidebar and keeps its width once the artist page loads.
+    private static func artists(_ model: AppModel) async {
+        await Shot.select(.artists, model)
+        try? await Task.sleep(for: .seconds(4))  // the list and the first artist page load
+        guard let window = mainWindow, let content = window.contentView else { return check(false, "main window") }
+        // A scroll view under the glass sidebar spans it too; its left inset is the part that the sidebar covers.
+        let frames = scrollViews(in: content).map { view in
+            let frame = view.convert(view.bounds, to: nil)
+            return NSRect(x: frame.minX + view.contentInsets.left, y: frame.minY, width: frame.width - view.contentInsets.left, height: frame.height)
+        }
+        guard let sidebar = frames.first(where: { $0.minX < 1 }),
+              let list = frames.first(where: { abs($0.width - 280) < 1 }) else { return check(false, "sidebar and artist list: \(frames)") }
+        check(list.minX >= sidebar.maxX - 1, "the artist list \(list) starts right of the sidebar \(sidebar)")
+    }
+
     // MARK: Helpers
+
+    private static func scrollViews(in view: NSView) -> [NSScrollView] {
+        (view as? NSScrollView).map { [$0] } ?? view.subviews.flatMap(scrollViews)
+    }
 
     private static var mainWindow: NSWindow? { NSApp.windows.first { $0.identifier?.rawValue.hasPrefix(MainWindow.id) == true } }
 
