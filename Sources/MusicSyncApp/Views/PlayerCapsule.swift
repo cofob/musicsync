@@ -4,8 +4,7 @@ import SwiftUI
 /// with its progress under it in the middle, the song menu, lyrics / queue / AirPlay / volume on the right.
 struct PlayerCapsule: View {
     @Environment(AppModel.self) private var model
-    @AppStorage(SidePanel.key, store: .app) private var panel = NowPlayingPanel.none
-    /// A narrow capsule (side panel open in a small window) leaves out shuffle, repeat and "•••" to keep room for the song.
+    /// A narrow capsule (a small window) leaves out shuffle, repeat and "•••" to keep room for the song.
     @State private var compact = false
 
     var body: some View {
@@ -72,9 +71,12 @@ struct PlayerCapsule: View {
     }
 
     private func panelButton(_ title: String, _ symbol: String, _ value: NowPlayingPanel) -> some View {
-        Button(title, systemImage: symbol) { withAnimation(.smooth) { panel = panel == value ? .none : value } }
-            .foregroundStyle(panel == value ? AnyShapeStyle(Color.musicAccent) : AnyShapeStyle(.primary))
-            .help(title)
+        Button(title, systemImage: symbol) {
+            model.nowPlayingPanel = value
+            model.showNowPlaying = true
+        }
+        .help(title)
+        .disabled(model.player.current == nil)
     }
 }
 

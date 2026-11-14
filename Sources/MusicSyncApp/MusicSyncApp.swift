@@ -91,8 +91,6 @@ struct MusicSyncApp: App {
                     .disabled(model.player.current == nil)
             }
             CommandGroup(after: .toolbar) {
-                SidePanelMenuItems()
-                Divider()
                 Button("Refresh Library") { Task { await model.refresh() } }
                     .keyboardShortcut("r")
                 Button("Sync Library Now") { model.syncLibraryNow() }

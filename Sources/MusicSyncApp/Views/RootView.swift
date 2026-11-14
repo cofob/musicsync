@@ -3,7 +3,6 @@ import SwiftUI
 struct RootView: View {
     @Environment(AppModel.self) private var model
     @FocusedValue(\.songListCommands) private var songList
-    @AppStorage(SidePanel.key, store: .app) private var panel = NowPlayingPanel.none
 
     var body: some View {
         @Bindable var model = model
@@ -36,7 +35,6 @@ struct RootView: View {
                 }
                 .animation(.easeInOut(duration: 0.2), value: selection)
                 .overlay(alignment: .top) { suggestions(selection) }
-                .inspector(isPresented: Binding(get: { panel != .none }, set: { if !$0 { panel = .none } })) { SidePanel() }
                 .toolbar {
                     // macOS 26 wraps toolbar items in a glass capsule; the field draws its own, so hide that one.
                     if #available(macOS 26, *) {

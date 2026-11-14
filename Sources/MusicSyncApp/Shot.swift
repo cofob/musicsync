@@ -30,7 +30,6 @@ import SwiftUI
             try? await Task.sleep(for: .seconds(delay))
             let capture: @MainActor @Sendable () -> Void = {
                 let saved = save(to: URL(fileURLWithPath: output))
-                UserDefaults.app.removeObject(forKey: SidePanel.key)  // the demo settings are shared with other shots
                 exit(saved && !ShotChecks.failed ? 0 : 1)
             }
             if menuPath.isEmpty { capture() } else { openMenu(then: capture) }
@@ -243,11 +242,6 @@ import SwiftUI
             }
         case "volume", "seek-hover":
             await playPaused(model)
-            model.selection = .home
-        case "panel-queue", "panel-lyrics":
-            // The side panel; the shot clears it again.
-            await queueScene(model)
-            UserDefaults.app.set((scene == "panel-queue" ? NowPlayingPanel.queue : .lyrics).rawValue, forKey: SidePanel.key)
             model.selection = .home
         case "upnext", "queue-quit":
             // History, Playing Next and AutoPlay sections, paused; "queue-quit" then quits, so the queue is saved.
