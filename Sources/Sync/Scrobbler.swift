@@ -26,6 +26,7 @@ public actor Scrobbler {
 
     private let url: URL
     private var state: State
+    private var flushing: Task<FlushResult, Never>?
 
     public init(queueURL: URL) {
         url = queueURL
@@ -55,8 +56,20 @@ public actor Scrobbler {
     }
 
     /// Sends the queue in batches of 50, oldest first. A failed batch and everything after it stays queued.
+    /// A flush that starts while another runs waits for it and returns its result.
     @discardableResult
     public func flush(client: SubsonicClient) async -> FlushResult {
+        if let flushing { return await flushing.value }
+        let task = Task {
+            let result = await send(client: client)
+            flushing = nil
+            return result
+        }
+        flushing = task
+        return await task.value
+    }
+
+    private func send(client: SubsonicClient) async -> FlushResult {
         var sent = 0
         let sorted = state.queue.sorted { $0.time < $1.time }
         for start in stride(from: 0, to: sorted.count, by: Self.batchSize) {
@@ -65,7 +78,7 @@ public actor Scrobbler {
                 try await client.scrobble(ids: batch.map(\.songID), times: batch.map(\.time), submission: true)
             } catch { break }
             sent += batch.count
-            state.queue = Array(sorted.dropFirst(sent))
+            for request in batch { if let i = state.queue.firstIndex(of: request) { state.queue.remove(at: i) } }
             save()
         }
         return FlushResult(sent: sent, pending: state.queue.count)
