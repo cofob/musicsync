@@ -28,6 +28,7 @@ struct PlaylistSidebarRow: View {
         .background(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.musicAccent, lineWidth: 2).padding(-4).opacity(isTargeted ? 1 : 0))
         .contextMenu {
             Button("Play", systemImage: "play.fill") { model.play(playlist) }
+            PinMenuItem(reason: .playlist(playlist.id)) { model.download(playlist) }
             SyncMenuItem(isOn: model.sync.isPlaylistSelected(playlist.id)) { model.sync.togglePlaylist(playlist.id) }
             Divider()
             if editable {

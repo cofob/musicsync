@@ -57,6 +57,7 @@ struct PlaylistDetailView: View {
             Text([current.songCount.map(formatSongs), current.duration.map(formatTotal)].compactMap { $0 }.joined(separator: ", "))
                 .font(.callout).foregroundStyle(.secondary)
         } accessory: {
+            DownloadButton(reason: .playlist(playlist.id)) { model.download(playlist) }
             SyncButton(isOn: model.sync.isPlaylistSelected(playlist.id)) { model.sync.togglePlaylist(playlist.id) }
             if editable { PlaylistHeaderMenu(playlist: current) }
         }

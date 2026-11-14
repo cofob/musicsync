@@ -1,4 +1,5 @@
 import AppKit
+import Subsonic
 import SwiftUI
 
 /// Development only: `MUSICSYNC_SHOT=<png>` opens `MUSICSYNC_SCENE`, waits `MUSICSYNC_SHOT_DELAY` seconds (default 6),
@@ -55,6 +56,25 @@ import SwiftUI
         case "info":
             guard let album = await first({ model.albums.first }), let song = try? await model.album(album.id)?.song?.first else { break }
             model.infoSong = song
+        case "album-download":
+            // Starts downloading the shortest album and shows its page.
+            await select(.albums, model)
+            guard let album = await shortestAlbum(model) else { break }
+            model.download(album)
+            model.show(.album(album))
+        case "downloaded":
+            await select(.albums, model)
+            if let album = await shortestAlbum(model) {
+                model.download(album)
+                _ = await first({ model.downloads.state(of: .album(album.id)) == .done ? true : nil })
+            }
+            await select(.downloaded, model)
+        case "settings-downloads": open(DownloadSettingsView(), "Downloads", model)
+        case "offline":
+            await select(.albums, model)
+            guard let album = await first({ model.albums.first }) else { break }
+            model.downloads.isOffline = true
+            model.show(.album(album))
         case let s where s.hasPrefix("search:"):
             await select(.search, model)
             model.searchText = String(s.dropFirst(7))
@@ -85,6 +105,11 @@ import SwiftUI
     private static func select(_ item: SidebarItem, _ model: AppModel) async {
         model.selection = item
         try? await Task.sleep(for: .milliseconds(300))
+    }
+
+    /// The album with the shortest playing time: the smallest real download.
+    private static func shortestAlbum(_ model: AppModel) async -> Album? {
+        await first({ model.albums.isEmpty ? nil : model.albums.min { ($0.duration ?? .max) < ($1.duration ?? .max) } })
     }
 
     /// Polls `value` until it is not nil, for at most 30 s.

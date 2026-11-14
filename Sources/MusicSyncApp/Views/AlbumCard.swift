@@ -13,6 +13,7 @@ struct AlbumCard<Badge: View>: View {
             VStack(alignment: .leading, spacing: 2) {
                 CoverImage(id: album.coverArt, size: 400, cornerRadius: 10)
                     .overlay(alignment: .topTrailing) { badge.padding(6) }
+                    .overlay(alignment: .bottomTrailing) { DownloadBadge(reason: .album(album.id)).padding(6) }
                     .albumHoverActions(album)
                     .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
                     .padding(.bottom, 6)
@@ -51,6 +52,7 @@ struct AlbumMenuItems: View {
             Divider()
             Button("Go to Artist", systemImage: "music.microphone") { model.show(.artist(artistId)) }
         }
+        PinMenuItem(reason: .album(album.id)) { model.download(album) }
         SyncMenuItem(isOn: model.sync.isSelected(album), isEnabled: !model.sync.isSelectedByArtist(album)) { model.sync.toggle(album) }
     }
 

@@ -7,6 +7,7 @@ struct SettingsView: View {
             GeneralSettingsView().tabItem { Label("General", systemImage: "gearshape") }
             ServerSettingsView().tabItem { Label("Server", systemImage: "server.rack") }
             LibrarySettingsView().tabItem { Label("Library", systemImage: "books.vertical") }
+            DownloadSettingsView().tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
             SyncSettingsView().tabItem { Label("Sync", systemImage: "arrow.triangle.2.circlepath") }
         }
     }

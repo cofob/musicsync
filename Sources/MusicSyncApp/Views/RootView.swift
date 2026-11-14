@@ -124,6 +124,7 @@ struct RootView: View {
         case .artists: ArtistsView()
         case .songs: SongsView()
         case .favorites: FavoritesView()
+        case .downloaded: DownloadedView()
         case .playlists: PlaylistsView()
         case .playlist(let id):
             if let playlist = model.playlists.first(where: { $0.id == id }) {

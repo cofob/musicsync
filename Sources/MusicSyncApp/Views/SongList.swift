@@ -20,6 +20,7 @@ struct SongMenuItems: View {
             model.toggleStar(song)
         }
         RatingMenu(song: song)
+        SongDownloadMenuItem(song: song)
         Divider()
         Button("Go to Album", systemImage: "square.stack") { model.goToAlbum(song) }.disabled(song.albumId == nil)
         Button("Go to Artist", systemImage: "music.microphone") { model.goToArtist(song) }.disabled(song.artistId == nil)
@@ -69,7 +70,7 @@ struct SongList: View {
         let isCurrent = model.player.current?.id == song.id
         return TrackRow(title: song.title, subtitle: subtitle(song), time: song.duration.map(TimeInterval.init),
                         isCurrent: isCurrent, isSelected: selected?.index == index && selected?.id == song.id,
-                        isStarred: model.isStarred(song)) {
+                        isStarred: model.isStarred(song), badge: model.downloads.badge(song)) {
             switch leading {
             case .track:
                 TrackNumber(text: song.track.map(String.init) ?? "", isCurrent: isCurrent)
@@ -83,6 +84,7 @@ struct SongList: View {
                 Button("Remove from Playlist", systemImage: "minus.circle") { onRemove(index) }
             }
         }
+        .opacity(model.downloads.isAvailable(song) ? 1 : 0.4)
         .onTapGesture(count: 2) { onPlay(index) }
         .simultaneousGesture(TapGesture().onEnded { selected = (index, song.id) })
     }

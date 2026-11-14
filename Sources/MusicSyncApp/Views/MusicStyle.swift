@@ -151,6 +151,8 @@ struct TrackRow<Leading: View, MenuItems: View>: View {
     var isSelected = false
     /// Small star before the time, as in Apple Music.
     var isStarred = false
+    /// Small gray symbol before the time, e.g. the download state.
+    var badge: String?
     @ViewBuilder var leading: Leading
     @ViewBuilder var menu: MenuItems
 
@@ -165,6 +167,7 @@ struct TrackRow<Leading: View, MenuItems: View>: View {
             }
             Spacer(minLength: 8)
             if isStarred { Image(systemName: "star.fill").font(.caption2).foregroundStyle(Color.musicAccent) }
+            if let badge { Image(systemName: badge).font(.caption).foregroundStyle(.secondary) }
             Text(time.map(formatTime) ?? "").monospacedDigit().foregroundStyle(.secondary)
             RowMenu { menu }
         }

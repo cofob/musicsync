@@ -71,8 +71,8 @@ struct AlbumDetailView<Accessory: View>: View {
     }
 }
 
-extension AlbumDetailView where Accessory == AlbumSyncButton {
-    init(album: Album) { self.init(album: album) { AlbumSyncButton(album: $0) } }
+extension AlbumDetailView where Accessory == AlbumHeaderButtons {
+    init(album: Album) { self.init(album: album) { AlbumHeaderButtons(album: $0) } }
 }
 
 /// Artist name in the accent color; opens the artist when its id is known.

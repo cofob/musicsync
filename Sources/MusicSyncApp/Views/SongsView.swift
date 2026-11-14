@@ -111,8 +111,10 @@ struct SongsView: View {
                 Text(song.title).lineLimit(1)
                     .foregroundStyle(model.player.current?.id == song.id && !selected ? Color.musicAccent : .primary)
                 Spacer(minLength: 4)
+                if let badge = model.downloads.badge(song) { Image(systemName: badge).font(.caption).foregroundStyle(.secondary) }
                 RowMenu(tint: selected ? .primary : .musicAccent) { SongMenuItems(song: song) }
             }
+            .opacity(model.downloads.isAvailable(song) ? 1 : 0.4)
         }
     }
 

@@ -4,11 +4,11 @@ import SwiftUI
 /// and a branch in `RootView.content(for:)`.
 enum SidebarItem: Hashable {
     case search, home
-    case recentlyAdded, artists, albums, songs, favorites
+    case recentlyAdded, artists, albums, songs, favorites, downloaded
     case playlists, playlist(String)
     case deviceOverview, deviceAlbums, deviceSongs, devicePlaylists
 
-    static let libraryItems: [SidebarItem] = [.recentlyAdded, .artists, .albums, .songs, .favorites]
+    static let libraryItems: [SidebarItem] = [.recentlyAdded, .artists, .albums, .songs, .favorites, .downloaded]
     static let deviceItems: [SidebarItem] = [.deviceOverview, .deviceAlbums, .deviceSongs, .devicePlaylists]
 
     var isDevice: Bool { Self.deviceItems.contains(self) }
@@ -22,6 +22,7 @@ enum SidebarItem: Hashable {
         case .artists: "Artists"
         case .songs, .deviceSongs: "Songs"
         case .favorites: "Favorites"
+        case .downloaded: "Downloaded"
         case .playlists: "All Playlists"
         case .devicePlaylists, .playlist: "Playlists"
         case .deviceOverview: "Overview"
@@ -37,6 +38,7 @@ enum SidebarItem: Hashable {
         case .artists: "music.microphone"
         case .songs, .deviceSongs: "music.note"
         case .favorites: "star"
+        case .downloaded: "arrow.down.circle"
         case .playlists: "square.grid.3x3"
         case .devicePlaylists, .playlist: "music.note.list"
         case .deviceOverview: "ipod"
@@ -81,7 +83,7 @@ struct Sidebar: View {
             } header: { PlaylistsHeader() }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if model.client != nil { LibraryStatusView().padding(.horizontal, 10).padding(.bottom, 8) }
+            if model.client != nil { VStack(spacing: 6) { OfflineBanner(); LibraryStatusView() }.padding(.horizontal, 10).padding(.bottom, 8) }
         }
         .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 300)
     }
