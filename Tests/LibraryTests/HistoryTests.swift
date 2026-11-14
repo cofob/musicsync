@@ -31,6 +31,18 @@ import Testing
         #expect(await PlayHistory(serverKey: "other@http://stub", directory: dir.url).events().isEmpty)
     }
 
+    @Test func clearRemovesEveryEvent() async throws {
+        let dir = TempDir()
+        let history = PlayHistory(serverKey: "k", directory: dir.url)
+        try await history.clear()  // works before the first play
+        for t in 0..<3 { try await history.record(event("s\(t)", Double(t))) }
+        try await history.clear()
+        #expect(await history.events().isEmpty)
+        #expect(await history.stats().isEmpty)
+        try await history.record(event("s9", 9))
+        #expect(await history.events().map(\.songId) == ["s9"])
+    }
+
     @Test func keepsOnlyTheNewestEvents() async throws {
         let dir = TempDir()
         let history = PlayHistory(serverKey: "k", directory: dir.url, limit: 3)

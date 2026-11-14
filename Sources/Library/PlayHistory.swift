@@ -21,6 +21,11 @@ public actor PlayHistory {
         try db.run("DELETE FROM plays WHERE id <= (SELECT MAX(id) FROM plays) - ?", [limit])  // a rowid range: cheap
     }
 
+    /// Settings > Library > Clear Listening History.
+    public func clear() throws {
+        try open().run("DELETE FROM plays", [])
+    }
+
     /// The newest `limit` events, oldest first.
     public func events(limit: Int = 5000) -> [PlayEvent] {
         read([]) { db in
