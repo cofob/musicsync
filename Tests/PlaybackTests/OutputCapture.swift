@@ -136,8 +136,8 @@ import AVFoundation
         let sr = track.sampleRate, n = max(Int(sr / 1000), 1), bin = Double(n) / sr
         guard let t0 = itemTime(item, atHost: from),
               let stamp = track.stamps.min(by: { abs($0.time - t0) < abs($1.time - t0) }) else { return nil }
-        // Rough guess from the stamp; the tap reports items about 93 ms early at rate 1.
-        guard let guessHost = host(of: item, at: stamp.time + 0.093) else { return nil }
+        // Rough guess from the stamp: with the time-domain algorithm it is within a few ms of the sound (measured).
+        guard let guessHost = host(of: item, at: stamp.time) else { return nil }
         let guess = guessHost - Double(stamp.frame) / sr
         let count = Int(length * sr)
         let expected: [Float] = (0..<count).map { k in

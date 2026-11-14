@@ -31,7 +31,8 @@ extension Player {
 
     private static func cue(_ url: URL, gain: Float, contentType: String? = nil) -> Mixer.Cue {
         let item = AVPlayerItem(asset: AVURLAsset(url: url, options: contentType.map { [AVURLAssetOverrideMIMETypeKey: $0] }))
-        item.audioTimePitchAlgorithm = .spectral  // keeps the pitch when the speed is not 1
+        // Keeps the pitch when the speed is not 1. Spectral raises the peaks off rate 1 (up to +5 dB over full scale, measured).
+        item.audioTimePitchAlgorithm = .timeDomain
         return Mixer.Cue(item: item, gain: gain)
     }
 

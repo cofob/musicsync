@@ -21,6 +21,8 @@ import Testing
         var step = 0.0
         /// Longest silence, s, and the highest sample.
         var silence = 0.0, peak: Float = 0
+        /// Seconds from the overlap start to the highest sample, and each deck's highest sample.
+        var peakAt = 0.0, deckPeaks: (Float, Float) = (0, 0)
         /// Largest rate change within 50 ms on the deck of `b` from its start.
         var rateStep = 0.0
         /// How late `b` started against the plan, ms (item timebases).
@@ -33,8 +35,8 @@ import Testing
 
         var summary: String {
             let beats = beatOffsets.map { String(format: "%+.1f", $0) }.joined(separator: " ")
-            return String(format: "beats [%@] ms, dip %.1f dB, jump %.1f dB, step %.1f dB, silence %.0f ms, peak %.3f, rate step %.5f, start %+.1f ms, shifts %.1f/%.1f ms, drift %.2f/%.2f ms",
-                          beats, dip, jump, step, silence * 1000, peak, rateStep, startError, shifts.0, shifts.1)
+            return String(format: "beats [%@] ms, dip %.1f dB, jump %.1f dB, step %.1f dB, silence %.0f ms, peak %.3f at %+.2f s (decks %.3f/%.3f), rate step %.5f, start %+.1f ms, shifts %.1f/%.1f ms, drift %.2f/%.2f ms",
+                          beats, dip, jump, step, silence * 1000, peak, peakAt, deckPeaks.0, deckPeaks.1, rateStep, startError, shifts.0, shifts.1)
         }
     }
 
@@ -103,6 +105,10 @@ import Testing
         result.step = around.map { abs(levels[$0 + 4] - levels[$0]) }.max() ?? 0
         result.silence = Measure.longestSilence(render.mix, sampleRate: render.sampleRate)
         result.peak = Measure.peak(render.mix)
+        if let i = render.mix.indices.max(by: { abs(render.mix[$0]) < abs(render.mix[$1]) }) {
+            result.peakAt = render.host(i / 2) - overlap
+        }
+        result.deckPeaks = (Measure.peak(out), Measure.peak(into))
         let rates = capture.polls.compactMap { p -> (time: Double, rate: Double)? in
             guard p.host >= overlap - 0.1, let s = p.decks.first(where: { $0.item == ib }) else { return nil }
             return (p.host, Double(s.playerRate))

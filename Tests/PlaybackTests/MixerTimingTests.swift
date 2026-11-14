@@ -19,7 +19,7 @@ import Testing
         let url = try await ClickTrack(bpm: 120, body: seconds, firstBeat: 0.1).file()
         files.append(url)
         let item = AVPlayerItem(url: url)
-        item.audioTimePitchAlgorithm = .spectral  // as the app plays
+        item.audioTimePitchAlgorithm = .timeDomain  // as the app plays
         return Mixer.Cue(item: item)
     }
 

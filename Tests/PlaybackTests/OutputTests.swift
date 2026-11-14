@@ -17,7 +17,7 @@ import Testing
 
     private func item(_ url: URL) -> AVPlayerItem {
         let item = AVPlayerItem(url: url)
-        item.audioTimePitchAlgorithm = .spectral  // as the app plays
+        item.audioTimePitchAlgorithm = .timeDomain  // as the app plays
         return item
     }
 
@@ -55,7 +55,7 @@ import Testing
     static let presets: [(String, EqualizerGains)] = [("Flat", .flat), ("Bass Booster", preset("Bass Booster")), ("Rock", preset("Rock")), ("+12 dB at 1 kHz", band(5, 12))]
 
     /// Frames from the start of a tap's run to the first frame of the song, at rate 1: the delay of the time-pitch unit (measured).
-    static let delay = 4096
+    static let delay = 1024
 
     private func noise(seconds: Double) -> [Float] {
         var g = SystemRandomNumberGenerator()

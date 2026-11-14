@@ -47,7 +47,7 @@ struct DemoMixTests {
         let stream = settings.stream(for: song)
         let url = client.streamURL(id: song.id, format: stream.format, maxBitRate: stream.maxBitRate)
         let item = AVPlayerItem(asset: AVURLAsset(url: url, options: stream.contentType.map { [AVURLAssetOverrideMIMETypeKey: $0] }))
-        item.audioTimePitchAlgorithm = .spectral
+        item.audioTimePitchAlgorithm = .timeDomain
         return Mixer.Cue(item: item, gain: settings.gain(for: song, inAlbumOrder: false))
     }
 
