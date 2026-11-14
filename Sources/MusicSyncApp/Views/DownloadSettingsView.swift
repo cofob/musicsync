@@ -13,8 +13,8 @@ struct DownloadSettingsView: View {
             Section {
                 Picker("Quality", selection: $downloads.settings.quality) {
                     Text("Original").tag(DownloadSettings.Quality.original)
-                    Text("AAC").tag(DownloadSettings.Quality.aac)
-                    Text("MP3").tag(DownloadSettings.Quality.mp3)
+                    Text("AAC").tag(DownloadSettings.Quality.aac).disabled(!ServerFormats.shared.allows("aac"))
+                    Text("MP3").tag(DownloadSettings.Quality.mp3).disabled(!ServerFormats.shared.allows("mp3"))
                 }
                 if downloads.settings.quality != .original {
                     Picker("Bit rate", selection: $downloads.settings.maxBitRate) {
@@ -22,7 +22,7 @@ struct DownloadSettingsView: View {
                     }
                 }
             } footer: {
-                Text("Original keeps the files as they are on the server. AAC and MP3 are converted by the server and take less space. A change applies to new downloads.")
+                Text("Original keeps the files as they are on the server. AAC and MP3 are converted by the server and take less space. A change applies to new downloads." + ServerFormats.shared.note)
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section {
@@ -46,6 +46,7 @@ struct DownloadSettingsView: View {
         }
         .formStyle(.grouped)
         .frame(width: 520, height: 680)
+        .task { await ServerFormats.shared.probe(model.client) }
         .confirmationDialog("Remove all downloads?", isPresented: $confirmClear) {
             Button("Remove All", role: .destructive) { model.removeAllDownloads() }
         } message: {

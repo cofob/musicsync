@@ -40,8 +40,8 @@ struct PlaybackSettingsView: View {
             Section {
                 Picker("Streaming quality", selection: $player.settings.quality) {
                     Text("Original").tag(StreamQuality.original)
-                    Text("AAC").tag(StreamQuality.aac)
-                    Text("MP3").tag(StreamQuality.mp3)
+                    Text("AAC").tag(StreamQuality.aac).disabled(!ServerFormats.shared.allows("aac"))
+                    Text("MP3").tag(StreamQuality.mp3).disabled(!ServerFormats.shared.allows("mp3"))
                 }
                 if player.settings.quality != .original {
                     Picker("Bit rate", selection: $player.settings.maxBitRate) {
@@ -53,7 +53,7 @@ struct PlaybackSettingsView: View {
                     Toggle("Seek in converted streams on the server", isOn: $player.settings.transcodeOffset)
                 }
             } footer: {
-                footer("Original plays the files as they are on the server. AAC and MP3 are converted by the server and use less data. Downloaded songs play from their files.")
+                footer("Original plays the files as they are on the server. AAC and MP3 are converted by the server and use less data. Downloaded songs play from their files." + ServerFormats.shared.note)
             }
             Section {
                 Picker("Speed", selection: $player.settings.speed) {
@@ -67,6 +67,7 @@ struct PlaybackSettingsView: View {
         .formStyle(.grouped)
         .frame(width: 480)
         .fixedSize(horizontal: false, vertical: true)
+        .task { await ServerFormats.shared.probe(model.client) }
     }
 
     private func footer(_ text: String) -> some View {

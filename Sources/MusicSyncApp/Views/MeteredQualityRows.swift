@@ -11,8 +11,8 @@ struct MeteredQualityRows: View {
             Text("Same as Other Networks").tag(StreamQuality?.none)
             Divider()
             Text("Original").tag(StreamQuality?.some(.original))
-            Text("AAC").tag(StreamQuality?.some(.aac))
-            Text("MP3").tag(StreamQuality?.some(.mp3))
+            Text("AAC").tag(StreamQuality?.some(.aac)).disabled(!ServerFormats.shared.allows("aac"))
+            Text("MP3").tag(StreamQuality?.some(.mp3)).disabled(!ServerFormats.shared.allows("mp3"))
         } label: {
             Text("On metered networks")
             Text(isMetered ? "This Mac is on a metered network now." : "Low Data Mode or a phone hotspot.")

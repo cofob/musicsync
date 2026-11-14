@@ -33,5 +33,9 @@ extension ShotChecks {
         check(player.activeQuality == "AAC 96 kbps", "info shows the metered quality: \(player.activeQuality ?? "nil")")
         player.isMetered = false
         check(params() == "mp3 128", "back on Wi-Fi: \(params())")
+        // The stub sends its WAV file for every format (BIG_MEDIA=1), or nothing: no conversion, or unknown.
+        await ServerFormats.shared.probe(model.client)
+        let formats = ServerFormats.shared.formats
+        check(formats?.isEmpty != false && ServerFormats.shared.allows("raw"), "the stub converts nothing: \(formats.map { "\($0)" } ?? "unknown")")
     }
 }

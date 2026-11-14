@@ -10,7 +10,7 @@ public struct SubsonicClient: Sendable {
     public let baseURL: URL
     public let username: String
     private let password: String
-    private let session: URLSession
+    let session: URLSession
 
     public init(baseURL: URL, username: String, password: String, session: URLSession = .shared) {
         self.baseURL = baseURL
