@@ -17,6 +17,13 @@
 	<key>NSAppTransportSecurity</key>
 	<dict><key>NSAllowsArbitraryLoads</key><true/></dict>
 	<key>NSLocalNetworkUsageDescription</key><string>MusicSync connects to your Navidrome server on the local network.</string>
+	<key>CFBundleURLTypes</key>
+	<array><dict>
+		<key>CFBundleURLName</key><string>dev.cofob.musicsync</string>
+		<key>CFBundleURLSchemes</key><array><string>musicsync</string></array>
+	</dict></array>
+	<key>NSUserActivityTypes</key>
+	<array><string>dev.cofob.musicsync.browse</string></array>
 	<key>NSRemovableVolumesUsageDescription</key><string>MusicSync reads and writes music on your iPod.</string>
 </dict>
 </plist>
