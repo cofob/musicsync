@@ -232,10 +232,13 @@ def reply(method, q):
     if method == "getPlaylist":
         p = next((p for p in playlists if p["id"] == q.get("id")), None)
         return p and {"playlist": dict({k: v for k, v in p.items() if k != "ids"}, entry=[song_by_id[i] for i in p["ids"]])}
-    if method == "updatePlaylist":  # adds the first songIdToAdd only
+    if method == "updatePlaylist":  # adds the first songIdToAdd and removes the first songIndexToRemove only
         p = next((p for p in playlists if p["id"] == q.get("playlistId")), None)
         if p and "songIdToAdd" in q:
             p["ids"].append(q["songIdToAdd"])
+        if p and q.get("songIndexToRemove", "").isdigit() and int(q["songIndexToRemove"]) < len(p["ids"]):
+            del p["ids"][int(q["songIndexToRemove"])]
+        if p:
             p["songCount"] = len(p["ids"])
         return p and {}
     if method == "getStarred2":
