@@ -3,7 +3,7 @@ import AVFoundation
 import Testing
 
 /// Real AVPlayer runs on silent files with the volume at 0: checks timing and deck state, not sound.
-@MainActor @Suite(.serialized) final class MixerTests {
+@MainActor @Suite(.slow, .serialized) final class MixerTests {
     private let mixer = Mixer()
     private var events: [(Mixer.Event, TimeInterval)] = []
     private let start = Date()

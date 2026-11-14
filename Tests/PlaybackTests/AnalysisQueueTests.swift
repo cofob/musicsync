@@ -2,7 +2,7 @@ import Foundation
 @testable import Playback
 import Testing
 
-@MainActor @Suite final class AnalysisQueueTests {
+@MainActor @Suite(.slow) final class AnalysisQueueTests {
     private let directory = FileManager.default.temporaryDirectory.appendingPathComponent("automix-test-\(UUID().uuidString)")
     private var files: [URL] = []
 

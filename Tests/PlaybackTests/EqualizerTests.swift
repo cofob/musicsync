@@ -77,7 +77,7 @@ import Testing
         #expect(loud.allSatisfy { abs($0) <= 1 })
     }
 
-    @Test func sampleRates() {
+    @Test(.slow) func sampleRates() {
         for rate in [8000.0, 22050, 32000, 44100, 48000, 88200, 96000, 192000] {
             let processor = EqualizerProcessor(sampleRate: rate, channels: 2, gains: EqualizerGains(preamp: 0, bands: Array(repeating: 12, count: 10)))
             let input = sine(250, rate: rate, seconds: 2).flatMap { [$0, $0] }

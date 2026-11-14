@@ -3,7 +3,7 @@ import AVFoundation
 import Testing
 
 /// Real AVPlayer on generated click tracks with the volume at 0: how exactly the incoming song starts.
-@MainActor @Suite(.serialized) final class MixerTimingTests {
+@MainActor @Suite(.slow, .serialized) final class MixerTimingTests {
     private let mixer = Mixer()
     private var advanced = false
     private var files: [URL] = []

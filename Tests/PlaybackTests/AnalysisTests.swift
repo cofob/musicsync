@@ -20,7 +20,7 @@ import Testing
         check(track, SongAnalysis(samples: track.samples()))
     }
 
-    @Test func longSongKeepsTime() {
+    @Test(.slow) func longSongKeepsTime() {
         let track = ClickTrack(bpm: 122, lead: 2, intro: 20, body: 260, outro: 15, trail: 3, firstBeat: 0.4, pickup: 2)
         check(track, SongAnalysis(samples: track.samples()))
     }
