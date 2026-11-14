@@ -139,7 +139,7 @@ struct DeviceSnapshot: Sendable {
         s.firmware = last.firmware
         s.serial = last.serial
         s.guid = last.guid
-        s.capacity = last.capacity.map { Capacity(total: $0[0], available: $0[1]) }
+        s.capacity = last.capacity.flatMap { $0.count == 2 ? Capacity(total: $0[0], available: $0[1]) : nil }
         s.lastSeen = last.seen
         s.fill(db)
         s.artwork = DeviceArtwork(cachedIn: artworkCache(device))
