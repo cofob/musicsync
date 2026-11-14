@@ -119,6 +119,49 @@ import Testing
         #expect(click.ratio < 1.5)
     }
 
+    /// Two songs of one album in one deck with the equalizer on: the second starts where the first ends, on the
+    /// clock (item timebases) and in the sound (a steady tone runs on across the change).
+    @Test func gaplessWithEqualizer() async throws {
+        let a = ClickTrack(bpm: 120, body: 3, firstBeat: 0.1), b = ClickTrack(bpm: 120, body: 3, firstBeat: 0.1)
+        let recorder = TapRecorder()
+        let mixer = Mixer(equalizer: Equalizer(recorder: recorder))
+        mixer.volume = 0
+        mixer.equalizer.set(Self.preset("Rock"))
+        mixer.usesEqualizer = true
+        let ia = item(try await a.file()), ib = item(try await b.file())
+        files += [ia, ib].compactMap { ($0.asset as? AVURLAsset)?.url }
+        let capture = OutputCapture(mixer: mixer, recorder: recorder)
+        capture.start()
+        mixer.play(Mixer.Cue(item: ia))
+        mixer.setNext(Mixer.Cue(item: ib))
+        try await Task.sleep(for: .seconds(5))
+        capture.stop()
+        mixer.stop()
+        // On the clock: where a reaches its end and b its start.
+        let end = try #require(capture.host(of: ia, at: a.length)), begin = try #require(capture.host(of: ib, at: 0))
+        let clockGap = (begin - end) * 1000
+        // In the sound: both recordings lined up by their clicks, then rendered.
+        var tracks = capture.tracks()
+        let idA = ObjectIdentifier(ia), idB = ObjectIdentifier(ib)
+        let source = a.samples(rate: 44100)
+        let trackA = try #require(tracks[idA]), trackB = try #require(tracks[idB])
+        tracks[idA]?.anchor = capture.anchor(trackA, of: idA, source: source, sourceRate: 44100, from: end - 2.5)?.anchor
+        tracks[idB]?.anchor = capture.anchor(trackB, of: idB, source: source, sourceRate: 44100, from: begin + 0.05)?.anchor
+        let render = capture.render(tracks, from: end - 0.3, to: end + 0.3)
+        let silence = Measure.longestSilence(render.mix, sampleRate: 44100, threshold: -40) * 1000
+        // Both songs heard at once: frames where both decks have sound.
+        let overlap = Double((0..<render.frames).count { abs(render.decks[0][2 * $0]) > 1e-3 && abs(render.decks[1][2 * $0]) > 1e-3 }) / 44.1
+        let mono = Measure.mono(render.mix)
+        let jumps = zip(mono.dropFirst(), mono).map { abs($0 - $1) }
+        let mid = jumps.count / 2, joint = jumps[mid - 441..<mid + 441].max() ?? 0, typical = jumps.sorted()[jumps.count * 99 / 100]
+        let lastA = tracks[idA]?.anchor.map { $0 + Double(trackA.frames) / 44100 - end } ?? .nan
+        print(String(format: "EQ gapless: clock gap %+.2f ms, silence %.0f ms, overlap %.1f ms, joint jump %.4f vs normal %.4f, a's recording ends %+.1f ms after its end",
+                     clockGap, silence, overlap, joint, typical, lastA * 1000))
+        #expect(abs(clockGap) < 5)
+        #expect(silence < 5)
+        #expect(overlap < 5)
+    }
+
     private func song(_ track: ClickTrack) async throws -> MixRun.Song {
         let url = try await track.file()
         files.append(url)

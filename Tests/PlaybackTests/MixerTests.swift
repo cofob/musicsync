@@ -47,7 +47,8 @@ import Testing
         mixer.setNext(try cue(1.5))
         let advanced = try #require(await time(of: .advanced(skipped: false)))
         #expect(advanced > 1.2 && advanced < 2.5)
-        #expect(loadedDecks == 1)
+        // With the equalizer tap the next song starts on the other deck: a queue would leave a gap.
+        #expect(loadedDecks == (equalizer ? 2 : 1))
         let ended = try #require(await time(of: .ended))
         #expect(ended > 2.7 && ended < 4.5)
         #expect(!mixer.isPlaying)

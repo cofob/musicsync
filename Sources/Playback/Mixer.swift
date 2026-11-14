@@ -60,9 +60,13 @@ import AVFoundation
         didSet {
             guard usesEqualizer != oldValue else { return }
             for cue in [current, next].compactMap({ $0 }) { Task { await cue.item.setGain(cue.gain, equalizer: tap) } }
+            if let next, transition == nil || transition?.duration == 0 { setNext(next) }
         }
     }
     private var tap: Equalizer? { usesEqualizer ? equalizer : nil }
+    /// Items with an audio tap do not play gapless in one queue (measured: 0.18–0.32 s of silence between them), so with
+    /// the equalizer on a gapless next song starts on the other deck at the end of the current one, once its length is known.
+    private var cut: Transition { Transition(at: .infinity, duration: 0) }
 
     let decks = [Deck(), Deck()]
     /// Deck of the current song.
@@ -111,7 +115,7 @@ import AVFoundation
     public func setNext(_ cue: Cue?, transition: Transition? = nil) {
         dropNext()
         next = cue
-        self.transition = transition
+        self.transition = transition ?? (usesEqualizer ? cut : nil)
         guard let cue else { return }
         observe(cue.item)
         Task { await cue.item.setGain(cue.gain, equalizer: tap) }
@@ -221,6 +225,10 @@ import AVFoundation
         guard deck === decks[active], current != nil else { return }
         onTime(time)
         loadNext()
+        if transition == cut, let duration {
+            transition?.at = duration
+            setBoundary()
+        }
         guard fade == nil, isPlaying, let next, let transition, next.item.status == .readyToPlay else { return }
         var at = transition.at
         if let duration { at = min(at, duration - transition.duration) }
@@ -260,7 +268,7 @@ import AVFoundation
         outgoing.setBoundary(nil)
         active = 1 - active
         let incoming = decks[active]
-        let volumes = transition.curve.volumes(at: 0)
+        let volumes = transition.duration > 0 ? transition.curve.volumes(at: 0) : (out: 1, in: 1)
         outgoing.fade = Float(volumes.out)
         incoming.fade = Float(volumes.in)
         fade = (outgoing, transition, nudge)
@@ -276,7 +284,8 @@ import AVFoundation
     private func stepFade() {
         guard let fade else { return }
         let t = fade.transition
-        let progress = t.duration > 0 ? (time - t.offset) / (t.duration * Double(t.rate)) : 1
+        // A cut ends once the incoming song runs.
+        let progress = t.duration > 0 ? (time - t.offset) / (t.duration * Double(t.rate)) : time > t.offset ? 1 : 0
         guard progress < 1, fade.outgoing.player.currentItem != nil else { return finishFade() }
         let volumes = t.curve.volumes(at: progress)
         fade.outgoing.fade = Float(volumes.out)

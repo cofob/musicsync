@@ -37,7 +37,7 @@ import AVFoundation
     func setBoundary(_ time: TimeInterval?) {
         if let boundaryObserver { player.removeTimeObserver(boundaryObserver) }
         boundaryObserver = nil
-        guard let time, time > 0 else { return }
+        guard let time, time > 0, time.isFinite else { return }
         let times = [NSValue(time: CMTime(seconds: time, preferredTimescale: 600))]
         boundaryObserver = player.addBoundaryTimeObserver(forTimes: times, queue: .main) { [weak self] in
             MainActor.assumeIsolated { if let self { self.mixer?.tick(self) } }
