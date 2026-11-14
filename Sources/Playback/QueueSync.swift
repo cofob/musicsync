@@ -51,13 +51,16 @@ public struct RemoteQueueState: Sendable, Equatable {
 
 public enum QueueHandoff {
     /// True when the server queue was saved somewhere else after the last one handled here, so "Continue from…" is
-    /// offered. Not for this app's own save (`saved`: what this client wrote last), nor when this Mac is already
-    /// at that song and position.
+    /// offered. Not for this app's own save (`saved`: what this client wrote last this session; before any, a queue of
+    /// this app at the local song counts as its own), nor when this Mac is already at that song and position.
     public static func offers(_ remote: RemoteQueueState, client: String, saved: RemoteQueueState?, handled: Date?,
                               local: (current: String?, position: TimeInterval)) -> Bool {
         guard let current = remote.current, let changed = remote.changed else { return false }
         if let handled, changed <= handled { return false }
-        if remote.changedBy == client, let saved, saved.current == current, abs(saved.position - remote.position) < 2 { return false }
+        if remote.changedBy == client {
+            if let saved, saved.current == current, abs(saved.position - remote.position) < 2 { return false }
+            if saved == nil, local.current == current { return false }
+        }
         return !(local.current == current && abs(local.position - remote.position) < 15)
     }
 }

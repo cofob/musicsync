@@ -21,7 +21,7 @@ struct NowPlayingView: View {
                 PlayerColumn().frame(maxWidth: 440)
                 if panel != .none {
                     Group {
-                        if panel == .lyrics { LyricsPanel(lyrics: lyrics) } else { QueuePanel() }
+                        if panel == .lyrics { LyricsPanel(lyrics: lyrics) } else { UpNextPanel() }
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .transition(.opacity)
@@ -204,57 +204,5 @@ private struct LyricsPanel: View {
         guard lyrics.isSynced else { return nil }
         let t = model.player.elapsed + 0.25
         return lyrics.lines.lastIndex { ($0.start ?? .infinity) <= t }
-    }
-}
-
-/// "Playing Next": upcoming entries; drag to reorder, delete to remove, double-click to play.
-private struct QueuePanel: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        let player = model.player
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Playing Next").font(.title2.bold())
-                Spacer()
-                Text(player.shuffle ? "Shuffle On" : "").font(.callout).foregroundStyle(.white.opacity(0.6))
-                AutoPlayButton()
-            }
-            if player.upcoming.isEmpty {
-                Text("Nothing up next").foregroundStyle(.white.opacity(0.6)).frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List {
-                    ForEach(Array(player.upcoming.enumerated()), id: \.offset) { offset, item in
-                        row(item)
-                            .onTapGesture(count: 2) { player.playUpcoming(at: offset) }
-                            .contextMenu {
-                                Button("Play", systemImage: "play.fill") { player.playUpcoming(at: offset) }
-                                Button("Remove from Queue", systemImage: "minus.circle") { player.removeUpcoming(at: [offset]) }
-                            }
-                    }
-                    .onMove { player.moveUpcoming(from: $0, to: $1) }
-                    .onDelete { player.removeUpcoming(at: $0) }
-                    .listRowBackground(Color.clear)
-                    .listRowSeparatorTint(.white.opacity(0.15))
-                }
-                .scrollContentBackground(.hidden)
-                .listStyle(.plain)
-            }
-        }
-        .padding(.trailing, 20).padding(.bottom, 50)
-    }
-
-    private func row(_ item: PlayItem) -> some View {
-        HStack(spacing: 12) {
-            CoverImage(id: item.coverArt, size: 100, cornerRadius: 5).frame(width: 40, height: 40)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.title).lineLimit(1)
-                Text(item.artist ?? "").font(.callout).foregroundStyle(.white.opacity(0.6)).lineLimit(1)
-            }
-            Spacer()
-            Text(item.duration.map(formatTime) ?? "").monospacedDigit().foregroundStyle(.white.opacity(0.6))
-        }
-        .padding(.vertical, 4)
-        .contentShape(Rectangle())
     }
 }

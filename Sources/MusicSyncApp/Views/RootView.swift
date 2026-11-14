@@ -192,7 +192,7 @@ extension View {
     /// Applied per page because pushed pages do not inherit an inset set on the stack.
     func playerInset() -> some View {
         safeAreaInset(edge: .bottom, spacing: 0) {
-            PlayerCapsule().padding(.horizontal, 20).padding(.bottom, 14)
+            VStack(spacing: 10) { ResumeBanner(); PlayerCapsule() }.padding(.horizontal, 20).padding(.bottom, 14)
         }
     }
 }

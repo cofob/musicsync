@@ -55,6 +55,7 @@ struct PlaybackSettingsView: View {
                 }
                 SleepTimerPicker(selection: $player.sleepTimer)
             }
+            if model.serverQueue.supported { QueueSyncSection() }
         }
         .formStyle(.grouped)
         .frame(width: 480)

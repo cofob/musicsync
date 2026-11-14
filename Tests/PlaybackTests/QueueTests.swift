@@ -123,6 +123,9 @@ import Testing
         #expect(!QueueHandoff.offers(own, client: "MusicSync", saved: saved, handled: nil, local: idle))
         own.position = 200
         #expect(QueueHandoff.offers(own, client: "MusicSync", saved: saved, handled: nil, local: idle))
+        // Saved by the last run here: the restored queue is at that song.
+        #expect(!QueueHandoff.offers(own, client: "MusicSync", saved: nil, handled: nil, local: ("s-2", 170)))
+        #expect(QueueHandoff.offers(own, client: "MusicSync", saved: nil, handled: nil, local: ("s-9", 0)))
         // Nothing to go on with.
         #expect(!QueueHandoff.offers(RemoteQueueState(current: nil, position: 0, changed: now, changedBy: "x"),
                                      client: "MusicSync", saved: nil, handled: nil, local: idle))

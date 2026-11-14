@@ -76,6 +76,8 @@ final class AppModel {
     @ObservationIgnored private(set) lazy var system = SystemServices(app: self)
     /// The web remote for iPhone, iPad and Apple Watch (Settings > Remote).
     @ObservationIgnored private(set) lazy var remote = RemoteControl(app: self)
+    @ObservationIgnored private(set) lazy var queueKeeper = QueueKeeper(app: self)
+    @ObservationIgnored private(set) lazy var serverQueue = ServerQueue(app: self)
     var showNowPlaying = false
     var nowPlayingPanel = NowPlayingPanel.lyrics
     /// Song shown in the "Get Info" sheet.
@@ -149,6 +151,7 @@ final class AppModel {
     private func connect() async {
         path = []
         shelves = []; starOverrides = [:]; ratingOverrides = [:]; ratingUnsupported = false; lyricsCache = [:]
+        queueKeeper.leave()
         player.stop()
         await stopLibrary()
         await downloads.stop()
@@ -170,6 +173,7 @@ final class AppModel {
         sync.deviceUpdated()  // the manifest belongs to the server
         let library = makeLibrary(client.config)
         startLibrary(library, client: client)
+        Task { await queueKeeper.restore(client, library: library); await serverQueue.connected(client) }
         if await reloadFromDatabase(library) { return }
         let cache = await store.load()
         guard store === self.store else { return }

@@ -170,6 +170,28 @@ import SwiftUI
                 if model.player.isPlaying { model.player.toggle() }
                 model.showNowPlaying = scene == "radio-nowplaying"
             }
+        case "upnext", "queue-quit":
+            // History, Playing Next and AutoPlay sections, paused; "queue-quit" then quits, so the queue is saved.
+            await queueScene(model)
+            if scene == "queue-quit" {
+                _ = await first({ model.player.elapsed > 40 ? true : nil })
+                NSApp.terminate(nil)
+            }
+            model.nowPlayingPanel = .queue
+            model.showNowPlaying = true
+        case "queue-restored":
+            _ = await first({ model.player.current })
+            model.nowPlayingPanel = .queue
+            model.showNowPlaying = true
+        case "queue-sync":
+            // Plays muted and privately for a moment, so the queue is saved on the server.
+            await queueScene(model)
+            model.player.toggle()
+            try? await Task.sleep(for: .seconds(4))
+            model.player.toggle()
+        case "resume":
+            _ = await first({ model.serverQueue.offer })
+            await select(.home, model)
         case "radio-editor":
             open(StationEditor(station: RadioStation(id: "1", name: "Groove Salad", streamUrl: "https://ice1.somafm.com/groovesalad-128-mp3")), "Station", model)
         default:
@@ -226,6 +248,25 @@ import SwiftUI
         model.play(album)
         _ = await first({ model.player.current })
         model.player.toggle()
+    }
+
+    /// A paused queue of three albums: two songs of the first in the history, two Play Next songs, AutoPlay songs,
+    /// 42 s into the current song. Private, so nothing is scrobbled.
+    private static func queueScene(_ model: AppModel) async {
+        guard let albums = await first({ model.albums.count >= 3 ? Array(model.albums.prefix(3)) : nil }) else { return }
+        var lists: [[PlayItem]] = []
+        for album in albums { lists.append(((try? await model.album(album.id))?.song ?? []).map(PlayItem.server)) }
+        guard let client = model.client, lists[0].count > 3 else { return }
+        let player = model.player
+        player.privateSession = true
+        player.restore(QueueSnapshot(server: QueueKeeper.key(client), items: lists[0], origins: lists[0].map { _ in .source },
+                                     index: 0, elapsed: 0, shuffle: false, repeatMode: "off"))
+        player.start(at: 1, paused: true)
+        player.start(at: 2, paused: true)
+        player.playNext(Array(lists[1].prefix(2)))
+        player.addAutoPlay(Array(lists[2].prefix(4)))
+        _ = await first({ player.duration > 0 ? true : nil })
+        player.seek(to: 42)
     }
 
     /// Shows `view` in its own window, for views that are not part of the main window.
