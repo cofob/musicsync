@@ -87,7 +87,7 @@ extension Mix {
     }
 }
 
-/// Mix card: art, title and description. Opens the mix page.
+/// Mix card: art with the title, then one line of description, like Apple Music. Opens the mix page.
 private struct MixCard: View {
     @Environment(AppModel.self) private var model
     let mix: Mix
@@ -98,8 +98,8 @@ private struct MixCard: View {
                 MixArtwork(mix: mix, songs: model.mixes.songs(of: mix))
                     .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
                     .padding(.bottom, 6)
-                Text(mix.title).lineLimit(1)
-                Text(mix.subtitle).foregroundStyle(.secondary).lineLimit(2)
+                // One line on every card keeps the artwork the same size.
+                Text(mix.subtitle).foregroundStyle(.secondary).lineLimit(1)
             }
             .contentShape(Rectangle())
         }
