@@ -38,6 +38,18 @@ import Testing
         #expect(RockboxPaths.playlistContents(["Music/A/B/c.opus"]) == "#EXTM3U\n../Music/A/B/c.opus\n")
     }
 
+    @Test func samePlaylistNamesGetDistinctStablePaths() {
+        let a = DesiredPlaylist(id: "a", name: "Favorites", songIDs: [])
+        let b = DesiredPlaylist(id: "b", name: "favorites", songIDs: [])
+        let c = DesiredPlaylist(id: "c", name: "Favorites", songIDs: [])
+        let expected = ["a": "Playlists/Favorites.m3u8", "b": "Playlists/favorites (2).m3u8", "c": "Playlists/Favorites (3).m3u8"]
+        #expect(RockboxPaths.playlistPaths(for: [c, b, a], recorded: [:]) == expected)
+        // A playlist that is not in this run keeps its recorded path.
+        let recorded = ["a": Manifest.RockboxPlaylist(path: "Playlists/Favorites.m3u8", songIDs: ["x"])]
+        #expect(RockboxPaths.playlistPaths(for: [b, c], recorded: recorded)
+            == ["b": "Playlists/favorites (2).m3u8", "c": "Playlists/Favorites (3).m3u8"])
+    }
+
     @Test func coverIsBaselineJPEGOf500Pixels() throws {
         let jpeg = try #require(RockboxPaths.coverJPEG(from: makeCoverPNG(size: 640)))
         #expect(jpeg.prefix(2) == Data([0xFF, 0xD8]))

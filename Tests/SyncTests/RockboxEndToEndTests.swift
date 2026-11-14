@@ -104,7 +104,7 @@ struct RockboxEndToEndTests {
 
         // Dropping the album and the playlist from the selection keeps their files.
         let removal = try await makePlan(selection: f.selection(rockbox: false, playlist: false), server: f.server, pod: pod)
-        #expect(removal.remove.isEmpty && removal.playlistsToDelete.isEmpty)
+        #expect(removal.remove.isEmpty)
     }
 
     @Test func rockboxOnlyDeviceNeedsNeitherGuidNorDatabase() async throws {

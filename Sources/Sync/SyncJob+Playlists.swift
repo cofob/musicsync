@@ -6,16 +6,6 @@ extension SyncJob {
     func reconcilePlaylists() throws {
         if usesDB { reconcileStockPlaylists() }
         try reconcileRockboxPlaylists()
-        for removal in plan.playlistsToDelete {
-            if let pid = removal.persistentID, let i = db.playlists.firstIndex(where: { $0.persistentId == pid && !$0.isMaster }) {
-                db.playlists.remove(at: i)
-                dbDirty = true
-            }
-            manifest.playlists[removal.serverID] = nil
-            if let path = removal.m3uPath { pendingDeletes.append(path) }
-            manifest.rockboxPlaylists[removal.serverID] = nil
-            manifestDirty = true
-        }
     }
 
     private func reconcileStockPlaylists() {
@@ -42,16 +32,23 @@ extension SyncJob {
         }
     }
 
-    /// `Playlists/<name>.m3u8` with paths relative to that folder.
+    /// `Playlists/<name>.m3u8` (see `RockboxPaths.playlistPaths`) with paths relative to that folder.
     private func reconcileRockboxPlaylists() throws {
         let fm = FileManager.default
+        let m3uPaths = RockboxPaths.playlistPaths(for: plan.desiredPlaylists, recorded: manifest.rockboxPlaylists)
+        let written = Set(plan.desiredPlaylists.filter { $0.songIDs.contains { manifest.rockboxEntries[$0] != nil } }
+            .compactMap { m3uPaths[$0.id]?.lowercased() })
+        /// Never deletes a path that a playlist of this run owns.
+        func removeFile(_ old: String?) {
+            if let old, !written.contains(old.lowercased()) { try? fm.removeItem(at: device.mountURL.appendingPathComponent(old)) }
+        }
         for p in plan.desiredPlaylists {
             let present = p.songIDs.filter { manifest.rockboxEntries[$0] != nil }
             let paths = present.compactMap { manifest.rockboxEntries[$0]?.relativePath }
             let old = manifest.rockboxPlaylists[p.id]?.path
-            let path = RockboxPaths.playlistPath(p.name)
+            let path = m3uPaths[p.id]!
             if paths.isEmpty {
-                if let old { try? fm.removeItem(at: device.mountURL.appendingPathComponent(old)) }
+                removeFile(old)
                 manifest.rockboxPlaylists[p.id] = nil
                 manifestDirty = true
                 continue
@@ -59,7 +56,7 @@ extension SyncJob {
             let url = device.mountURL.appendingPathComponent(path)
             try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try Data(RockboxPaths.playlistContents(paths).utf8).write(to: url, options: .atomic)
-            if let old, old != path { try? fm.removeItem(at: device.mountURL.appendingPathComponent(old)) }
+            removeFile(old)
             manifest.rockboxPlaylists[p.id] = .init(path: path, songIDs: present)
             manifestDirty = true
         }

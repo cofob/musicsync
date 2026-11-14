@@ -14,12 +14,6 @@ public struct SyncPlan: Sendable {
         public var entry: Manifest.Entry
     }
 
-    public struct PlaylistRemoval: Sendable, Equatable {
-        public var serverID: String
-        public var persistentID: UInt64?
-        public var m3uPath: String?
-    }
-
     public var add: [DesiredSong] = []
     public var remove: [Removal] = []
     /// New file, same track (id, dbid, play counts and playlists stay). Rockbox files are replaced.
@@ -29,7 +23,6 @@ public struct SyncPlan: Sendable {
 
     public var playlistsToCreate: [DesiredPlaylist] = []
     public var playlistsToUpdate: [DesiredPlaylist] = []
-    public var playlistsToDelete: [PlaylistRemoval] = []
     /// All wanted playlists; the engine reconciles every one of them.
     public var desiredPlaylists: [DesiredPlaylist] = []
     /// Some playlist has stock tracks or an iPod playlist must go.
@@ -53,7 +46,7 @@ public struct SyncPlan: Sendable {
 
     public var isEmpty: Bool {
         add.isEmpty && remove.isEmpty && deleteTracks.isEmpty && reencode.isEmpty && retag.isEmpty
-            && playlistsToCreate.isEmpty && playlistsToUpdate.isEmpty && playlistsToDelete.isEmpty
+            && playlistsToCreate.isEmpty && playlistsToUpdate.isEmpty
     }
 
     /// True when the iTunesDB (and so the FireWire GUID) is needed.

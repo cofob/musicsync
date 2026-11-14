@@ -45,6 +45,19 @@ import Testing
         #expect(plan.playlistsToCreate.count == 1)
     }
 
+    @Test func reconciledPlaylistWithSkippedForeignSongNeedsNoUpdate() {
+        let dup = makeDesired(makeSong("f", album: "foreign album!", albumId: "al-f", artist: "Foreign Artist"))
+        let a = makeDesired(makeSong("a"))
+        var input = fixture(songs: [dup, a], present: [a],
+                            playlists: [DesiredPlaylist(id: "p", name: "Mix", songIDs: ["f", "a"])]) { $0.playlists = ["p": 11] }
+        let trackID = input.manifest.entries["a"]!.trackID
+        input.library = makeLibrary(tracks: [makeTrack(1), makeTrack(10, dbid: 500)],
+                                    playlists: [PodPlaylist(persistentID: 11, name: "Mix", trackIDs: [trackID])], manifest: input.manifest)
+        let plan = SyncPlanner.plan(input)
+        #expect(plan.skippedForeignAlbums.count == 1)
+        #expect(plan.playlistsToCreate.isEmpty && plan.playlistsToUpdate.isEmpty && plan.isEmpty)
+    }
+
     @Test func duplicateDesiredSongsCountOnce() {
         let d = makeDesired(makeSong("a"))
         #expect(SyncPlanner.plan(fixture(songs: [d, d], present: [])).add.count == 1)
@@ -180,7 +193,6 @@ import Testing
         let plan = SyncPlanner.plan(input)
         #expect(plan.playlistsToCreate.map(\.id) == ["p-new"])
         #expect(plan.playlistsToUpdate.map(\.id) == ["p-order"])
-        #expect(plan.playlistsToDelete.isEmpty)
     }
 
     @Test func coversAreCollectedPerAlbum() {

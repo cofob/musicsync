@@ -177,7 +177,7 @@ struct SyncSheet: View {
                 row("Add", count: plan.add.count, bytes: plan.addBytes)
                 row("Update", count: plan.reencode.count + plan.retag.count)
                 row("Remove", count: plan.remove.count, bytes: plan.freedBytes)
-                row("Playlists", count: plan.playlistsToCreate.count + plan.playlistsToUpdate.count + plan.playlistsToDelete.count,
+                row("Playlists", count: plan.playlistsToCreate.count + plan.playlistsToUpdate.count,
                     unit: "changes")
                 Divider()
                 GridRow {

@@ -60,7 +60,8 @@ public enum SyncPlanner {
         plan.addBytes = (plan.add + plan.reencode.map(\.desired)).reduce(0) { $0 + SizeEstimate.bytes($1) }
         plan.freedBytes = plan.remove.reduce(0) { $0 + $1.entry.outSize } + plan.reencode.reduce(0) { $0 + $1.entry.outSize }
         let stock = desired.filter { $0.preset.target == .stock && !skipped.contains($0.albumID) }
-        planPlaylists(&plan, input, stockSongs: Set(stock.map(\.id)))
+        let rockbox = desired.filter { $0.preset.target == .rockbox }
+        planPlaylists(&plan, input, stockSongs: Set(stock.map(\.id)), rockboxSongs: Set(rockbox.map(\.id)))
         return plan
     }
 
@@ -85,22 +86,23 @@ public enum SyncPlanner {
             || changed(e.sourceCreated, d.song.created)
     }
 
-    private static func planPlaylists(_ plan: inout SyncPlan, _ input: PlannerInput, stockSongs: Set<String>) {
+    private static func planPlaylists(_ plan: inout SyncPlan, _ input: PlannerInput, stockSongs: Set<String>, rockboxSongs: Set<String>) {
         let manifest = input.manifest
         let current = Dictionary(input.library.playlists.map { ($0.persistentID, $0) }) { a, _ in a }
         let songByTrackID = Dictionary(manifest.entries.map { ($0.value.trackID, $0.key) }) { a, _ in a }
         plan.desiredPlaylists = input.playlists
+        let paths = RockboxPaths.playlistPaths(for: input.playlists, recorded: manifest.rockboxPlaylists)
         plan.playlistsTouchStock = !manifest.playlists.isEmpty
             || input.playlists.contains { $0.songIDs.contains(where: stockSongs.contains) }
         for p in input.playlists {
             let wanted = p.songIDs.filter(stockSongs.contains)
-            let rockbox = p.songIDs.filter { !stockSongs.contains($0) }
+            let rockbox = p.songIDs.filter(rockboxSongs.contains)
             if wanted.isEmpty && rockbox.isEmpty { continue }
             let existing = manifest.playlists[p.id].flatMap { current[$0] }
             let record = manifest.rockboxPlaylists[p.id]
             let isNew = (!wanted.isEmpty && existing == nil) || (wanted.isEmpty && record == nil)
             let stockChanged = existing.map { $0.name != p.name || $0.trackIDs.compactMap { songByTrackID[$0] } != wanted } ?? false
-            let rockboxChanged = record.map { $0.songIDs != rockbox || $0.path != RockboxPaths.playlistPath(p.name) } ?? !rockbox.isEmpty
+            let rockboxChanged = record.map { $0.songIDs != rockbox || $0.path != paths[p.id] } ?? !rockbox.isEmpty
             if isNew { plan.playlistsToCreate.append(p) } else if stockChanged || rockboxChanged { plan.playlistsToUpdate.append(p) }
         }
     }

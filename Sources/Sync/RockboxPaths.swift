@@ -39,6 +39,24 @@ public enum RockboxPaths {
         "Playlists/\(component(name, fallback: "Playlist", maxBytes: maxComponentBytes - 5)).m3u8"
     }
 
+    /// A distinct `Playlists/<name>.m3u8` per playlist id (` (2)`, ... for equal names, ignoring case as FAT32 does).
+    /// Paths recorded for playlists outside `playlists` stay taken.
+    public static func playlistPaths(for playlists: [DesiredPlaylist], recorded: [String: Manifest.RockboxPlaylist]) -> [String: String] {
+        let ids = Set(playlists.map(\.id))
+        var taken = Set(recorded.filter { !ids.contains($0.key) }.map { $0.value.path.lowercased() })
+        var paths: [String: String] = [:]
+        for p in playlists.sorted(by: { $0.id < $1.id }) {
+            let base = playlistPath(p.name).dropLast(".m3u8".count)
+            var path = "\(base).m3u8", n = 1
+            while !taken.insert(path.lowercased()).inserted {
+                n += 1
+                path = "\(base) (\(n)).m3u8"
+            }
+            paths[p.id] = path
+        }
+        return paths
+    }
+
     /// m3u8 text; paths are relative to the `Playlists` folder.
     public static func playlistContents(_ paths: [String]) -> String {
         "#EXTM3U\n" + paths.map { "../\($0)\n" }.joined()
