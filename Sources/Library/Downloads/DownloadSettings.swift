@@ -16,6 +16,9 @@ public struct DownloadSettings: Codable, Equatable, Sendable {
     public var storageLimitGB = 0.0
     /// Files downloaded at the same time.
     public var concurrency = 2
+    public var smart = SmartSettings()
+    /// Playback cache size; 0 turns the cache off.
+    public var cacheGB = 1.0
 
     public init() {}
 
@@ -27,6 +30,9 @@ public struct DownloadSettings: Codable, Equatable, Sendable {
         maxBitRate = try c.decodeIfPresent(Int.self, forKey: .maxBitRate) ?? d.maxBitRate
         storageLimitGB = try c.decodeIfPresent(Double.self, forKey: .storageLimitGB) ?? d.storageLimitGB
         concurrency = try c.decodeIfPresent(Int.self, forKey: .concurrency) ?? d.concurrency
+        // A smart settings shape from another version resets only those.
+        smart = (try? c.decodeIfPresent(SmartSettings.self, forKey: .smart)) ?? d.smart
+        cacheGB = try c.decodeIfPresent(Double.self, forKey: .cacheGB) ?? d.cacheGB
     }
 
     public static let defaultsKey = "downloadSettings"

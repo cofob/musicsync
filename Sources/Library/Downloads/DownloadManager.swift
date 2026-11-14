@@ -13,6 +13,8 @@ public actor DownloadManager {
     private var settings: DownloadSettings
     private var client: SubsonicClient?
     private var offline = false
+    /// Songs only rules keep start only while this is set (network, power and streaming allow it).
+    private var smartAllowed = false
     private(set) var running: [String: Task<Void, Never>] = [:]
     /// Songs waiting for a retry after a failure, and their failure counts.
     private(set) var waiting: Set<String> = []
@@ -24,7 +26,7 @@ public actor DownloadManager {
     static let maxAttempts = 3
     public static let coverSize = 600
     /// Kept free on the disk.
-    static let reserveBytes: Int64 = 500_000_000
+    static let reserveBytes = SmartPlanner.reserveBytes
 
     /// `serverKey` identifies server and user (see `LibraryDatabase.serverKey`); each key gets its own folder.
     public init(serverKey: String, directory: URL? = nil, settings: DownloadSettings = DownloadSettings(),
@@ -83,6 +85,13 @@ public actor DownloadManager {
         await pump()
     }
 
+    public func setSmartAllowed(_ allowed: Bool) async {
+        guard allowed != smartAllowed else { return }
+        smartAllowed = allowed
+        changed()
+        await pump()
+    }
+
     // MARK: Pins
 
     /// Downloads `songs` on their own.
@@ -116,6 +125,21 @@ public actor DownloadManager {
     /// Drops `reason` from `songIDs` (all songs when nil); songs without reasons are deleted.
     public func remove(_ reason: DownloadReason, songIDs: [String]? = nil) async throws {
         await release(try await store.remove(reason, songIDs: songIDs))
+    }
+
+    /// Evaluates the smart rules against `library` and follows the plan; nil (nothing changes) while the mirror
+    /// is not complete. Songs the user keeps are never removed.
+    @discardableResult
+    public func updateSmart(from library: Library, day: String, now: Date = Date()) async throws -> SmartPlan? {
+        let settings = settings
+        guard let candidates = await library.smartCandidates(settings.smart, day: day, now: now) else { return nil }
+        let lastPlayed = await library.history.stats().compactMapValues(\.lastPlayed)
+        let plan = SmartPlanner.plan(candidates, settings: settings.smart, entries: await store.entries(), lastPlayed: lastPlayed,
+                                     freeDisk: freeDisk()) { settings.plan(for: $0).estimate($0) }
+        try Task.checkCancellation()
+        await release(try await store.setSmart(plan.songs))
+        await pump()
+        return plan
     }
 
     public func removeAll() async throws {
@@ -177,7 +201,7 @@ public actor DownloadManager {
         guard let client else { return }
         if offline { return hub.update { $0.blocked = .offline } }
         while running.count < max(1, settings.concurrency),
-              let entry = await store.nextQueued(excluding: Set(running.keys).union(waiting)) {
+              let entry = await store.nextQueued(excluding: Set(running.keys).union(waiting), smart: smartAllowed) {
             if let block = await block(for: entry) { return hub.update { $0.blocked = block } }
             let plan = settings.plan(for: entry.song)
             running[entry.id] = Task { await self.run(entry, plan: plan, client: client) }
@@ -185,16 +209,18 @@ public actor DownloadManager {
         hub.update { $0.blocked = nil }
     }
 
-    /// Storage limit and free disk space, counting the running downloads.
+    /// Storage limit (user downloads only; smart ones have their own budgets) and free disk space, counting the running downloads.
     private func block(for entry: DownloadEntry) async -> DownloadStatus.Block? {
         let need = settings.plan(for: entry.song).estimate(entry.song)
         var inFlight: Int64 = 0
         for id in running.keys { if let e = await store.entry(id) { inFlight += settings.plan(for: e.song).estimate(e.song) } }
-        if let limit = settings.limitBytes, await store.usedBytes() + inFlight + need > limit { return .storageLimit }
-        let free = (try? filesDirectory.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?
-            .volumeAvailableCapacityForImportantUsage
-        if let free, free < inFlight + need + Self.reserveBytes { return .diskFull }
+        if entry.isUserKept, let limit = settings.limitBytes, await store.userBytes() + inFlight + need > limit { return .storageLimit }
+        if let free = freeDisk(), free < inFlight + need + Self.reserveBytes { return .diskFull }
         return nil
+    }
+
+    private func freeDisk() -> Int64? {
+        (try? filesDirectory.resourceValues(forKeys: [.volumeAvailableCapacityForImportantUsageKey]))?.volumeAvailableCapacityForImportantUsage
     }
 
     private func run(_ entry: DownloadEntry, plan: DownloadPlan, client: SubsonicClient) async {
@@ -283,7 +309,7 @@ public actor DownloadManager {
     /// Store changed: readers reload; an empty queue ends the batch.
     private func changed() {
         Task {
-            let pending = await store.pendingCount()
+            let pending = await store.pendingCount(smart: smartAllowed)
             hub.update { status in
                 status.revision += 1
                 if pending == 0 { status.batchTotal = 0; status.batchDone = 0 } else { status.batchTotal = max(status.batchTotal, status.batchDone + pending) }

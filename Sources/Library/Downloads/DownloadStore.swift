@@ -88,13 +88,27 @@ public actor DownloadStore {
                 INSERT INTO pins(reason, json, songIDs, addedAt) VALUES(?, ?, ?, ?)
                 ON CONFLICT(reason) DO UPDATE SET json = excluded.json, songIDs = excluded.songIDs
                 """, [pin.reason.raw, pinJSON, order, now])
-            let keep = Set(songs.map(\.id))
-            for id in try db.rows("SELECT songId FROM reasons WHERE reason = ?", [pin.reason.raw], { $0.text(0) ?? "" }) where !keep.contains(id) {
-                try db.run("DELETE FROM reasons WHERE songId = ? AND reason = ?", [id, pin.reason.raw])
-            }
-            try insert(db, rows, reason: pin.reason)
+            try replace(db, pin.reason, rows)
             return try prune(db)
         }
+    }
+
+    /// Gives each rule exactly its songs in `songs`; rules left out lose all theirs. Returns the songs with no reason left.
+    public func setSmart(_ songs: [SmartRule: [Song]]) throws -> [Released] {
+        let rows = try songs.mapValues { try $0.map { ($0.id, try json($0)) } }
+        return try write { db in
+            for rule in SmartRule.allCases { try replace(db, .smart(rule), rows[rule] ?? []) }
+            return try prune(db)
+        }
+    }
+
+    /// Songs that left `reason` lose it; new ones get it.
+    private func replace(_ db: SQLiteConnection, _ reason: DownloadReason, _ rows: [(String, String)]) throws {
+        let keep = Set(rows.map(\.0))
+        for id in try db.rows("SELECT songId FROM reasons WHERE reason = ?", [reason.raw], { $0.text(0) ?? "" }) where !keep.contains(id) {
+            try db.run("DELETE FROM reasons WHERE songId = ? AND reason = ?", [id, reason.raw])
+        }
+        try insert(db, rows, reason: reason)
     }
 
     /// Drops `reason` from `songIDs` (all songs when nil) and forgets a pin with that reason.
@@ -180,10 +194,12 @@ public actor DownloadStore {
         try write { try $0.exec("UPDATE songs SET state = 'queued' WHERE state = 'downloading'") }
     }
 
-    /// Oldest queued song not in `excluding`.
-    func nextQueued(excluding: Set<String>) -> DownloadEntry? {
+    /// Oldest queued song not in `excluding`; the user's songs come first. Without `smart`, songs only rules keep are left out.
+    func nextQueued(excluding: Set<String>, smart: Bool = true) -> DownloadEntry? {
         read(nil) { db in
-            let ids = try db.rows("SELECT id FROM songs WHERE state = 'queued' ORDER BY addedAt, rowid LIMIT ?", [excluding.count + 1]) { $0.text(0) ?? "" }
+            let ids = try db.rows("""
+                SELECT id FROM songs WHERE state = 'queued' AND (? OR \(Self.userKept)) ORDER BY NOT \(Self.userKept), addedAt, rowid LIMIT ?
+                """, [smart, excluding.count + 1]) { $0.text(0) ?? "" }
             return try ids.first { !excluding.contains($0) }.flatMap { try entry(db, $0) }
         }
     }
@@ -241,8 +257,20 @@ public actor DownloadStore {
     /// Bytes of finished files.
     public func usedBytes() -> Int64 { Int64(read(0) { try $0.scalar("SELECT COALESCE(SUM(size), 0) FROM songs WHERE state = 'done'") }) }
 
-    /// Songs waiting or downloading.
-    func pendingCount() -> Int { read(0) { try $0.scalar("SELECT COUNT(*) FROM songs WHERE state IN ('queued', 'downloading')") } }
+    /// Bytes of finished files the user keeps; the storage limit counts only these.
+    public func userBytes() -> Int64 {
+        Int64(read(0) { try $0.scalar("SELECT COALESCE(SUM(size), 0) FROM songs WHERE state = 'done' AND \(Self.userKept)") })
+    }
+
+    /// Songs waiting or downloading. Without `smart`, queued songs only rules keep are left out (they wait).
+    func pendingCount(smart: Bool = true) -> Int {
+        read(0) {
+            try $0.scalar("SELECT COUNT(*) FROM songs WHERE state = 'downloading' OR (state = 'queued' AND (? OR \(Self.userKept)))", [smart])
+        }
+    }
+
+    /// SQL: the song has a reason that is not a rule.
+    private static let userKept = "EXISTS (SELECT 1 FROM reasons r WHERE r.songId = songs.id AND r.reason NOT LIKE 'smart:%')"
 
     private static let columns = "id, state, fileName, size, format, bitRate, error, json"
 

@@ -11,12 +11,15 @@ public enum DownloadReason: Hashable, Sendable {
     case song
     case album(String)
     case playlist(String)
+    /// Chosen by a smart download rule; rules add and remove these on their own.
+    case smart(SmartRule)
 
     var raw: String {
         switch self {
         case .song: "song"
         case .album(let id): "album:\(id)"
         case .playlist(let id): "playlist:\(id)"
+        case .smart(let rule): "smart:\(rule.rawValue)"
         }
     }
 
@@ -27,6 +30,7 @@ public enum DownloadReason: Hashable, Sendable {
         switch parts[0] {
         case "album": self = .album(parts[1])
         case "playlist": self = .playlist(parts[1])
+        case "smart": guard let rule = SmartRule(rawValue: parts[1]) else { return nil }; self = .smart(rule)
         default: return nil
         }
     }
@@ -86,6 +90,10 @@ public struct DownloadEntry: Sendable, Equatable, Identifiable {
 
     public var id: String { song.id }
     public var isCancelled: Bool { state == .failed && error == Self.cancelledMessage }
+    /// Rules that keep the song, in `SmartRule` order.
+    public var smartRules: [SmartRule] { SmartRule.allCases.filter { reasons.contains(.smart($0)) } }
+    /// Kept by the user (song, album or playlist download); rules never remove it.
+    public var isUserKept: Bool { reasons.contains { if case .smart = $0 { false } else { true } } }
 }
 
 /// Live state of the download manager.
