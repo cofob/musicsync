@@ -329,6 +329,8 @@ public actor DownloadManager {
         guard let client, !FileManager.default.fileExists(atPath: file.path),
               let data = try? await client.coverArt(id: id, size: Self.coverSize), !data.isEmpty else { return }
         try? FileManager.default.atomicWrite(data, to: file)
+        // The pin or song may have gone while the cover loaded.
+        await pruneCovers()
     }
 
     // MARK: Helpers
