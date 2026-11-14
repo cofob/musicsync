@@ -46,7 +46,8 @@ extension AppModel {
         return await Self.slices(query.isEmpty ? sorted : sorted.filter { $0.name.localizedCaseInsensitiveContains(query) })
     }
 
-    private static func slices<T: Sendable>(_ items: [T]) async -> PagedList<T> {
+    /// Pages over a list already in memory (iPod contents, albums before the local library is ready).
+    static func slices<T: Sendable>(_ items: [T]) async -> PagedList<T> {
         let list = PagedList(total: items.count) { offset, limit in Array(items[min(offset, items.count)..<min(offset + limit, items.count)]) }
         await list.load(page: 0)
         return list

@@ -48,28 +48,27 @@ struct DeviceCard: View {
     }
 }
 
+/// iPod albums grid; cards come in pages as they scroll in (`PagedList`), as on the library Albums page.
 struct DeviceAlbumsView: View {
     @Environment(AppModel.self) private var model
+    @State private var list: PagedList<DeviceAlbum>?
 
     var body: some View {
-        let query = model.query
-        let all = model.ipod.snapshot?.albums ?? []
-        let albums = query.isEmpty ? all : all.filter {
-            $0.name.localizedCaseInsensitiveContains(query) || $0.artist.localizedCaseInsensitiveContains(query)
-        }
         Group {
-            if model.ipod.snapshot == nil {
+            if model.ipod.snapshot == nil || list == nil {
                 ProgressView()
-            } else if albums.isEmpty {
+            } else if let list, list.count == 0 {
                 ContentUnavailableView("No Albums", systemImage: "square.stack",
-                                       description: Text(query.isEmpty ? "There is no music on this iPod." : "No matches."))
-            } else {
+                                       description: Text(model.query.isEmpty ? "There is no music on this iPod." : "No matches."))
+            } else if let list {
                 ScrollView {
                     LazyVGrid(columns: albumGridColumns, spacing: 24) {
-                        ForEach(albums) { album in
-                            DeviceCard(route: .deviceAlbum(album.id), imageID: album.imageID, title: album.name.nilIfEmpty ?? "Unknown Album",
-                                       subtitle: album.artist.nilIfEmpty ?? "Unknown Artist", onPlay: { model.play(album.tracks) },
-                                       onDelete: { model.sync.tracksToDelete = album.tracks })
+                        ForEach(0..<list.count, id: \.self) { i in
+                            PagedRow(list: list, index: i) { album in
+                                DeviceCard(route: .deviceAlbum(album.id), imageID: album.imageID, title: album.name.nilIfEmpty ?? "Unknown Album",
+                                           subtitle: album.artist.nilIfEmpty ?? "Unknown Artist", onPlay: { model.play(album.tracks) },
+                                           onDelete: { model.sync.tracksToDelete = album.tracks })
+                            } placeholder: { PlaceholderCard() }
                         }
                     }
                     .padding(24)
@@ -78,6 +77,16 @@ struct DeviceAlbumsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .navigationTitle("Albums")
+        .task(id: [String(model.ipod.version), model.searchText]) {
+            if list != nil { try? await Task.sleep(for: .milliseconds(150)) }  // typing
+            guard !Task.isCancelled else { return }
+            let query = model.query
+            let all = model.ipod.snapshot?.albums ?? []
+            let found = await AppModel.slices(query.isEmpty ? all : all.filter {
+                $0.name.localizedCaseInsensitiveContains(query) || $0.artist.localizedCaseInsensitiveContains(query)
+            })
+            if !Task.isCancelled { list = found }
+        }
     }
 }
 
