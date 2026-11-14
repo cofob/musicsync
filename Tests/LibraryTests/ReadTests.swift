@@ -86,6 +86,10 @@ import Subsonic
         #expect(await db.lyrics(songId: "s2") == nil)
         #expect(await db.lyrics(songId: "s3") == nil)
         #expect(await db.songsMissingLyrics(limit: 10).sorted() == ["s3", "s4"])
+        // Stored replies, also "none", are not asked again; unknown songs are.
+        #expect(await db.storedLyrics(songId: "s1")?.count == 2)
+        #expect(await db.storedLyrics(songId: "s2") == [])
+        #expect(await db.storedLyrics(songId: "s3") == nil)
     }
 }
 

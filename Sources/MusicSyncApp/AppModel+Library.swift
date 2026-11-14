@@ -76,11 +76,23 @@ extension AppModel {
     }
 
     /// Mirrored lyrics, else OpenSubsonic `getLyricsBySongId`, else classic `getLyrics`. Nil when none.
+    /// Lyrics from memory, then the library database, then the server; server replies (also "none") are kept.
     func lyrics(for song: Song) async -> Lyrics? {
-        if let local = await library?.database.lyrics(songId: song.id), let lyrics = Lyrics(local) { return lyrics }
+        if let hit = lyricsCache[song.id] { return hit }
+        let found = await fetchLyrics(song)
+        lyricsCache[song.id] = .some(found)
+        return found
+    }
+
+    private func fetchLyrics(_ song: Song) async -> Lyrics? {
+        func best(_ list: [StructuredLyrics]) -> Lyrics? { (list.first(where: \.synced) ?? list.first).flatMap(Lyrics.init) }
+        let database = library?.database
+        if let stored = await database?.storedLyrics(songId: song.id) { return best(stored) }
         guard let client else { return nil }
-        if let list = try? await client.getLyricsBySongId(id: song.id),
-           let best = list.first(where: \.synced) ?? list.first, let lyrics = Lyrics(best) { return lyrics }
+        if let list = try? await client.getLyricsBySongId(id: song.id) {
+            try? await database?.storeLyrics(songId: song.id, lyrics: list)
+            if let lyrics = best(list) { return lyrics }
+        }
         guard let artist = song.artist, let legacy = try? await client.getLyrics(artist: artist, title: song.title) else { return nil }
         return Lyrics(plain: legacy.value ?? "")
     }

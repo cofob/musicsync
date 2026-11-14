@@ -67,6 +67,8 @@ final class AppModel {
     var nowPlayingPanel = NowPlayingPanel.lyrics
     /// Song shown in the "Get Info" sheet.
     var infoSong: Song?
+    /// Song id -> lyrics (nil = none) seen this session.
+    @ObservationIgnored var lyricsCache: [String: Lyrics?] = [:]
     /// Getting-started guide; opens by itself on the first launch.
     var showGuide = false
 

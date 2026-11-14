@@ -86,6 +86,15 @@ extension LibraryDatabase {
         }
     }
 
+    /// Stored lyrics list: nil = not asked yet (or an old "none"), empty = the server has none.
+    public func storedLyrics(songId: String) -> [StructuredLyrics]? {
+        let cutoff = Date().timeIntervalSince1970 - Self.retryAfter
+        return read(nil) { db in
+            try db.prepare("SELECT json FROM lyrics WHERE songId = ? AND (status = 'found' OR fetchedAt > ?)")
+                .first([songId, cutoff], { $0.text(0) == nil ? [] : decode([StructuredLyrics].self, $0) ?? [] })
+        }
+    }
+
     /// Local thumbnail file. A missing file removes its record, so the mirror fetches it again.
     public func smallCoverURL(coverArtId: String) -> URL? {
         let name = read(nil) { db in

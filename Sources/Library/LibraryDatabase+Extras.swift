@@ -73,7 +73,7 @@ extension LibraryDatabase {
     }
 
     /// An empty list stores the "none" marker.
-    func storeLyrics(songId: String, lyrics: [StructuredLyrics]) throws {
+    public func storeLyrics(songId: String, lyrics: [StructuredLyrics]) throws {
         let text = lyrics.isEmpty ? nil : String(decoding: try encoder.encode(lyrics), as: UTF8.self)
         try write {
             try $0.run("""
