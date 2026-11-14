@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Observation
 import Subsonic
 
@@ -140,18 +140,22 @@ final class Jukebox: PlayerRemote {
         if let last { apply(last) }
     }
 
-    /// Every second the position moves on while playing; every second time the server's status replaces it.
+    /// Every second the position moves on while playing; every second time the server's status replaces it, but
+    /// only while a window of the app (main, MiniPlayer or the menu bar player) is on screen.
     private func poll(_ client: SubsonicClient) async {
         for tick in 1... {
             try? await Task.sleep(for: .seconds(1))
             guard !Task.isCancelled, isActive else { return }
             if player.isPlaying, player.duration > 0 { player.elapsed = min(player.elapsed + 1, player.duration) }
-            guard tick % 2 == 0, sender == nil, let status = try? await client.jukebox(.status), sender == nil, isCurrent(client) else { continue }
+            guard tick % 2 == 0, sender == nil, Self.isOnScreen, let status = try? await client.jukebox(.status), sender == nil, isCurrent(client) else { continue }
             apply(status)
         }
     }
 
-    /// Takes the server's song, position and play state.
+    /// A window the user can see; the menu bar item's own window cannot become key, so it does not count.
+    static var isOnScreen: Bool { !NSApp.isHidden && NSApp.windows.contains { $0.isVisible && $0.canBecomeKey } }
+
+    /// Takes the server's song, position, play state and volume: another client may have changed it.
     private func apply(_ status: JukeboxStatus) {
         guard isActive else { return }
         let ids = serverIds
@@ -159,6 +163,7 @@ final class Jukebox: PlayerRemote {
         if let index { player.follow(index) }
         if let playing = status.playing { player.isPlaying = playing }
         if let position = status.position, player.duration > 0 { player.elapsed = min(max(0, Double(position)), player.duration) }
+        if let gain = status.gain, gain != self.gain { self.gain = gain; player.volume = gain }
         sent = JukeboxTarget(ids: ids.compactMap { $0 }, index: index == nil ? nil : status.currentIndex, playing: player.isPlaying)
         player.updateNowPlaying()
     }

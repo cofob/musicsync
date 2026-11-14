@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Subsonic
 
 /// `check:jukebox`: plays an album on the jukebox of `scripts/big-server.py` (run with BIG_MEDIA=1, so this Mac can
@@ -43,6 +43,15 @@ extension ShotChecks {
         player.toggle()
         try? await Task.sleep(for: .seconds(5))
         check(player.isPlaying && player.elapsed > 62, "the position runs on while the server plays: \(player.elapsed)")
+        _ = try? await client.jukebox(.setGain(0.7))
+        check(await wait { abs(player.volume - 0.7) < 0.01 }, "the poll brings another client's volume: \(player.volume)")
+        // Hidden, the app stops asking the server; shown again, it catches up. The server's index 3 is songs[4].
+        NSApp.hide(nil)
+        _ = try? await client.jukebox(.skip(index: 3, offset: 0))
+        try? await Task.sleep(for: .seconds(4))
+        check(player.current?.id == songs[1].id, "no poll while the app is hidden: \(player.current?.title ?? "none")")
+        NSApp.unhideWithoutActivation()
+        check(await wait { player.current?.id == songs[4].id }, "the poll goes on when the app shows again: \(player.current?.title ?? "none")")
         // Another remote moves the server on: the poll brings its song.
         _ = try? await client.jukebox(.skip(index: 2, offset: 5))
         check(await wait { player.current?.id == songs[3].id }, "the poll follows the server's song: \(player.current?.title ?? "none")")
