@@ -53,6 +53,7 @@ struct FilledCapsuleStyle: ButtonStyle {
 
 /// Round icon button on a light gray disc.
 struct CircleIconStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
     var size: CGFloat = 32
 
     func makeBody(configuration: Configuration) -> some View {
@@ -62,6 +63,7 @@ struct CircleIconStyle: ButtonStyle {
             .foregroundStyle(Color.musicAccent)
             .frame(width: size, height: size)
             .background(Color.primary.opacity(configuration.isPressed ? 0.14 : 0.07), in: Circle())
+            .opacity(isEnabled ? 1 : 0.4)
             .contentShape(Circle())
     }
 }
@@ -297,6 +299,7 @@ struct PlaceholderRows: View {
 /// Plain button that takes clicks in its whole frame. `.plain` takes them only on the drawn icon or text,
 /// so a frame or background set outside the button is not clickable.
 struct HitAreaButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
     var width: CGFloat?
     var height: CGFloat?
 
@@ -304,6 +307,6 @@ struct HitAreaButtonStyle: ButtonStyle {
         configuration.label
             .frame(width: width, height: height)
             .contentShape(Rectangle())
-            .opacity(configuration.isPressed ? 0.6 : 1)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.6 : 1) : 0.4)
     }
 }
