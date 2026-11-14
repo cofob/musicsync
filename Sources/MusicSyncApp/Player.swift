@@ -227,8 +227,12 @@ final class Player {
 
     // MARK: Queue handling
 
+    /// When nothing from `i` on can play and no entry is current (a new list while offline), the old song stops too.
     func start(at i: Int, paused: Bool = false) {
-        guard let i = playable(i) else { return }
+        guard let i = playable(i) else {
+            if index == nil { mixer.stop(); nextIndex = nil; elapsed = 0; updateNowPlaying() }
+            return
+        }
         index = i
         elapsed = 0
         if let cue = cue(at: i) { mixer.play(cue, paused: paused) } else { mixer.stop() }
