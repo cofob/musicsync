@@ -179,6 +179,8 @@ struct SongsTable: NSViewRepresentable {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 refreshPending = false
+                // Without a known total (server search), a loaded page may add rows.
+                guard table.numberOfRows == list?.count ?? 0 else { return table.reloadData() }
                 let rows = table.rows(in: table.visibleRect)
                 guard rows.length > 0 else { return }
                 table.reloadData(forRowIndexes: IndexSet(integersIn: rows.location..<NSMaxRange(rows)),
@@ -198,6 +200,7 @@ struct SongsTable: NSViewRepresentable {
                 let badge = song.flatMap { model.downloads.badge($0) }
                 cell.badge.image = badge.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
                 cell.badge.isHidden = badge == nil
+                cell.needsLayout = true
                 cell.more.contentTintColor = accent
                 cell.more.isHidden = song == nil
                 cell.alphaValue = song.map(model.downloads.isAvailable) == false ? 0.4 : 1
