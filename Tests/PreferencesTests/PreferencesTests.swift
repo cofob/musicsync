@@ -33,7 +33,8 @@ private func decode<T: Decodable>(_ json: String) throws -> T {
         #expect(AppearanceSettings().accent == .red)
         let red = AppearanceSettings.Accent.red.rgb
         #expect(red.red > 0.9 && red.green < 0.2)
-        #expect(Set(AppearanceSettings.Accent.allCases.map { "\($0.rgb)" }).count == AppearanceSettings.Accent.allCases.count)
+        let fixed = AppearanceSettings.Accent.allCases.filter { $0 != .album }
+        #expect(Set(fixed.map { "\($0.rgb)" }).count == fixed.count)
     }
 
     @Test func gridDensityGrows() {
@@ -63,6 +64,71 @@ private func decode<T: Decodable>(_ json: String) throws -> T {
         #expect(C.detail([.plays], rating: 4, plays: 1, suffix: "flac", bitRate: 900) == "1 play")
         #expect(C.detail(Set(C.allCases), rating: 4, plays: 3, suffix: "flac", bitRate: 900) == "★★★★ · 3 plays · FLAC 900 kbps")
         #expect(C.detail(Set(C.allCases), rating: 0, plays: 0, suffix: "mp3", bitRate: nil) == "MP3")
+    }
+}
+
+@Suite struct AppearanceLookTests {
+    typealias Column = AppearanceSettings.SongsTableColumn
+
+    @Test func defaults() {
+        let settings = AppearanceSettings()
+        #expect(settings.listDensity == .comfortable)
+        #expect(settings.nowPlayingBackground == .animated)
+        #expect(settings.tableColumns == Column.defaults)
+    }
+
+    @Test func olderSettingsLoad() throws {
+        let old: AppearanceSettings = try decode(#"{"accent":"pink","nowPlayingBackground":"artwork"}"#)
+        #expect(old.accent == .pink)
+        #expect(old.nowPlayingBackground == .artwork)  // "Static" stays
+        #expect(old.listDensity == .comfortable)
+        #expect(old.tableColumns == Column.defaults)
+        let odd: AppearanceSettings = try decode(#"{"accent":"album","listDensity":"tiny","tableColumns":["year","year","lyrics","plays"]}"#)
+        #expect(odd.accent == .album)
+        #expect(odd.listDensity == .comfortable)
+        #expect(odd.tableColumns == [.title, .year, .plays])  // no duplicates or unknown columns; title kept
+    }
+
+    @Test func savesAndLoads() throws {
+        let defaults = try #require(UserDefaults(suiteName: "prefs-test-\(UUID().uuidString)"))
+        var settings = AppearanceSettings()
+        settings.accent = .album
+        settings.listDensity = .compact
+        settings.nowPlayingBackground = .plain
+        settings.setTableColumns([.track, .title, .bitRate])
+        settings.save(to: defaults)
+        #expect(AppearanceSettings.load(from: defaults) == settings)
+    }
+
+    @Test func tableColumns() {
+        var settings = AppearanceSettings()
+        settings.setShown(.year, true)
+        #expect(settings.tableColumns.last == .year)
+        settings.setShown(.year, true)
+        #expect(settings.tableColumns.filter { $0 == .year }.count == 1)
+        settings.setShown(.genre, false)
+        settings.setShown(.title, false)
+        #expect(settings.shows(.title) && !settings.shows(.genre))
+        settings.setTableColumns([.artist, .year])
+        #expect(settings.tableColumns == [.title, .artist, .year])
+    }
+
+    @Test func listDensity() {
+        typealias D = AppearanceSettings.ListDensity
+        #expect(D.compact.rowHeight(twoLines: false) < D.comfortable.rowHeight(twoLines: false))
+        #expect(D.compact.rowHeight(twoLines: true) < D.comfortable.rowHeight(twoLines: true))
+        #expect(D.compact.tableRowHeight < D.comfortable.tableRowHeight)
+    }
+
+    @Test func coverAccent() throws {
+        typealias A = AppearanceSettings.Accent
+        #expect(A.vivid([(0.5, 0.5, 0.5), (0.1, 0.1, 0.1)]) == nil)  // gray cover
+        let blue = try #require(A.vivid([(0.4, 0.4, 0.4), (0.1, 0.2, 0.5), (0.3, 0.3, 0.32)]))
+        #expect(blue.blue > blue.red && blue.blue > blue.green)
+        #expect(max(blue.red, blue.green, blue.blue) >= 0.7)  // a dark cover still gives a readable color
+        let red = try #require(A.vivid([(0.9, 0.1, 0.1)]))
+        #expect(abs(red.red - 0.9) < 0.01 && abs(red.green - 0.1) < 0.01 && abs(red.blue - 0.1) < 0.01)
+        #expect(A.album.rgb == A.red.rgb)
     }
 }
 

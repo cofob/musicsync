@@ -3,19 +3,70 @@ import Foundation
 /// Settings > Appearance.
 public struct AppearanceSettings: StoredSettings {
     public enum Accent: String, Codable, CaseIterable, Sendable {
-        case red, pink, orange, purple, blue, graphite
+        case red, pink, orange, purple, blue, green, graphite
+        /// Taken from the cover of the current song; red without one.
+        case album
+
+        public typealias RGB = (red: Double, green: Double, blue: Double)
 
         /// sRGB components; red is the Apple Music red.
-        public var rgb: (red: Double, green: Double, blue: Double) {
+        public var rgb: RGB {
             switch self {
-            case .red: (0.98, 0.14, 0.24)
+            case .red, .album: (0.98, 0.14, 0.24)
             case .pink: (0.96, 0.27, 0.56)
             case .orange: (1.0, 0.58, 0.0)
             case .purple: (0.69, 0.32, 0.87)
             case .blue: (0.0, 0.48, 1.0)
+            case .green: (0.2, 0.78, 0.35)
             case .graphite: (0.56, 0.56, 0.58)
             }
         }
+
+        /// The most colorful of the cover `samples`, made bright and strong enough to read on light and dark
+        /// backgrounds; nil for a gray cover.
+        public static func vivid(_ samples: [RGB]) -> RGB? {
+            let hsb = samples.map(Self.hsb).filter { $0.saturation > 0.2 && $0.brightness > 0.15 }
+            guard let best = hsb.max(by: { $0.saturation * $0.brightness < $1.saturation * $1.brightness }) else { return nil }
+            return Self.rgb(hue: best.hue, saturation: max(best.saturation, 0.55), brightness: min(max(best.brightness, 0.7), 0.9))
+        }
+
+        private static func hsb(_ c: RGB) -> (hue: Double, saturation: Double, brightness: Double) {
+            let high = max(c.red, c.green, c.blue), delta = high - min(c.red, c.green, c.blue)
+            guard delta > 0 else { return (0, 0, high) }
+            let sector = high == c.red ? (c.green - c.blue) / delta : high == c.green ? (c.blue - c.red) / delta + 2 : (c.red - c.green) / delta + 4
+            return ((sector / 6 + 1).truncatingRemainder(dividingBy: 1), delta / high, high)
+        }
+
+        private static func rgb(hue: Double, saturation: Double, brightness: Double) -> RGB {
+            func channel(_ n: Double) -> Double {
+                let k = (n + hue * 6).truncatingRemainder(dividingBy: 6)
+                return brightness - brightness * saturation * max(0, min(k, 4 - k, 1))
+            }
+            return (channel(5), channel(3), channel(1))
+        }
+    }
+
+    /// Row height of song lists and the Songs table.
+    public enum ListDensity: String, Codable, CaseIterable, Sendable {
+        case comfortable, compact
+
+        /// Height of a song list row, with or without a second line.
+        public func rowHeight(twoLines: Bool) -> Double {
+            switch self {
+            case .comfortable: twoLines ? 54 : 42
+            case .compact: twoLines ? 44 : 32
+            }
+        }
+
+        public var tableRowHeight: Double { self == .compact ? 20 : 24 }
+    }
+
+    /// A column of the Songs table.
+    public enum SongsTableColumn: String, Codable, CaseIterable, Sendable {
+        case track, title, artist, album, time, plays, rating, star, genre, year, added, bitRate
+
+        /// Shown before the user changes them, in this order.
+        public static let defaults: [SongsTableColumn] = [.title, .time, .artist, .album, .genre, .star, .rating, .plays]
     }
 
     /// Cover size in album grids.
@@ -33,6 +84,8 @@ public struct AppearanceSettings: StoredSettings {
     }
 
     public enum NowPlayingBackground: String, Codable, CaseIterable, Sendable {
+        /// Colors taken from the cover that slowly move.
+        case animated
         /// Colors taken from the cover.
         case artwork
         case plain
@@ -66,9 +119,12 @@ public struct AppearanceSettings: StoredSettings {
 
     public var accent = Accent.red
     public var density = GridDensity.medium
+    public var listDensity = ListDensity.comfortable
+    /// Shown columns of the Songs table, in order; the title is always one of them.
+    public private(set) var tableColumns = SongsTableColumn.defaults
     /// Keys of sidebar rows the user turned off (Edit Sidebar).
     public var hiddenSidebarItems: Set<String> = []
-    public var nowPlayingBackground = NowPlayingBackground.artwork
+    public var nowPlayingBackground = NowPlayingBackground.animated
     public var startPage = StartPage.home
     public var songColumns: Set<SongColumn> = []
 
@@ -82,12 +138,28 @@ public struct AppearanceSettings: StoredSettings {
         if shown { hiddenSidebarItems.remove(sidebarKey) } else { hiddenSidebarItems.insert(sidebarKey) }
     }
 
+    public func shows(_ column: SongsTableColumn) -> Bool { tableColumns.contains(column) }
+
+    /// A shown column goes at the end; the title cannot be hidden.
+    public mutating func setShown(_ column: SongsTableColumn, _ shown: Bool) {
+        if shown, !shows(column) { tableColumns.append(column) } else if !shown, column != .title { tableColumns.removeAll { $0 == column } }
+    }
+
+    /// Sets the shown columns and their order, e.g. after a drag in the table header.
+    public mutating func setTableColumns(_ columns: [SongsTableColumn]) {
+        var seen = Set<SongsTableColumn>()
+        let unique = columns.filter { seen.insert($0).inserted }
+        tableColumns = unique.contains(.title) ? unique : [.title] + unique
+    }
+
     /// Missing or unknown values keep their defaults, so settings of an older or newer version still load.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = AppearanceSettings()
         accent = c.value(.accent, or: d.accent)
         density = c.value(.density, or: d.density)
+        listDensity = c.value(.listDensity, or: d.listDensity)
+        setTableColumns(c.value(.tableColumns, or: d.tableColumns.map(\.rawValue)).compactMap(SongsTableColumn.init))
         hiddenSidebarItems = c.value(.hiddenSidebarItems, or: d.hiddenSidebarItems)
         nowPlayingBackground = c.value(.nowPlayingBackground, or: d.nowPlayingBackground)
         startPage = c.value(.startPage, or: d.startPage)
