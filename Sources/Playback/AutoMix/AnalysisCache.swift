@@ -20,7 +20,10 @@ public struct AnalysisCache: Sendable {
     public func read(_ key: String) -> SongAnalysis? {
         guard let data = try? Data(contentsOf: url(key)), let entry = try? JSONDecoder().decode(Entry.self, from: data),
               entry.version == SongAnalysis.version else { return nil }
-        return entry.analysis
+        // A damaged file may hold values the analysis never makes; with those a mix plan could loop for ever.
+        let a = entry.analysis
+        guard Beat.tempos.contains(a.bpm), 0 <= a.soundStart, a.soundStart <= a.soundEnd, a.soundEnd <= a.duration + 1 else { return nil }
+        return a
     }
 
     public func write(_ analysis: SongAnalysis, for key: String) {
