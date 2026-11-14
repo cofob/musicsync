@@ -95,7 +95,9 @@ final class Player {
     /// Plays the current and the next song: gapless or crossfaded (`Playback/Mixer`).
     @ObservationIgnored let mixer = Mixer()
     /// Queue index of the song the mixer holds as next.
-    @ObservationIgnored private var nextIndex: Int?
+    @ObservationIgnored var nextIndex: Int?
+    /// Song analyses for AutoMix (`Player+AutoMix`).
+    @ObservationIgnored let analyses = AnalysisQueue()
     /// Queue indexes that failed raw and are streamed as mp3 instead.
     @ObservationIgnored var transcoded: Set<Int> = []
     /// Tracks that failed since the last one became ready; a full queue of them stops playback.
@@ -251,6 +253,7 @@ final class Player {
         let cue = i.flatMap(cue(at:))
         nextIndex = cue == nil ? nil : i
         mixer.setNext(cue, transition: i.flatMap(transition(to:)))
+        analyzeUpcoming()
     }
 
     private func mixerEvent(_ event: Mixer.Event) {

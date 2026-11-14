@@ -41,10 +41,11 @@ extension Player {
         return settings.gain(for: song(at: i), inAlbumOrder: inAlbumOrder)
     }
 
-    /// Crossfade from the current entry into entry `i`, or nil for gapless.
+    /// AutoMix or crossfade from the current entry into entry `i`, or nil for gapless.
     func transition(to i: Int) -> Transition? {
         guard let index, queue.indices.contains(index) else { return nil }
-        return settings.transition(from: song(at: index), to: song(at: i), duration: queue[index].duration)
+        return settings.transition(from: song(at: index), to: song(at: i), duration: queue[index].duration,
+                                   analyses: analyses(into: i), canSeek: canSeek(i))
     }
 
     private func song(at i: Int) -> Song? {
