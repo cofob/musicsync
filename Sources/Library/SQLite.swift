@@ -97,6 +97,9 @@ final class SQLiteConnection: @unchecked Sendable {
         guard sqlite3_open_v2(path, &handle, flags, nil) == SQLITE_OK else {
             let error = SQLiteError(handle)
             sqlite3_close_v2(handle)
+            // `deinit` runs for a failed init too. Closing the freed pointer again could close
+            // another thread's new connection that got the same address.
+            handle = nil
             throw error
         }
         sqlite3_busy_timeout(handle, 5000)
