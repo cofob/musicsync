@@ -19,6 +19,12 @@ func formatTotal(_ seconds: Int) -> String {
     return minutes >= 60 ? "\(minutes / 60) hr \(minutes % 60) min" : "\(minutes) min"
 }
 
+/// The day of a server date such as "2024-03-05T10:20:00Z", in the short local style; nil when it is not one.
+func formatDay(_ iso: String?) -> String? {
+    guard let day = iso?.prefix(10), let date = try? Date(String(day), strategy: .iso8601.year().month().day()) else { return nil }
+    return date.formatted(Date.FormatStyle(date: .numeric, time: .omitted, timeZone: .gmt))
+}
+
 /// "1 song" or "12 songs".
 func formatSongs(_ count: Int) -> String { "\(count) \(count == 1 ? "song" : "songs")" }
 

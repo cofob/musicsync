@@ -1,6 +1,7 @@
 import AppKit
 import Library
 import Observation
+import Preferences
 import SwiftUI
 import Subsonic
 
@@ -17,6 +18,9 @@ struct SongsTable: NSViewRepresentable {
     var bottomInset: CGFloat = 0
     /// A new list scrolls to the top only when this changes (sort, filter); a library refresh keeps the place.
     var scrollKey = ""
+    /// Settings > Appearance; read here so that a change updates the table.
+    var columns = AppPreferences.shared.appearance.tableColumns
+    var rowHeight = AppPreferences.shared.appearance.listDensity.tableRowHeight
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -27,8 +31,10 @@ struct SongsTable: NSViewRepresentable {
         table.intercellSpacing = NSSize(width: 8, height: 0)
         table.allowsMultipleSelection = true
         table.allowsColumnReordering = true
-        table.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
+        table.columnAutoresizingStyle = .sequentialColumnAutoresizingStyle  // only the title column has `autoresizingMask`
+        table.rowSizeStyle = .custom
         for column in Column.allCases { table.addTableColumn(column.tableColumn) }
+        table.headerView?.menu = context.coordinator.headerMenu()
         table.sortDescriptors = [NSSortDescriptor(key: Column(sort)?.rawValue ?? Column.artist.rawValue, ascending: !descending)]
         table.setDraggingSourceOperationMask(.copy, forLocal: true)
         table.dataSource = context.coordinator
@@ -51,6 +57,7 @@ struct SongsTable: NSViewRepresentable {
         coordinator.parent = self
         scroll.contentInsets.bottom = bottomInset
         scroll.scrollerInsets.bottom = bottomInset
+        coordinator.show(columns, rowHeight: rowHeight)
         guard coordinator.list !== list, let table = coordinator.table else { return }
         coordinator.list = list
         coordinator.observed = []
@@ -61,47 +68,7 @@ struct SongsTable: NSViewRepresentable {
         coordinator.fillLiveRows()
     }
 
-    /// The columns, as on the SwiftUI table before. A sortable column names its database order.
-    enum Column: String, CaseIterable {
-        case title, time, artist, album, genre, star, rating, plays
-
-        init?(_ sort: SongSort) {
-            guard let column = Self.allCases.first(where: { $0.sort == sort }) else { return nil }
-            self = column
-        }
-
-        var sort: SongSort? {
-            switch self {
-            case .title: .title
-            case .time: .duration
-            case .artist: .artist
-            case .album: .album
-            case .rating: .rating
-            case .plays: .mostPlayed
-            case .genre, .star: nil
-            }
-        }
-
-        @MainActor var tableColumn: NSTableColumn {
-            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(rawValue))
-            let (title, min, ideal, max): (String, CGFloat, CGFloat, CGFloat) = switch self {
-            case .title: ("Title", 180, 280, 10_000)
-            case .time: ("Time", 44, 52, 70)
-            case .artist: ("Artist", 100, 180, 10_000)
-            case .album: ("Album", 100, 200, 10_000)
-            case .genre: ("Genre", 60, 110, 10_000)
-            case .star: ("\u{2606}", 24, 28, 36)
-            case .rating: ("Rating", 70, 74, 90)
-            case .plays: ("Plays", 40, 50, 70)
-            }
-            column.title = title
-            column.minWidth = min
-            column.width = ideal
-            column.maxWidth = max
-            if sort != nil { column.sortDescriptorPrototype = NSSortDescriptor(key: rawValue, ascending: true) }
-            return column
-        }
-    }
+    typealias Column = AppearanceSettings.SongsTableColumn
 
     /// The table view with the keys and the context menu of the old SwiftUI table.
     final class Table: NSTableView {
@@ -132,7 +99,7 @@ struct SongsTable: NSViewRepresentable {
     }
 
     @MainActor
-    final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
+    final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSMenuDelegate {
         var parent: SongsTable?
         var list: PagedList<Song>?
         weak var table: Table?
@@ -141,6 +108,55 @@ struct SongsTable: NSViewRepresentable {
         var observed: Set<Column> = []
         var scrollKey: String?
         private var refreshPending = false
+        private var shown: ([Column], CGFloat)?
+
+        /// Puts the shown columns in their order and hides the others; a row height change redraws the rows.
+        func show(_ columns: [Column], rowHeight: CGFloat) {
+            guard let table, shown.map({ $0 != columns || $1 != rowHeight }) ?? true else { return }
+            shown = nil  // the moves below are not the user's
+            for (index, column) in columns.enumerated() {
+                let from = table.column(withIdentifier: NSUserInterfaceItemIdentifier(column.rawValue))
+                if from >= 0, from != index { table.moveColumn(from, toColumn: index) }
+            }
+            for tableColumn in table.tableColumns {
+                tableColumn.isHidden = !(Column(rawValue: tableColumn.identifier.rawValue).map(columns.contains) ?? false)
+            }
+            table.sizeToFit()  // the title column takes the width of hidden columns, or gives it up for new ones
+            table.rowHeight = rowHeight
+            shown = (columns, rowHeight)
+        }
+
+        /// The header menu of Music: a checkmark for each shown column.
+        func headerMenu() -> NSMenu {
+            let menu = NSMenu()
+            menu.delegate = self
+            return menu
+        }
+
+        func menuNeedsUpdate(_ menu: NSMenu) {
+            menu.removeAllItems()
+            let settings = AppPreferences.shared.appearance
+            for column in Column.allCases {
+                let item = NSMenuItem(title: column.title, action: #selector(toggleColumn), keyEquivalent: "")
+                item.target = self
+                item.representedObject = column.rawValue
+                item.state = settings.shows(column) ? .on : .off
+                item.isEnabled = column != .title
+                menu.addItem(item)
+            }
+        }
+
+        @objc func toggleColumn(_ item: NSMenuItem) {
+            guard let column = (item.representedObject as? String).flatMap(Column.init) else { return }
+            AppPreferences.shared.appearance.setShown(column, item.state != .on)
+        }
+
+        /// A column dragged to another place keeps it.
+        func tableViewColumnDidMove(_ notification: Notification) {
+            guard let table, let shown, !table.tableColumns.isEmpty else { return }
+            let order = table.tableColumns.filter { !$0.isHidden }.compactMap { Column(rawValue: $0.identifier.rawValue) }
+            if order != shown.0 { AppPreferences.shared.appearance.setTableColumns(order) }
+        }
 
         func numberOfRows(in tableView: NSTableView) -> Int { list?.count ?? 0 }
 
@@ -242,7 +258,7 @@ struct SongsTable: NSViewRepresentable {
                 cell.isOn = song.map(model.isStarred) ?? false
                 return cell
             default:
-                let cell = reused as? TextCell ?? TextCell(column.cellID, digits: column == .time || column == .plays)
+                let cell = reused as? TextCell ?? TextCell(column.cellID, digits: [.time, .plays, .track, .year, .bitRate].contains(column))
                 cell.text = song.map { text(column, $0) } ?? ""
                 return cell
             }
@@ -255,6 +271,10 @@ struct SongsTable: NSViewRepresentable {
             case .album: song.album ?? ""
             case .genre: song.genre ?? ""
             case .plays: (song.playCount ?? 0) > 0 ? String(song.playCount ?? 0) : ""
+            case .track: song.track.map(String.init) ?? ""
+            case .year: song.year.map(String.init) ?? ""
+            case .added: formatDay(song.created) ?? ""
+            case .bitRate: song.bitRate.map { "\($0) kbps" } ?? ""
             default: ""
             }
         }
@@ -263,4 +283,53 @@ struct SongsTable: NSViewRepresentable {
 
 private extension SongsTable.Column {
     var cellID: NSUserInterfaceItemIdentifier { NSUserInterfaceItemIdentifier("cell-" + rawValue) }
+}
+
+/// A sortable column names its database order.
+extension SongsTable.Column {
+    init?(_ sort: SongSort) {
+        guard let column = Self.allCases.first(where: { $0.sort == sort }) else { return nil }
+        self = column
+    }
+
+    var sort: SongSort? {
+        switch self {
+        case .title: .title
+        case .time: .duration
+        case .artist: .artist
+        case .album: .album
+        case .rating: .rating
+        case .plays: .mostPlayed
+        case .added: .newest
+        case .track, .genre, .star, .year, .bitRate: nil
+        }
+    }
+
+    /// Name in the header menu.
+    @MainActor var title: String { self == .star ? "Favorite" : tableColumn.title }
+
+    @MainActor var tableColumn: NSTableColumn {
+        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(rawValue))
+        let (title, min, ideal, max): (String, CGFloat, CGFloat, CGFloat) = switch self {
+        case .title: ("Title", 180, 280, 10_000)
+        case .time: ("Time", 44, 52, 70)
+        case .artist: ("Artist", 100, 180, 10_000)
+        case .album: ("Album", 100, 200, 10_000)
+        case .genre: ("Genre", 60, 110, 10_000)
+        case .star: ("\u{2606}", 24, 28, 36)
+        case .rating: ("Rating", 70, 74, 90)
+        case .plays: ("Plays", 40, 50, 70)
+        case .track: ("#", 24, 30, 44)
+        case .year: ("Year", 40, 48, 60)
+        case .added: ("Date Added", 80, 96, 140)
+        case .bitRate: ("Bit Rate", 60, 72, 100)
+        }
+        column.title = title
+        column.minWidth = min
+        column.width = ideal
+        column.maxWidth = max
+        column.resizingMask = self == .title ? [.autoresizingMask, .userResizingMask] : .userResizingMask
+        if sort != nil { column.sortDescriptorPrototype = NSSortDescriptor(key: rawValue, ascending: true) }
+        return column
+    }
 }

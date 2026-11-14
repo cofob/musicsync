@@ -191,7 +191,7 @@ struct TrackRow<Leading: View, MenuItems: View>: View {
             RowMenu { menu }
         }
         .padding(.horizontal, 10)
-        .frame(minHeight: subtitle == nil ? 42 : 54)
+        .frame(minHeight: AppPreferences.shared.appearance.listDensity.rowHeight(twoLines: subtitle != nil))
         .background(isSelected ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear), in: selectionShape)
         .contentShape(Rectangle())
         .contextMenu { menu }
