@@ -9,7 +9,7 @@ struct AppearanceSettingsView: View {
             Section {
                 LabeledContent("Accent color") { AccentPicker(selection: $prefs.appearance.accent) }
             } footer: {
-                SettingsFooter("Buttons, icons, the playing song and favorites use this color.")
+                SettingsFooter("Buttons, icons, the playing song and favorites use this color. Album Color takes it from the cover of the playing song.")
             }
             Section {
                 Picker("Album covers", selection: $prefs.appearance.density) {
@@ -23,11 +23,12 @@ struct AppearanceSettingsView: View {
             }
             Section {
                 Picker("Now Playing background", selection: $prefs.appearance.nowPlayingBackground) {
-                    Text("Colors of the Cover").tag(AppearanceSettings.NowPlayingBackground.artwork)
+                    Text("Animated Cover Colors").tag(AppearanceSettings.NowPlayingBackground.animated)
+                    Text("Static Cover Colors").tag(AppearanceSettings.NowPlayingBackground.artwork)
                     Text("Plain").tag(AppearanceSettings.NowPlayingBackground.plain)
                 }
             } footer: {
-                SettingsFooter("The full-window player takes its colors from the cover, or stays dark gray.")
+                SettingsFooter("The full-window player takes its colors from the cover, or stays dark gray. With Reduce Motion the colors stay still.")
             }
             Section {
                 Picker("Open at launch", selection: $prefs.appearance.startPage) {
@@ -40,6 +41,11 @@ struct AppearanceSettingsView: View {
                 SettingsFooter("The page the window shows when MusicSync opens.")
             }
             Section {
+                Picker("Rows", selection: $prefs.appearance.listDensity) {
+                    Text("Comfortable").tag(AppearanceSettings.ListDensity.comfortable)
+                    Text("Compact").tag(AppearanceSettings.ListDensity.compact)
+                }
+                .pickerStyle(.segmented)
                 ForEach(AppearanceSettings.SongColumn.allCases, id: \.self) { column in
                     Toggle(column.title, isOn: Binding(get: { prefs.appearance.songColumns.contains(column) }, set: {
                         if $0 { prefs.appearance.songColumns.insert(column) } else { prefs.appearance.songColumns.remove(column) }
@@ -48,7 +54,7 @@ struct AppearanceSettingsView: View {
             } header: {
                 Text("Song Lists")
             } footer: {
-                SettingsFooter("Extra details next to the song length on album, playlist and song pages.")
+                SettingsFooter("Extra details next to the song length on album, playlist and song pages. To choose the columns of the Songs page, Control-click its header.")
             }
             Section {
                 ForEach(SidebarItem.editable, id: \.self) { item in
@@ -76,7 +82,7 @@ private struct AccentPicker: View {
         HStack(spacing: 8) {
             ForEach(AppearanceSettings.Accent.allCases, id: \.self) { accent in
                 Button { selection = accent } label: {
-                    Circle().fill(accent.color.gradient).frame(width: 18, height: 18)
+                    Circle().fill(fill(accent)).frame(width: 18, height: 18)
                         .overlay { if selection == accent { Circle().fill(.white).frame(width: 6, height: 6) } }
                         .padding(2)
                         .overlay { Circle().strokeBorder(selection == accent ? accent.color : .clear, lineWidth: 1.5) }
@@ -87,6 +93,12 @@ private struct AccentPicker: View {
                 .accessibilityAddTraits(selection == accent ? .isSelected : [])
             }
         }
+    }
+
+    /// Album Color shows all colors, as the multicolor accent of System Settings.
+    private func fill(_ accent: AppearanceSettings.Accent) -> AnyShapeStyle {
+        accent == .album ? AnyShapeStyle(AngularGradient(colors: [.red, .orange, .yellow, .green, .blue, .purple, .red], center: .center))
+            : AnyShapeStyle(accent.color.gradient)
     }
 }
 

@@ -49,7 +49,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         switch self {
         case .general: ["menu bar", "song title", "notifications", "spotlight"]
         case .appearance: ["accent color", "theme", "album covers", "grid", "density", "size", "sidebar", "now playing", "background",
-                           "start page", "song list", "columns", "rating", "plays", "format"]
+                           "start page", "song list", "columns", "rating", "plays", "format", "row height", "compact", "album color", "animated"]
         case .playback: ["crossfade", "sound check", "replaygain", "volume", "streaming quality", "bitrate", "speed", "gapless", "autoplay"]
         case .server: ["navidrome", "subsonic", "url", "address", "username", "password", "connection", "account"]
         case .library: ["background sync", "mirror", "lyrics", "covers", "home", "shelves", "top picks", "made for you", "recently played",
