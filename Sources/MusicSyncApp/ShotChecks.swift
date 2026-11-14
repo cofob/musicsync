@@ -1,3 +1,4 @@
+import AppIntents
 import AppKit
 import Playback
 import Subsonic
@@ -26,6 +27,7 @@ import SwiftUI
         case "nowplaying-drag": await nowPlayingDrag(model)
         case "podcast-resume": await podcastResume(model)
         case "accessibility": await accessibility(model)
+        case "intents": await intents(model)
         default: check(false, "known check \(name)")
         }
     }
@@ -556,6 +558,97 @@ import SwiftUI
         try? await Task.sleep(for: .seconds(1))
         let left = try? await model.client?.getBookmarks().contains { $0.entry.id == "st-0-1" }
         check(left == false && podcasts.progress(episode) == nil, "Mark as Played drops the bookmark")
+    }
+
+    // MARK: Shortcuts
+
+    /// Runs the Shortcuts actions through `perform()`, as Shortcuts does. Adding to a playlist needs the stub server.
+    private static func intents(_ model: AppModel) async {
+        let player = model.player
+        func failure<I: AppIntent>(_ intent: I) async -> Error? {
+            do { _ = try await intent.perform(); player.pause(); return nil } catch { return error }
+        }
+        func run<I: AppIntent>(_ intent: I, _ what: String) async -> Error? {
+            let error = await failure(intent)
+            if let error { check(false, "\(what): \(error)") }
+            return error
+        }
+        guard let album = await Shot.first({ model.albums.first { ($0.songCount ?? 0) > 1 } }),
+              let songs = try? await model.album(album.id)?.song else { return check(false, "an album") }
+
+        let albums = try? await AlbumQuery().entities(matching: album.name.uppercased())
+        check(albums?.contains { $0.id == album.id } == true, "the album query finds \(album.name)")
+        let playAlbum = PlayAlbumIntent()
+        playAlbum.album = AlbumEntity(id: album.id, name: album.name, artist: album.artistName)
+        playAlbum.shuffle = false
+        if await run(playAlbum, "Play Album") == nil {
+            check(player.queue.map(\.id) == songs.map(\.id) && !player.shuffle, "Play Album plays \(album.name) in order")
+        }
+        let current = try? await GetCurrentSongIntent().perform().value
+        check(current?.id == player.current?.id && current?.title == songs.first?.title, "Get Current Song gives \(current?.title ?? "nothing")")
+
+        if let id = album.artistId, let artist = try? await ArtistQuery().entities(for: [id]).first {
+            let playArtist = PlayArtistIntent()
+            playArtist.artist = artist
+            playArtist.shuffle = true
+            if await run(playArtist, "Play Artist") == nil { check(player.shuffle && !player.queue.isEmpty, "Play Artist shuffles \(artist.name)") }
+        } else { check(false, "the artist query finds the album artist") }
+
+        if let playlist = try? await PlaylistQuery().suggestedEntities().first, let entries = try? await model.playlist(playlist.id)?.entry {
+            let playPlaylist = PlayPlaylistIntent()
+            playPlaylist.playlist = playlist
+            playPlaylist.shuffle = false
+            if await run(playPlaylist, "Play Playlist") == nil { check(player.queue.map(\.id) == entries.map(\.id), "Play Playlist plays \(playlist.name)") }
+        }
+
+        let title = songs[1].title
+        let found = try? await SongQuery().entities(matching: title)
+        check(found?.contains { $0.id == songs[1].id } == true, "the song query finds \(title)")
+        let playMusic = PlayMusicIntent()
+        playMusic.text = title
+        if await run(playMusic, "Play \(title)") == nil {
+            check(player.queue.contains { [$0.title, $0.album, $0.artist].contains(title) }, "Play \(title) plays its best match")
+        }
+        playMusic.text = "zzqx no such music"
+        let none = await failure(playMusic)
+        check(none.map { if case IntentError.notFound = $0 { true } else { false } } == true, "Play fails for text that matches nothing: \(String(describing: none))")
+
+        if await run(ShuffleLibraryIntent(), "Shuffle Library") == nil { check(player.shuffle && player.queue.count > 1, "Shuffle Library: \(player.queue.count) songs") }
+        _ = await run(ToggleShuffleIntent(), "Toggle Shuffle")
+        check(!player.shuffle, "Toggle Shuffle turns shuffle off")
+        let setRepeat = SetRepeatIntent()
+        setRepeat.mode = .one
+        _ = await run(setRepeat, "Set Repeat")
+        check(player.repeatMode == .one, "Set Repeat to One")
+        player.repeatMode = .off
+        let setVolume = SetVolumeIntent()
+        setVolume.level = 30
+        _ = await run(setVolume, "Set Volume")
+        check(abs(player.volume - 0.3) < 0.001, "Set Volume to 30%: \(player.volume)")
+        player.volume = 0
+
+        let before = player.queue.map(\.id)
+        if let error = await failure(StartStationIntent()) {
+            check(!model.mixes.isAvailable && error is IntentError, "Start Station needs the local library: \(error)")
+        } else {
+            check(await wait { player.queue.map(\.id) != before }, "Start Station plays a station: \(player.queue.count) songs")
+            player.pause()
+        }
+
+        if model.config?.baseURL.host == "127.0.0.1", let playlist = model.editablePlaylists.first(where: { $0.songCount == 50 }), let song = model.system.currentSong {
+            let before = (try? await model.playlist(playlist.id)?.entry?.count) ?? 0
+            let add = AddCurrentSongToPlaylistIntent()
+            add.playlist = PlaylistEntity(id: playlist.id, name: playlist.name)
+            _ = await run(add, "Add Current Song to Playlist")
+            let entries = try? await model.playlist(playlist.id)?.entry
+            check(entries?.count == before + 1 && entries?.last?.id == song.id, "Add Current Song to Playlist adds \(song.title) to \(playlist.name)")
+        }
+
+        IntentHost.system = nil
+        let refused = await failure(playAlbum)
+        check(refused.map { if case IntentError.notConnected = $0 { true } else { false } } == true, "Play Album fails without a server: \(String(describing: refused))")
+        IntentHost.system = model.system
+        player.pause()
     }
 
     private static func wait(_ condition: () -> Bool) async -> Bool { await Shot.first { condition() ? true : nil } ?? false }

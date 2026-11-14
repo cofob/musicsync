@@ -174,6 +174,12 @@ def reply(method, q):
     if method == "getPlaylist":
         p = next((p for p in playlists if p["id"] == q.get("id")), None)
         return p and {"playlist": dict({k: v for k, v in p.items() if k != "ids"}, entry=[song_by_id[i] for i in p["ids"]])}
+    if method == "updatePlaylist":  # adds the first songIdToAdd only
+        p = next((p for p in playlists if p["id"] == q.get("playlistId")), None)
+        if p and "songIdToAdd" in q:
+            p["ids"].append(q["songIdToAdd"])
+            p["songCount"] = len(p["ids"])
+        return p and {}
     if method == "getStarred2":
         return {"starred2": {"artist": [a for a in artists[:50]], "album": [a for a in albums if "starred" in a],
                              "song": [s for s in songs if "starred" in s]}}
