@@ -75,13 +75,14 @@ struct DownloadedView: View {
         }
     }
 
+    /// The controls go under the title when both do not fit on one line, so the title never breaks.
     private func header(songs: Int) -> some View {
-        HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Downloaded").font(.system(size: 34, weight: .bold))
-                Text("\(formatSongs(songs)) · \(formatBytes(model.downloads.usedBytes))").foregroundStyle(.secondary)
-            }
-            Spacer()
+        let title = VStack(alignment: .leading, spacing: 2) {
+            Text("Downloaded").font(.system(size: 34, weight: .bold))
+            Text("\(formatSongs(songs)) · \(formatBytes(model.downloads.usedBytes))").foregroundStyle(.secondary)
+        }
+        .lineLimit(1)
+        let controls = HStack {
             if !model.downloads.entries.isEmpty {
                 Picker("Show", selection: $filter) {
                     ForEach(Filter.allCases) { Text($0.rawValue).tag($0) }
@@ -89,6 +90,11 @@ struct DownloadedView: View {
                 .pickerStyle(.segmented).labelsHidden().fixedSize()
                 Button("Remove All…") { confirmRemoveAll = true }.buttonStyle(FilledCapsuleStyle())
             }
+        }
+        .fixedSize()
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline) { title; Spacer(); controls }
+            VStack(alignment: .leading, spacing: 14) { title; controls }
         }
     }
 

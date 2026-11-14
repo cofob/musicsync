@@ -23,7 +23,7 @@ import SwiftUI
         Task {
             let delay = Double(env["MUSICSYNC_SHOT_DELAY"] ?? "") ?? 6
             try? await Task.sleep(for: .seconds(1))  // the main window opens
-            NSApp.windows.first?.setContentSize(NSSize(width: 1280, height: 820))
+            NSApp.windows.first?.setContentSize(NSSize(width: Double(env["MUSICSYNC_SHOT_WIDTH"] ?? "") ?? 1280, height: 820))
             await show(env["MUSICSYNC_SCENE"] ?? "home", model)
             try? await Task.sleep(for: .seconds(delay))
             let capture: @MainActor @Sendable () -> Void = { exit(save(to: URL(fileURLWithPath: output)) && !ShotChecks.failed ? 0 : 1) }
