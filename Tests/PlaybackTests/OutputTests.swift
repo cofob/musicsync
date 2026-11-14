@@ -1,3 +1,4 @@
+import Accelerate
 import AVFoundation
 @testable import Playback
 import Testing
@@ -54,12 +55,25 @@ import Testing
 
     static let presets: [(String, EqualizerGains)] = [("Flat", .flat), ("Bass Booster", preset("Bass Booster")), ("Rock", preset("Rock")), ("+12 dB at 1 kHz", band(5, 12))]
 
-    /// Frames from the start of a tap's run to the first frame of the song, at rate 1: the delay of the time-pitch unit (measured).
+    /// Frames from the start of a tap's run to the first frame of the song, at rate 1: the delay of the time-pitch unit,
+    /// about 1024 (measured). It varies a little, so a band measure lines the frames up exactly.
     static let delay = 1024
 
+    /// The first frame of `source` in the mono recording of `track`, within 2048 frames of `delay`: where the two match best.
+    private static func start(of source: [Float], in track: OutputCapture.Track) -> Int {
+        let mid = source.count / 2, probe = Array(source[mid..<mid + 4096]), heard = track.mono(delay - 2048 + mid..<delay + 2048 + mid + 4096)
+        var scores = [Float](repeating: 0, count: 4097)
+        vDSP_conv(heard, 1, probe, 1, &scores, 1, 4097, 4096)
+        return delay - 2048 + (scores.indices.max { scores[$0] < scores[$1] } ?? 2048)
+    }
+
     private func noise(seconds: Double) -> [Float] {
-        var g = SystemRandomNumberGenerator()
-        return (0..<Int(seconds * 44100)).map { _ in Float.random(in: -0.1...0.1, using: &g) }
+        // A fixed sequence (64-bit LCG), so each run plays the same noise.
+        var state: UInt64 = 1
+        return (0..<Int(seconds * 44100)).map { _ in
+            state = state &* 6364136223846793005 &+ 1442695040888963407
+            return Float(Double(state >> 11) / Double(1 << 53) * 0.2 - 0.1)
+        }
     }
 
     /// A logarithmic sweep from 20 Hz to 20 kHz between half-second silences.
@@ -80,10 +94,11 @@ import Testing
         try await Task.sleep(for: .seconds(seconds))
         for (preset, run) in zip(Self.presets, runs) {
             let track = try run.stop()
-            let measured = Measure.bandGains(input: source, output: track.mono(Self.delay..<Self.delay + source.count), sampleRate: 44100)
+            let first = Self.start(of: source, in: track)
+            let measured = Measure.bandGains(input: source, output: track.mono(first..<first + source.count), sampleRate: 44100)
             let expected = Measure.expectedGains(preset.1, sampleRate: 44100)
             let error = zip(measured, expected).map { abs($0 - $1) }.max() ?? 0
-            print("EQ \(signal) \(preset.0): measured \(measured.map { String(format: "%+.2f", $0) }) expected \(expected.map { String(format: "%+.2f", $0) }) worst \(String(format: "%.2f", error)) dB")
+            print("EQ \(signal) \(preset.0): measured \(measured.map { String(format: "%+.2f", $0) }) expected \(expected.map { String(format: "%+.2f", $0) }) worst \(String(format: "%.2f", error)) dB, song from frame \(first)")
             #expect(error < 1, "\(preset.0)")
         }
     }
