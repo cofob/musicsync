@@ -105,6 +105,8 @@ private final class PartWriter: NSObject, URLSessionDataDelegate, @unchecked Sen
         let result = Result<Void, Error> {
             if let error = failure ?? error { throw error }
             if let errorBody { try SubsonicClient.check(response, body: errorBody) }
+            // URLSession does not always notice a range reply that ends early.
+            if expected >= 0, have < expected { throw URLError(.networkConnectionLost) }
         }
         lock.withLock { self.task = nil }
         finish?(result)
