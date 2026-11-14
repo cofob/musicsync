@@ -33,7 +33,8 @@ extension SyncJob {
         progress = SyncProgress(itemsDone: 0, itemsTotal: items.count, bytesDone: 0, bytesTotal: items.reduce(0) { $0 + $1.estimate })
         publishProgress()
 
-        let pipeline = TransferPipeline(client: client, ffmpeg: ffmpeg, workDir: workDir, lyrics: settings.lyrics)
+        let pipeline = TransferPipeline(client: client, ffmpeg: ffmpeg, workDir: workDir, lyrics: settings.lyrics,
+                                        serverConversion: settings.serverConversion)
         let used = Set(db.tracks.map { ITunesDB.relativePath(ipodLocation: $0.location) })
             .union(manifest.entries.values.map(\.relativePath)).union(manifest.rockboxEntries.values.map(\.relativePath))
         let copier = DeviceCopier(device: device, used: used)

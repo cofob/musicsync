@@ -49,6 +49,12 @@ struct SyncSettingsView: View {
             } footer: {
                 Text("The iPod shows lyrics of new AAC songs from the server.").font(.caption).foregroundStyle(.secondary)
             }
+            Section {
+                Toggle("Convert on the server", isOn: $model.syncSettings.serverConversion)
+            } footer: {
+                Text("Lossless songs come from the server as AAC 256k: about 4× less to download. The server's encoder is a little worse than Apple's, and these songs are not gapless.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Section("FireWire GUID") { guidFields }
         }
         .formStyle(.grouped)

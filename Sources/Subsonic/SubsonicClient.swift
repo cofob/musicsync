@@ -161,12 +161,15 @@ public struct SubsonicClient: Sendable {
     /// Downloads the original file to a temp file. The caller moves or deletes it.
     /// `progress` gets bytes received and expected (-1 when unknown), at most 5 times a second.
     /// A download task, not `session.download(from:delegate:)`: that one never reports progress.
-    public func download(id: String, progress: (@Sendable (Int64, Int64) -> Void)? = nil) async throws -> URL {
+    /// The original file, or with `format` the server's conversion (`stream`; no Content-Length then).
+    public func download(id: String, format: String? = nil, maxBitRate: Int? = nil,
+                         progress: (@Sendable (Int64, Int64) -> Void)? = nil) async throws -> URL {
         let dest = FileManager.default.temporaryDirectory.appendingPathComponent("musicsync-\(UUID().uuidString)-\(id)")
         let box = TaskBox()
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
-                let task = session.downloadTask(with: downloadURL(id: id)) { tmp, response, error in
+                let url = format == nil ? downloadURL(id: id) : streamURL(id: id, format: format, maxBitRate: maxBitRate)
+                let task = session.downloadTask(with: url) { tmp, response, error in
                     // `tmp` is deleted when this returns, so it is moved here.
                     if let error { return continuation.resume(throwing: error) }
                     if let status = (response as? HTTPURLResponse)?.statusCode, status != 200 {

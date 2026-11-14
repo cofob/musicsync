@@ -12,6 +12,9 @@ final class StubServer: @unchecked Sendable {
     private let lock = NSLock()
     private var replies: [String: String] = [:]
     private var files: [String: URL] = [:]
+    private var converted: [String: URL] = [:]
+    /// Query items of every `stream` request.
+    private(set) var streamQueries: [[URLQueryItem]] = []
     private var coverData: Data?
     private var _scrobbles: [Scrobble] = []
     private var scrobbleCalls = 0
@@ -36,6 +39,8 @@ final class StubServer: @unchecked Sendable {
     /// `key` is the method, or `method:id` for per-object replies.
     func reply(_ key: String, _ json: String) { locked { replies[key] = json } }
     func serve(songID: String, file: URL) { locked { files[songID] = file } }
+    /// `stream` replies with `file`; without it, `stream` sends the original (a server with no such transcoding).
+    func serveConverted(songID: String, file: URL) { locked { converted[songID] = file } }
     func serveCover(_ data: Data) { locked { coverData = data } }
     var scrobbles: [Scrobble] { locked { _scrobbles } }
     var failScrobblesAfter: Int? {
@@ -61,6 +66,10 @@ final class StubServer: @unchecked Sendable {
             case "download":
                 if downloadDelay > 0 { Thread.sleep(forTimeInterval: downloadDelay) }
                 guard let id, let file = files[id], let data = try? Data(contentsOf: file) else { return (404, Data()) }
+                return (200, data)
+            case "stream":
+                streamQueries.append(items)
+                guard let id, let file = converted[id] ?? files[id], let data = try? Data(contentsOf: file) else { return (404, Data()) }
                 return (200, data)
             case "getCoverArt":
                 return coverData.map { (200, $0) } ?? (404, Data())

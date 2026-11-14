@@ -18,6 +18,8 @@ public struct SyncSettings: Codable, Sendable, Equatable {
     public var fullAlbums: Bool = false
     /// Puts the server's lyrics into new stock iPod files.
     public var lyrics: Bool = true
+    /// Lossless songs for the stock iPod come from the server already converted to AAC (less to download).
+    public var serverConversion: Bool = false
     /// Manual FirewireGuid per volume UUID (for test images or failed detection).
     public var manualGuids: [String: String] = [:]
 
@@ -33,6 +35,7 @@ public struct SyncSettings: Codable, Sendable, Equatable {
         ejectAfterSync = try c.decodeIfPresent(Bool.self, forKey: .ejectAfterSync) ?? ejectAfterSync
         fullAlbums = try c.decodeIfPresent(Bool.self, forKey: .fullAlbums) ?? fullAlbums
         lyrics = try c.decodeIfPresent(Bool.self, forKey: .lyrics) ?? lyrics
+        serverConversion = try c.decodeIfPresent(Bool.self, forKey: .serverConversion) ?? serverConversion
         manualGuids = try c.decodeIfPresent([String: String].self, forKey: .manualGuids) ?? manualGuids
     }
 

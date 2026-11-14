@@ -22,11 +22,14 @@ struct TransferPipeline: Sendable {
     let workDir: URL
     /// Adds lyrics to stock iPod m4a files.
     var lyrics = false
+    /// Asks the server to convert lossless songs (`serverFormat`).
+    var serverConversion = false
 
     func prepare(_ d: DesiredSong, stage: @escaping @Sendable (ItemStage) -> Void) async throws -> Prepared {
-        let expected = Int64(d.song.size ?? 0)
+        let server = Self.serverFormat(d, enabled: serverConversion)
+        let expected = server != nil ? SizeEstimate.bytes(d) : Int64(d.song.size ?? 0)
         stage(.downloading(0, expected))
-        let downloaded = try await client.download(id: d.song.id) { done, total in
+        let downloaded = try await client.download(id: d.song.id, format: server?.format, maxBitRate: server?.kbps) { done, total in
             stage(.downloading(done, total > 0 ? total : expected))
         }
         var temporary = [downloaded]
@@ -34,8 +37,10 @@ struct TransferPipeline: Sendable {
             let source = try await ffmpeg.probe(downloaded)
             var file = downloaded
             var transcoded = false
-            let needsTranscode = FFmpeg.needsTranscode(source: source, preset: d.preset)
-            let ext = needsTranscode ? d.preset.fileExtension : Self.passthroughExtension(source, preset: d.preset)
+            // The server's AAC comes as ADTS: remuxed into m4a, not encoded again. Any other reply goes the usual way.
+            let fromServer = server != nil && source.codec == "aac" && source.container.contains("aac") && source.sampleRate <= 48000
+            let needsTranscode = !fromServer && FFmpeg.needsTranscode(source: source, preset: d.preset)
+            let ext = needsTranscode || fromServer ? d.preset.fileExtension : Self.passthroughExtension(source, preset: d.preset)
             let text = lyrics && d.preset.target == .stock && ext == "m4a" ? await client.plainLyrics(for: d.song) : nil
             if needsTranscode {
                 stage(.transcoding(0))
@@ -44,10 +49,10 @@ struct TransferPipeline: Sendable {
                 try await ffmpeg.transcode(input: downloaded, output: file, preset: d.preset, source: source, tags: d.tags,
                                            lyrics: text) { stage(.transcoding($0)) }
                 transcoded = true
-            } else if let text {
+            } else if text != nil || fromServer {
                 file = workDir.appendingPathComponent("\(UUID().uuidString).m4a")
                 temporary.append(file)
-                try await ffmpeg.addLyrics(text, input: downloaded, output: file)
+                try await ffmpeg.remux(input: downloaded, output: file, lyrics: text)
             }
             let output = try await ffmpeg.probe(file)
             var gapless: GaplessInfo?
@@ -63,6 +68,16 @@ struct TransferPipeline: Sendable {
             for url in temporary { try? FileManager.default.removeItem(at: url) }
             throw error
         }
+    }
+
+    /// Format and bitrate to ask the server for, or nil for the original file: only for the stock AAC preset,
+    /// only for songs that need converting, and only up to 48 kHz (the server keeps the sample rate).
+    static func serverFormat(_ d: DesiredSong, enabled: Bool) -> (format: String, kbps: Int)? {
+        guard enabled, d.preset.target == .stock, case .aac(.cvbr(let kbps)) = d.preset.codec,
+              let rate = d.song.samplingRate, rate > 0, rate <= 48000 else { return nil }
+        let suffix = d.song.suffix?.lowercased() ?? ""
+        let ready = suffix == "mp3" || suffix == "aac" || (suffix == "m4a" && (d.song.bitRate ?? .max) <= 320)
+        return ready ? nil : ("aac", kbps)
     }
 
     /// Extension for a file copied unchanged, from its container.

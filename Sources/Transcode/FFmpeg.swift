@@ -110,10 +110,10 @@ public struct FFmpeg: Sendable {
         return a
     }
 
-    /// Copies an m4a file with the lyrics tag (`©lyr`) added; the audio is not re-encoded.
-    public func addLyrics(_ lyrics: String, input: URL, output: URL) async throws {
-        let args = ["-y", "-nostdin", "-hide_banner", "-v", "error", "-i", input.path, "-map", "0", "-c", "copy",
-                    "-metadata", "lyrics=\(lyrics)", "-movflags", "+faststart", "-f", "ipod", output.path]
+    /// Copies the audio unchanged into an iPod m4a (also from ADTS AAC), optionally with the lyrics tag (`©lyr`).
+    public func remux(input: URL, output: URL, lyrics: String? = nil) async throws {
+        let args = ["-y", "-nostdin", "-hide_banner", "-v", "error", "-i", input.path, "-map", "0", "-c", "copy"]
+            + (lyrics.map { ["-metadata", "lyrics=\($0)"] } ?? []) + ["-movflags", "+faststart", "-f", "ipod", output.path]
         let result = try await runProcess(ffmpeg, args)
         guard result.status == 0 else {
             try? FileManager.default.removeItem(at: output)

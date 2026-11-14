@@ -32,7 +32,7 @@ struct IntegrationTests {
         defer { try? FileManager.default.removeItem(at: dir) }
         let aac = dir.appendingPathComponent("in.m4a"), out = dir.appendingPathComponent("out.m4a")
         try await ff.transcode(input: flac, output: aac, preset: .stockAAC, source: try await ff.probe(flac), tags: TrackTags()) { _ in }
-        try await ff.addLyrics("La la\nLa", input: aac, output: out)
+        try await ff.remux(input: aac, output: out, lyrics: "La la\nLa")
         let tags = try await runProcess(ff.ffprobe, ["-v", "error", "-show_entries", "format_tags=lyrics", "-of", "default=nw=1:nk=1", out.path])
         #expect(String(decoding: tags.stdout, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines) == "La la\nLa")
         #expect(try Gapless.read(from: out) == Gapless.read(from: aac))

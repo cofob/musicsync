@@ -71,14 +71,14 @@ struct FakeIPod {
 
 // MARK: Audio fixtures
 
-/// Writes a stereo 44.1 kHz FLAC sine of `seconds`.
-func makeFLAC(in dir: URL, name: String, seconds: Double, frequency: Int) throws -> URL {
+/// Writes a stereo 44.1 kHz sine of `seconds`, FLAC unless `encode` says otherwise.
+func makeFLAC(in dir: URL, name: String, seconds: Double, frequency: Int, encode: [String] = ["-c:a", "flac"]) throws -> URL {
     let ff = try #require(ffmpegTools)
     let url = dir.appendingPathComponent(name)
     let process = Process()
     process.executableURL = ff.ffmpeg
     process.arguments = ["-y", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=\(frequency):duration=\(seconds):sample_rate=44100",
-                         "-ac", "2", "-c:a", "flac", url.path]
+                         "-ac", "2"] + encode + [url.path]
     try process.run()
     process.waitUntilExit()
     try #require(process.terminationStatus == 0)
