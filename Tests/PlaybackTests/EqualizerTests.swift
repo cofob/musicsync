@@ -124,8 +124,8 @@ import Testing
     @Test func settingsEditing() {
         var s = EqualizerSettings()
         #expect(s.gains == .flat)
-        s.isOn = true
         s.apply(EqualizerPreset.builtIn[17])
+        #expect(s.isOn)
         #expect(s.preset == "Rock")
         #expect(s.gains.bands == EqualizerPreset.builtIn[17].bands)
         s.setBand(0, to: 20)
