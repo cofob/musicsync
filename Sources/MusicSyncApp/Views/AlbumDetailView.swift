@@ -61,7 +61,7 @@ struct AlbumDetailView<Accessory: View>: View {
 
     private func footer(_ songs: [Song]) -> String {
         let count = album.songCount ?? songs.count
-        return ["\(count) \(count == 1 ? "song" : "songs")", album.duration.map(formatTotal)].compactMap { $0 }.joined(separator: ", ")
+        return [formatSongs(count), album.duration.map(formatTotal)].compactMap { $0 }.joined(separator: ", ")
     }
 
     /// Most common source format among the tracks.

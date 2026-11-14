@@ -13,6 +13,9 @@ func formatTotal(_ seconds: Int) -> String {
     return minutes >= 60 ? "\(minutes / 60) hr \(minutes % 60) min" : "\(minutes) min"
 }
 
+/// "1 song" or "12 songs".
+func formatSongs(_ count: Int) -> String { "\(count) \(count == 1 ? "song" : "songs")" }
+
 /// "1.2 GB".
 /// "0 KB", not the formatter's "Zero kB".
 func formatBytes(_ bytes: Int64) -> String { bytes.formatted(.byteCount(style: .file, spellsOutZero: false)) }

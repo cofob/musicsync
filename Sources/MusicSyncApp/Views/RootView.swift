@@ -94,7 +94,7 @@ struct RootView: View {
         } message: {
             Text("“\(model.sync.foreignAlbum?.name ?? "")” was put on the iPod by iTunes. MusicSync skips it while that copy is there, to avoid duplicates.")
         }
-        .confirmationDialog("Delete \(model.sync.tracksToDelete.count) songs from the iPod?",
+        .confirmationDialog("Delete \(formatSongs(model.sync.tracksToDelete.count)) from the iPod?",
                             isPresented: Binding(get: { !model.sync.tracksToDelete.isEmpty }, set: { if !$0 { model.sync.tracksToDelete = [] } })) {
             Button("Delete", role: .destructive) { model.sync.deleteConfirmed() }
         } message: {

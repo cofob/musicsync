@@ -16,7 +16,7 @@ struct DevicePlaylistsView: View {
                         ForEach(playlists) { playlist in
                             DeviceCard(route: .devicePlaylist(playlist.id), imageID: playlist.tracks.lazy.compactMap(\.imageID).first,
                                        symbol: "music.note.list", title: playlist.name,
-                                       subtitle: "\(playlist.tracks.count) songs") { model.play(playlist.tracks) }
+                                       subtitle: formatSongs(playlist.tracks.count)) { model.play(playlist.tracks) }
                         }
                     }
                     .padding(24)
@@ -38,7 +38,7 @@ struct DevicePlaylistDetailView: View {
                 MediaHeader(cover: { DeviceCoverImage(imageID: playlist.tracks.lazy.compactMap(\.imageID).first, cornerRadius: 10, symbol: "music.note.list") },
                             title: playlist.name, canPlay: !playlist.tracks.isEmpty,
                             onPlay: { model.play(playlist.tracks) }, onShuffle: { model.play(playlist.tracks, shuffled: true) }) {
-                    Text("\(playlist.tracks.count) songs · \(formatTotal(Int(playlist.duration)))").foregroundStyle(.secondary)
+                    Text("\(formatSongs(playlist.tracks.count)) · \(formatTotal(Int(playlist.duration)))").foregroundStyle(.secondary)
                 }
                 DeviceTrackList(tracks: playlist.tracks, leading: .cover)
             }

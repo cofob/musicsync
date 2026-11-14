@@ -17,7 +17,7 @@ struct PlaylistsView: View {
                                 .playlistHoverActions(playlist)
                                 .shadow(color: .black.opacity(0.12), radius: 4, y: 2).padding(.bottom, 6)
                             Text(playlist.name).lineLimit(2)
-                            Text(playlist.songCount.map { "\($0) songs" } ?? "").foregroundStyle(.secondary)
+                            Text(playlist.songCount.map(formatSongs) ?? "").foregroundStyle(.secondary)
                         }
                         .contentShape(Rectangle())
                     }

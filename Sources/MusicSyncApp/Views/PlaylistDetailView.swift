@@ -15,7 +15,7 @@ struct PlaylistDetailView: View {
                         onShuffle: { model.player.play(songs, shuffled: true) }) {
                 if let owner = playlist.owner { Text(owner).font(.system(size: 22, weight: .medium)).foregroundStyle(Color.musicAccent) }
                 if let comment = playlist.comment, !comment.isEmpty { Text(comment).foregroundStyle(.secondary).lineLimit(3) }
-                Text([playlist.songCount.map { "\($0) songs" }, playlist.duration.map(formatTotal)].compactMap { $0 }.joined(separator: ", "))
+                Text([playlist.songCount.map(formatSongs), playlist.duration.map(formatTotal)].compactMap { $0 }.joined(separator: ", "))
                     .font(.callout).foregroundStyle(.secondary)
             } accessory: {
                 SyncButton(isOn: model.sync.isPlaylistSelected(playlist.id)) { model.sync.togglePlaylist(playlist.id) }
