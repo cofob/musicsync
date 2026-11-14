@@ -114,7 +114,9 @@ struct SongsTable: NSViewRepresentable {
         }
 
         override func keyDown(with event: NSEvent) {
-            if event.keyCode == 36 || event.keyCode == 76, !selectedRowIndexes.isEmpty { onReturn?() } else { super.keyDown(with: event) }
+            if event.keyCode == 36 || event.keyCode == 76, !selectedRowIndexes.isEmpty { onReturn?() }
+            else if event.keyCode == 53 { deselectAll(nil) }  // Escape, as in the album and playlist lists
+            else { super.keyDown(with: event) }
         }
     }
 
