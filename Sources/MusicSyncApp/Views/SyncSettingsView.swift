@@ -16,13 +16,26 @@ struct SyncSettingsView: View {
 
     var body: some View {
         @Bindable var model = model
-        let preset = Preset.builtIns.first { $0.id == model.syncSettings.presetID } ?? .stockAAC
+        let presets = model.syncSettings.presets
+        let preset = presets.first { $0.id == model.syncSettings.presetID } ?? .stockAAC
         Form {
-            Section("Encoding") {
-                Picker("Default preset", selection: $model.syncSettings.presetID) {
-                    ForEach(Preset.builtIns) { Text("\($0.name) (\($0.target == .stock ? "Stock firmware" : "Rockbox"))").tag($0.id) }
+            Section {
+                Picker("Default format", selection: $model.syncSettings.presetID) {
+                    ForEach(presets) { Text("\($0.name) (\($0.target == .stock ? "Stock firmware" : "Rockbox"))").tag($0.id) }
                 }
-                LabeledContent("Bitrate", value: preset.codec.summary)
+                Picker("AAC bitrate", selection: $model.syncSettings.aacBitrate) {
+                    ForEach([128, 192, 256, 320], id: \.self) { Text("\($0) kbps").tag($0) }
+                }
+                Picker("Opus bitrate", selection: $model.syncSettings.opusBitrate) {
+                    ForEach([96, 128, 160, 192, 256], id: \.self) { Text("\($0) kbps").tag($0) }
+                }
+                LabeledContent("Output", value: preset.codec.summary)
+            } header: {
+                Text("Format")
+            } footer: {
+                SettingsFooter("Albums use the default format unless their menu picks another. A new bitrate applies to songs added from now on.")
+            }
+            Section {
                 TextField("ffmpeg path", text: Binding(get: { model.syncSettings.ffmpegPath ?? "" },
                                                        set: { model.syncSettings.ffmpegPath = $0.isEmpty ? nil : $0 }),
                           prompt: Text("Auto-detect"))
@@ -30,32 +43,65 @@ struct SyncSettingsView: View {
                 ffmpegStatusView(preset)
                 Stepper("Workers: \(model.syncSettings.workers)", value: $model.syncSettings.workers,
                         in: 1...max(1, ProcessInfo.processInfo.activeProcessorCount))
+            } header: {
+                Text("Converter")
+            } footer: {
+                SettingsFooter("ffmpeg converts songs on this Mac; more workers convert more songs at the same time.")
             }
-            Section("Playback on iPod") {
+            Section {
                 Picker("Sound Check source", selection: $model.syncSettings.soundCheck) {
                     Text("Album gain").tag(SyncSettings.SoundCheckSource.album)
                     Text("Track gain").tag(SyncSettings.SoundCheckSource.track)
                     Text("Off").tag(SyncSettings.SoundCheckSource.off)
                 }
-                Toggle("Eject after sync", isOn: $model.syncSettings.ejectAfterSync)
+                Toggle("Add lyrics to songs", isOn: $model.syncSettings.lyrics)
+            } header: {
+                Text("Playback on iPod")
+            } footer: {
+                SettingsFooter("Sound Check uses the ReplayGain tags of the songs. The iPod shows lyrics of new AAC songs from the server.")
             }
             Section {
                 Toggle("Always sync whole albums", isOn: $model.syncSettings.fullAlbums)
             } footer: {
-                Text("Songs from synced playlists bring their full albums.").font(.caption).foregroundStyle(.secondary)
-            }
-            Section {
-                Toggle("Add lyrics to songs", isOn: $model.syncSettings.lyrics)
-            } footer: {
-                Text("The iPod shows lyrics of new AAC songs from the server.").font(.caption).foregroundStyle(.secondary)
+                SettingsFooter("Songs from synced playlists bring their full albums.")
             }
             Section {
                 Toggle("Convert on the server", isOn: $model.syncSettings.serverConversion)
             } footer: {
-                Text("Lossless songs come from the server as AAC 256k: about 4× less to download. The server's encoder is a little worse than Apple's, and these songs are not gapless.")
-                    .font(.caption).foregroundStyle(.secondary)
+                SettingsFooter("Lossless songs come from the server as AAC \(model.syncSettings.aacBitrate)k: about 4× less to download. The server's encoder is a little worse than Apple's, and these songs are not gapless.")
             }
-            Section("FireWire GUID") { guidFields }
+            Section {
+                Picker("Keep free on the iPod", selection: $model.syncSettings.keepFreeGB) {
+                    ForEach([0.5, 1, 2, 5, 10], id: \.self) { Text("\($0.formatted()) GB").tag($0) }
+                }
+            } footer: {
+                SettingsFooter("A sync that would leave less free space does not start.")
+            }
+            Section {
+                Toggle("Sync when the iPod connects", isOn: $model.syncSettings.autoSync)
+                Toggle("Eject after sync", isOn: $model.syncSettings.ejectAfterSync)
+                Toggle("Send iPod plays to the server", isOn: $model.syncSettings.sendPlayCounts)
+            } header: {
+                Text("Automation")
+            } footer: {
+                SettingsFooter("Plays counted on the iPod always stay on it; when sending is on, the next sync also counts them on the server.")
+            }
+            Section {
+                Picker("Album cover size", selection: $model.syncSettings.rockboxCoverSize) {
+                    ForEach([200, 320, 500], id: \.self) { Text("\($0) × \($0)").tag($0) }
+                }
+            } header: {
+                Text("Rockbox")
+            } footer: {
+                SettingsFooter("Size of the cover.jpg in each album folder; it applies to folders that have no cover yet.")
+            }
+            Section {
+                guidFields
+            } header: {
+                Text("This iPod")
+            } footer: {
+                SettingsFooter("A new name goes onto the iPod with the next sync. Enter the GUID only when it is not found.")
+            }
         }
         .formStyle(.grouped)
         .frame(width: 480)
@@ -104,7 +150,9 @@ struct SyncSettingsView: View {
                 let text = $0.trimmingCharacters(in: .whitespaces)
                 model.syncSettings.manualGuids[uuid] = text.isEmpty ? nil : text
             })
-            LabeledContent("Device", value: model.ipod.snapshot?.name ?? device.volumeName)
+            TextField("Name", text: Binding(get: { model.syncSettings.deviceNames[uuid] ?? model.ipod.snapshot?.name ?? device.volumeName },
+                                            set: { model.syncSettings.deviceNames[uuid] = $0.isEmpty ? nil : $0 }))
+                .disabled(model.ipod.snapshot?.database == nil)
             LabeledContent("Volume UUID") { Text(uuid).font(.caption.monospaced()).textSelection(.enabled) }
             TextField("Manual GUID", text: manual, prompt: Text("16 hex digits"))
                 .autocorrectionDisabled()
@@ -114,7 +162,7 @@ struct SyncSettingsView: View {
             LabeledContent("In use", value: model.ipod.snapshot?.guid ?? "Not found")
                 .onChange(of: FirewireGuid.parse(manual.wrappedValue)) { model.ipod.reload() }
         } else {
-            Text("Connect an iPod to set its GUID.").foregroundStyle(.secondary)
+            Text("Connect an iPod to set its name and GUID.").foregroundStyle(.secondary)
         }
     }
 }

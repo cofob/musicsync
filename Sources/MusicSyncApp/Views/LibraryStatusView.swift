@@ -185,6 +185,7 @@ struct LibrarySettingsView: View {
                         .disabled(model.library == nil)
                 }
             }
+            HomeAndListeningSections()
         }
         .formStyle(.grouped)
         .frame(width: 480)

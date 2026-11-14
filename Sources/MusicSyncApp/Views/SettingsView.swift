@@ -1,20 +1,60 @@
 import SwiftUI
 import Subsonic
 
+/// Settings window: a sidebar of pages with a search field, as in System Settings.
 struct SettingsView: View {
     @Environment(AppModel.self) private var model
+    @State private var page: SettingsPage
+    @State private var query: String
+
+    init(page: SettingsPage = .general, query: String = "") {
+        _page = State(initialValue: query.isEmpty ? page : SettingsPage.allCases.first { $0.matches(query) } ?? page)
+        _query = State(initialValue: query)
+    }
 
     var body: some View {
-        TabView {
-            GeneralSettingsView().tabItem { Label("General", systemImage: "gearshape") }
-            PlaybackSettingsView().tabItem { Label("Playback", systemImage: "play.circle") }
-            ServerSettingsView().tabItem { Label("Server", systemImage: "server.rack") }
-            LibrarySettingsView().tabItem { Label("Library", systemImage: "books.vertical") }
-            DownloadSettingsView().tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
-            SyncSettingsView().tabItem { Label("Sync", systemImage: "arrow.triangle.2.circlepath") }
-            ShortcutsSettingsView().tabItem { Label("Shortcuts", systemImage: "keyboard") }
-            RemoteSettingsView().tabItem { Label("Remote", systemImage: "iphone.radiowaves.left.and.right") }
-            if model.system.sharesSupported { SharesSettingsView().tabItem { Label("Sharing", systemImage: "square.and.arrow.up") } }
+        let pages = SettingsPage.allCases.filter { ($0 != .sharing || model.system.sharesSupported) && $0.matches(query) }
+        NavigationSplitView {
+            List {
+                ForEach(pages) { item in
+                    Label { Text(item.title) } icon: { SettingsIcon(page: item) }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle().inset(by: -8))
+                        .onTapGesture { page = item }
+                        .accessibilityAddTraits(page == item ? [.isButton, .isSelected] : .isButton)
+                        // Gray like the main sidebar, not the system blue.
+                        .listRowBackground(RoundedRectangle(cornerRadius: 6).fill(page == item ? Color.primary.opacity(0.1) : .clear)
+                            .padding(.horizontal, 10))
+                }
+            }
+            .searchable(text: $query, placement: .sidebar)
+            .overlay { if pages.isEmpty { ContentUnavailableView.search(text: query) } }
+            .navigationSplitViewColumnWidth(200)
+            .toolbar(removing: .sidebarToggle)
+        } detail: {
+            ScrollView { Self.content(page).frame(maxWidth: .infinity) }
+                .navigationTitle(page.title)
+                .id(page)
+        }
+        .onChange(of: query) { if let first = pages.first, !pages.contains(page) { page = first } }
+        .frame(width: 720, height: 600)
+        .tint(Color.musicAccent)
+    }
+
+    /// The page alone; also used by the screenshot scenes.
+    @ViewBuilder static func content(_ page: SettingsPage) -> some View {
+        switch page {
+        case .general: GeneralSettingsView()
+        case .appearance: AppearanceSettingsView()
+        case .playback: PlaybackSettingsView()
+        case .server: ServerSettingsView()
+        case .library: LibrarySettingsView()
+        case .downloads: DownloadSettingsView()
+        case .sync: SyncSettingsView()
+        case .shortcuts: ShortcutsSettingsView()
+        case .remote: RemoteSettingsView()
+        case .sharing: SharesSettingsView()
+        case .advanced: AdvancedSettingsView()
         }
     }
 }

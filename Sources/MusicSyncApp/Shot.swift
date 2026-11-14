@@ -3,6 +3,7 @@ import Carbon.HIToolbox
 import Integration
 import Library
 import Playback
+import Preferences
 import Recommend
 import Subsonic
 import SwiftUI
@@ -48,6 +49,25 @@ import SwiftUI
             await playPaused(model)
             model.showNowPlaying = true
         case "settings": open(SettingsView(), "Settings", model)
+        case let s where s.hasPrefix("settings:"):
+            // `settings:<page>`, or `settings:?<query>` for the search.
+            let name = String(s.dropFirst(9))
+            if name.hasPrefix("?") {
+                open(SettingsView(query: String(name.dropFirst())), "Settings", model)
+            } else {
+                open(SettingsView(page: SettingsPage(rawValue: name) ?? .general), "Settings", model)
+            }
+        case let s where s.hasPrefix("page:"):
+            // A settings page alone at its full height, to see its lower sections.
+            open(SettingsView.content(SettingsPage(rawValue: String(s.dropFirst(5))) ?? .general), "Settings", model)
+        case let s where s.hasPrefix("look:"):
+            // `look:<accent>:<density>:<scene>`, e.g. `look:pink:large:albums`; the saved settings stay unchanged.
+            let parts = s.split(separator: ":").map(String.init)
+            guard parts.count == 4 else { break }
+            AppPreferences.shared.appearance.accent = .init(rawValue: parts[1]) ?? .red
+            AppPreferences.shared.appearance.density = .init(rawValue: parts[2]) ?? .medium
+            AppearanceSettings().save()
+            await show(parts[3], model)
         case "sync-checking":
             model.sync.checked = (40, 120)
             open(SyncSheet(), "Sync", model)

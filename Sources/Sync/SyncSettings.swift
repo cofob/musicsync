@@ -66,8 +66,12 @@ public struct SyncSettings: Codable, Sendable, Equatable {
         Preset.builtIns.map { preset in
             var preset = preset
             switch preset.codec {
-            case .aac(.cvbr): preset.codec = .aac(.cvbr(bitrateKbps: aacBitrate))
-            case .opus: preset.codec = .opus(bitrateKbps: opusBitrate)
+            case .aac(.cvbr):
+                preset.codec = .aac(.cvbr(bitrateKbps: aacBitrate))
+                preset.name = "iPod AAC \(aacBitrate)k"
+            case .opus:
+                preset.codec = .opus(bitrateKbps: opusBitrate)
+                preset.name = "Opus \(opusBitrate)k"
             default: break
             }
             return preset

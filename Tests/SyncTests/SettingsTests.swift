@@ -32,6 +32,7 @@ import Transcode
         let presets = Dictionary(uniqueKeysWithValues: s.presets.map { ($0.id, $0) })
         #expect(presets["stock-aac"]?.codec == .aac(.cvbr(bitrateKbps: 320)))
         #expect(presets["rockbox-opus"]?.codec == .opus(bitrateKbps: 96))
+        #expect(presets["stock-aac"]?.name == "iPod AAC 320k" && presets["rockbox-opus"]?.name == "Opus 96k")
         #expect(presets["rockbox-flac"] == .rockboxFLAC && presets["stock-alac"] == .stockALAC)
         // Same version: songs on the iPod are not converted again.
         #expect(presets["stock-aac"]?.version == Preset.stockAAC.version)
