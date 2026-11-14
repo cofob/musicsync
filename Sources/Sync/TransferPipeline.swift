@@ -38,7 +38,7 @@ struct TransferPipeline: Sendable {
             var file = downloaded
             var transcoded = false
             // The server's AAC comes as ADTS: remuxed into m4a, not encoded again. Any other reply goes the usual way.
-            let fromServer = server != nil && source.codec == "aac" && source.container.contains("aac") && source.sampleRate <= 48000
+            let fromServer = server != nil && source.codec == "aac" && source.container.contains("aac") && source.sampleRate <= 48000 && source.channels <= 2
             let needsTranscode = !fromServer && FFmpeg.needsTranscode(source: source, preset: d.preset)
             let ext = needsTranscode || fromServer ? d.preset.fileExtension : Self.passthroughExtension(source, preset: d.preset)
             let text = lyrics && d.preset.target == .stock && ext == "m4a" ? await client.plainLyrics(for: d.song) : nil
@@ -93,49 +93,59 @@ struct TransferPipeline: Sendable {
 /// Copies files to the device one at a time and hands out unused names.
 actor DeviceCopier {
     private let device: IPodDevice
+    /// Lowercased: FAT32 ignores case.
     private var used: Set<String>
 
     init(device: IPodDevice, used: Set<String>) {
         self.device = device
-        self.used = used
+        self.used = Set(used.map { $0.lowercased() })
     }
 
     /// Copies into `iPod_Control/Music/Fxx/XXXX.ext`; returns the relative path.
     func copyStock(_ file: URL, ext: String) throws -> String {
         let path = device.layout.newMusicFilePath(ext: ext, existing: used)
-        used.insert(path)
+        used.insert(path.lowercased())
         try copy(file, to: path)
         return path
     }
 
     /// Copies to `wanted` (or `wanted (2)`, ...) unless the path is `replacing`, which is overwritten.
+    /// A file there that no entry owns and that has the size of `file` is kept: a copy whose checkpoint was lost.
     func copyRockbox(_ file: URL, wanted: String, replacing: String?) throws -> String {
-        let folded = Set(used.map { $0.lowercased() })
         let url = URL(fileURLWithPath: wanted)
         let stem = wanted.dropLast(url.pathExtension.isEmpty ? 0 : url.pathExtension.count + 1)
         var path = wanted, n = 1
         while path.lowercased() != replacing?.lowercased(),
-              folded.contains(path.lowercased()) || FileManager.default.fileExists(atPath: device.mountURL.appendingPathComponent(path).path) {
+              used.contains(path.lowercased()) || FileManager.default.fileExists(atPath: device.mountURL.appendingPathComponent(path).path) {
+            if !used.contains(path.lowercased()), Self.size(device.mountURL.appendingPathComponent(path)) == Self.size(file) {
+                used.insert(path.lowercased())
+                return path
+            }
             n += 1
             path = "\(stem) (\(n))" + (url.pathExtension.isEmpty ? "" : ".\(url.pathExtension)")
         }
-        used.insert(path)
+        used.insert(path.lowercased())
         try copy(file, to: path, overwrite: path.lowercased() == replacing?.lowercased())
         return path
     }
+
+    private static func size(_ url: URL) -> Int64? { try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64 }
 
     private func copy(_ file: URL, to relativePath: String, overwrite: Bool = false) throws {
         let fm = FileManager.default
         let dest = device.mountURL.appendingPathComponent(relativePath)
         try fm.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
-        if overwrite { try? fm.removeItem(at: dest) }
+        // A replaced file stays until the new one is complete.
+        let tmp = dest.deletingLastPathComponent().appendingPathComponent(".musicsync-\(UUID().uuidString)")
+        let target = overwrite && fm.fileExists(atPath: dest.path) ? tmp : dest
         do {
-            try fm.copyItem(at: file, to: dest)
+            try fm.copyItem(at: file, to: target)
             let want = try fm.attributesOfItem(atPath: file.path)[.size] as? Int64
-            let got = try fm.attributesOfItem(atPath: dest.path)[.size] as? Int64
+            let got = try fm.attributesOfItem(atPath: target.path)[.size] as? Int64
             guard want == got else { throw CocoaError(.fileWriteOutOfSpace) }
+            if target != dest { _ = try fm.replaceItemAt(dest, withItemAt: target) }
         } catch {
-            try? fm.removeItem(at: dest)
+            try? fm.removeItem(at: target)
             throw error
         }
     }

@@ -121,6 +121,15 @@ struct RockboxEndToEndTests {
         #expect(run.error == nil && run.summary?.added == 2)
         #expect(!FileManager.default.fileExists(atPath: f.pod.device.iTunesDBURL.path))
         #expect(f.pod.manifest().rockboxEntries.count == 2)
+
+        // Files copied before a lost checkpoint are adopted, not copied again as "(2)".
+        var manifest = f.pod.manifest()
+        let paths = Set(manifest.rockboxEntries.values.map(\.relativePath))
+        manifest.rockboxEntries = [:]
+        try ManifestStore.save(manifest, for: f.pod.device)
+        let again = try await makePlan(selection: selection, server: f.server, pod: f.pod)
+        #expect(await runSync(again, pod: f.pod, server: f.server, settings: f.pod.settings(guid: false)).error == nil)
+        #expect(Set(f.pod.manifest().rockboxEntries.values.map(\.relativePath)) == paths)
     }
 
     @Test func switchingAnAlbumFromStockToRockboxMovesItsFiles() async throws {
