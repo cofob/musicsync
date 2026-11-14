@@ -7,8 +7,9 @@ extension ClientTests {
     @Test func sharesAndSong() async throws {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [StubProtocol.self]
-        let c = SubsonicClient(baseURL: URL(string: "https://music.example.com")!, username: "demo", password: "sesame",
+        var c = SubsonicClient(baseURL: URL(string: "https://music.example.com")!, username: "demo", password: "sesame",
                                session: URLSession(configuration: config))
+        c.retry = .instant
         let share = #"{"id":"sh-1","url":"https://music.example.com/share/sh-1","description":"Xtal — Aphex Twin","username":"demo","created":"2026-11-13T16:10:37Z","expires":"2027-11-13T16:10:37Z","visitCount":6,"entry":[{"id":"s-1","title":"Xtal"}]}"#
         StubProtocol.replies = [
             "getShares": #"{"subsonic-response":{"status":"ok","version":"1.16.1","shares":{"share":[\#(share)]}}}"#,

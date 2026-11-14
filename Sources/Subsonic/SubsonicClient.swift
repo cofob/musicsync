@@ -11,6 +11,8 @@ public struct SubsonicClient: Sendable {
     public let username: String
     private let password: String
     let session: URLSession
+    /// For reads only (`RetryPolicy.isRead`); writes are sent once.
+    public var retry = RetryPolicy.standard
 
     public init(baseURL: URL, username: String, password: String, session: URLSession = .shared) {
         self.baseURL = baseURL
@@ -72,6 +74,10 @@ public struct SubsonicClient: Sendable {
     // MARK: Requests
 
     func call<Body: Decodable>(_ method: String, key: String?, _ query: [(String, String)] = []) async throws -> (ServerInfo, Body?) {
+        try await (RetryPolicy.isRead(method) ? retry : .none).run { try await callOnce(method, key: key, query) }
+    }
+
+    private func callOnce<Body: Decodable>(_ method: String, key: String?, _ query: [(String, String)]) async throws -> (ServerInfo, Body?) {
         let (data, response) = try await session.data(from: url(method, query))
         if let status = (response as? HTTPURLResponse)?.statusCode, status != 200 { throw SubsonicError.badStatus(status) }
         let decoder = JSONDecoder()
@@ -151,10 +157,13 @@ public struct SubsonicClient: Sendable {
     }
 
     /// Cover art bytes (square, `size` px).
+    /// An error body here means the server has no image, so only network and status errors are tried again.
     public func coverArt(id: String, size: Int) async throws -> Data {
-        let (data, response) = try await session.data(from: coverArtURL(id: id, size: size))
-        try Self.check(response, body: data)
-        return data
+        try await retry.run(retries: RetryPolicy.isTransientBinary) {
+            let (data, response) = try await session.data(from: coverArtURL(id: id, size: size))
+            try Self.check(response, body: data)
+            return data
+        }
     }
 
     /// Binary endpoints send a Subsonic error body (XML/JSON) with HTTP 200.

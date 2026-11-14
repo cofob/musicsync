@@ -7,8 +7,9 @@ extension ClientTests {
     @Test func artistInfoGenresAndRadio() async throws {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [StubProtocol.self]
-        let c = SubsonicClient(baseURL: URL(string: "https://music.example.com")!, username: "demo", password: "sesame",
+        var c = SubsonicClient(baseURL: URL(string: "https://music.example.com")!, username: "demo", password: "sesame",
                                session: URLSession(configuration: config))
+        c.retry = .instant
         let ok = #"{"subsonic-response":{"status":"ok","version":"1.16.1"}}"#
         StubProtocol.replies = [
             "getArtistInfo2": #"{"subsonic-response":{"status":"ok","version":"1.16.1","artistInfo2":{"biography":"Bio","largeImageUrl":"https://img/l.jpg","similarArtist":[{"id":"ar-2","name":"Björk"},{"id":"","name":"Unknown"}]}}}"#,

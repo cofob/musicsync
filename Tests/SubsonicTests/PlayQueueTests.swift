@@ -7,8 +7,9 @@ extension ClientTests {
     @Test func playQueue() async throws {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [StubProtocol.self]
-        let c = SubsonicClient(baseURL: URL(string: "https://music.example.com")!, username: "demo", password: "sesame",
+        var c = SubsonicClient(baseURL: URL(string: "https://music.example.com")!, username: "demo", password: "sesame",
                                session: URLSession(configuration: config))
+        c.retry = .instant
         StubProtocol.replies = [
             "getPlayQueue": #"{"subsonic-response":{"status":"ok","version":"1.16.1","playQueue":{"entry":[{"id":"s-1","title":"Xtal"},{"id":"s-2","title":"Tha"}],"current":"s-2","position":61500,"username":"demo","changed":"2026-11-14T07:47:28.669536271Z","changedBy":"feishin"}}}"#,
             "savePlayQueue": #"{"subsonic-response":{"status":"ok","version":"1.16.1"}}"#,

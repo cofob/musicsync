@@ -10,8 +10,9 @@ extension ClientTests {
     @Test func podcasts() async throws {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [StubProtocol.self]
-        let c = SubsonicClient(baseURL: URL(string: "https://music.example.com")!, username: "demo", password: "sesame",
+        var c = SubsonicClient(baseURL: URL(string: "https://music.example.com")!, username: "demo", password: "sesame",
                                session: URLSession(configuration: config))
+        c.retry = .instant
         StubProtocol.replies = [
             "getPodcasts": #"{"subsonic-response":{"status":"ok","version":"1.16.1","podcasts":{"channel":[{"id":"ch-1","url":"https://example.com/feed","title":"Night Talks","description":"Talks","coverArt":"pod-ch-1","status":"completed","episode":[\#(Self.episode),{"id":"ep-2","channelId":"ch-1","title":"Next","status":"new"}]}]}}}"#,
             "getNewestPodcasts": #"{"subsonic-response":{"status":"ok","version":"1.16.1","newestPodcasts":{"episode":[\#(Self.episode)]}}}"#,

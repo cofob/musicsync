@@ -3,7 +3,9 @@ import Testing
 @testable import Subsonic
 
 private func client(_ base: String = "https://music.example.com", session: URLSession = .shared) -> SubsonicClient {
-    SubsonicClient(baseURL: URL(string: base)!, username: "demo", password: "sesame", session: session)
+    var c = SubsonicClient(baseURL: URL(string: base)!, username: "demo", password: "sesame", session: session)
+    c.retry = .instant
+    return c
 }
 
 private func query(_ url: URL) -> [String: String] {

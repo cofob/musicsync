@@ -58,8 +58,9 @@ extension ClientTests {
     @Test func junkRepliesNeverTrap() async {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [StubProtocol.self]
-        let c = SubsonicClient(baseURL: URL(string: "https://music.example.com")!, username: "u", password: "p",
+        var c = SubsonicClient(baseURL: URL(string: "https://music.example.com")!, username: "u", password: "p",
                                session: URLSession(configuration: config))
+        c.retry = .instant
         var random = SystemRandomNumberGenerator()
         let mangled = Self.oddBodies.map { body in
             // The same replies cut short at a random byte.
@@ -78,8 +79,9 @@ extension ClientTests {
     @Test func oddValuesDecodeOrFail() async throws {
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [StubProtocol.self]
-        let c = SubsonicClient(baseURL: URL(string: "https://music.example.com")!, username: "u", password: "p",
+        var c = SubsonicClient(baseURL: URL(string: "https://music.example.com")!, username: "u", password: "p",
                                session: URLSession(configuration: config))
+        c.retry = .instant
         StubProtocol.replies = ["getAlbum": Self.ok(#""album":{"id":"a","name":"x","song":[{"id":"s","title":"t","duration":9223372036854775807}]}"#)]
         #expect(try await c.getAlbum(id: "a").song?.first?.duration == .max)
         StubProtocol.replies = ["getAlbum": Self.ok(#""album":{"id":"a","name":"x","song":[{"id":"s","title":"t","duration":1e300}]}"#)]

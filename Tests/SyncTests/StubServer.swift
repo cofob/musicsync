@@ -33,7 +33,9 @@ final class StubServer: @unchecked Sendable {
 
     var client: SubsonicClient {
         Registry.shared.register(self)
-        return SubsonicClient(baseURL: URL(string: "http://\(host)")!, username: "demo", password: "pw", session: session)
+        var client = SubsonicClient(baseURL: URL(string: "http://\(host)")!, username: "demo", password: "pw", session: session)
+        client.retry = RetryPolicy(attempts: RetryPolicy.standard.attempts, sleep: { _ in })  // the tries, not the waits
+        return client
     }
 
     // MARK: Setup
