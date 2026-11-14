@@ -22,6 +22,8 @@ import SwiftUI
         case "miniplayer": await miniPlayer(model)
         case "equalizer": await equalizer(model)
         case "artists": await artists(model)
+        case "nowplaying-lyrics": await nowPlayingLyrics(model)
+        case "nowplaying-drag": await nowPlayingDrag(model)
         default: check(false, "known check \(name)")
         }
     }
@@ -254,6 +256,54 @@ import SwiftUI
         try? await Task.sleep(for: .seconds(2))
         await send(key(51, "\u{7f}", window), window)
         check(await wait { count() == before - 3 }, "back on the playlist, Delete removes only the clicked row")
+    }
+
+    // MARK: Now Playing
+
+    /// Synced lyrics at line 30 of 60: right after Now Playing opens, that line is on screen, without waiting for the next line.
+    private static func nowPlayingLyrics(_ model: AppModel) async {
+        await Shot.playPaused(model)
+        guard case .server(let song)? = model.player.current, let window = mainWindow, let content = window.contentView else { return check(false, "a song") }
+        let json = #"{"synced":true,"line":["# + (0..<60).map { #"{"start":\#($0 * 5000),"value":"Line \#($0)"}"# }.joined(separator: ",") + "]}"
+        model.lyricsCache[song.id] = (try? JSONDecoder().decode(StructuredLyrics.self, from: Data(json.utf8))).flatMap(Lyrics.init)
+        model.player.seek(to: 151)
+        _ = await wait { abs(model.player.elapsed - 151) < 1 }
+        model.nowPlayingPanel = .lyrics
+        model.showNowPlaying = true
+        try? await Task.sleep(for: .seconds(1.5))  // the slide and the lyrics fade; the next line is at 155 s
+        // The lyrics stack: 220 pt above and below 60 lines of height h with 26 pt between them.
+        let lineHeight = { (scroll: NSScrollView) in ((scroll.documentView?.frame.height ?? 0) - 440 - 59 * 26) / 60 }
+        guard let scroll = views(content, of: NSScrollView.self).first(where: { (30...50).contains(lineHeight($0)) }) else { return check(false, "lyrics scroll view") }
+        let h = lineHeight(scroll), viewport = scroll.contentView.bounds.height
+        // `scrollTo` with anchor 0.35 puts that point of line 30 at that point of the viewport.
+        let expected = 220 + 30 * (h + 26) + 0.35 * h - 0.35 * viewport
+        let offset = scroll.contentView.bounds.minY
+        check(model.player.elapsed < 154 && abs(offset - expected) < 4, "the lyrics open on line 30 at once: offset \(offset), expected \(expected)")
+    }
+
+    /// A drag on the volume slider in the title bar area changes the volume and leaves the window in place.
+    private static func nowPlayingDrag(_ model: AppModel) async {
+        await Shot.playPaused(model)
+        model.showNowPlaying = true
+        try? await Task.sleep(for: .seconds(1))
+        guard let window = mainWindow, let content = window.contentView else { return check(false, "main window") }
+        let bars = views(content, of: BarMouseArea.AreaView.self)
+        check(!bars.isEmpty && bars.allSatisfy { !$0.mouseDownCanMoveWindow }, "\(bars.count) bars do not move the window")
+        guard let volume = bars.first(where: { abs($0.bounds.width - 120) < 1 }), let frameView = content.superview else { return check(false, "volume slider") }
+        check(frameView.hitTest(frameView.convert(NSPoint(x: volume.bounds.midX, y: volume.bounds.midY), from: volume)) === volume, "the volume slider gets its clicks")
+        let before = window.frame
+        model.player.volume = 0.2
+        let y = volume.bounds.midY
+        for (type, x) in [(NSEvent.EventType.leftMouseDragged, 0.5), (.leftMouseDragged, 0.8), (.leftMouseUp, 0.8)] {
+            mouse(type, volume.convert(NSPoint(x: volume.bounds.width * x, y: y), to: nil), window).map { NSApp.postEvent($0, atStart: false) }
+        }
+        mouse(.leftMouseDown, volume.convert(NSPoint(x: volume.bounds.width * 0.2, y: y), to: nil), window).map(window.sendEvent)
+        check(await wait { abs(model.player.volume - 0.8) < 0.02 }, "the drag sets the volume: \(model.player.volume)")
+        check(window.frame == before, "the window stays: \(before) → \(window.frame)")
+    }
+
+    private static func views<T: NSView>(_ root: NSView, of type: T.Type) -> [T] {
+        ((root as? T).map { [$0] } ?? []) + root.subviews.flatMap { views($0, of: type) }
     }
 
     // MARK: Windows

@@ -53,6 +53,7 @@ struct RootView: View {
             }
             if model.showNowPlaying {
                 NowPlayingView().transition(.move(edge: .bottom)).zIndex(1)
+                NowPlayingVolume().transition(NowPlayingVolume.transition).zIndex(2)
             }
         }
         .animation(.smooth(duration: 0.35), value: model.showNowPlaying)

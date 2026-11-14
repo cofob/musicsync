@@ -37,17 +37,6 @@ struct NowPlayingView: View {
                 // The window buttons hide with the toolbar, so the close button takes their corner.
                 .padding(.leading, 16).padding(.top, 12)
         }
-        .overlay(alignment: .topTrailing) {
-            HStack(spacing: 12) {
-                AirPlayButton(tint: .white).frame(width: 22, height: 22)
-                Divider().frame(height: 18)
-                VolumeSlider(tint: .white).frame(width: 120)
-                Image(systemName: volumeSymbol(player.volume)).frame(width: 22)
-            }
-            .padding(.horizontal, 14).frame(height: 36)
-            .glass(in: Capsule())
-            .padding(.trailing, 16).padding(.top, 10)
-        }
         .overlay(alignment: .bottomTrailing) {
             HStack(spacing: 4) {
                 panelToggle("Lyrics", "quote.bubble", .lyrics)
@@ -77,6 +66,30 @@ struct NowPlayingView: View {
             .foregroundStyle(on ? Color.black : .white)
             .background(on ? Color.white.opacity(0.9) : .clear, in: Capsule())
             .help(title)
+    }
+}
+
+/// AirPlay and volume over the top right corner of Now Playing. `RootView` shows it beside Now Playing,
+/// not inside it, so it fades and scales in and out on its own instead of sliding with the page.
+struct NowPlayingVolume: View {
+    @Environment(AppModel.self) private var model
+
+    static let transition: AnyTransition = .opacity.combined(with: .scale(scale: 0.9, anchor: .topTrailing)).combined(with: .offset(y: -6))
+
+    var body: some View {
+        HStack(spacing: 12) {
+            AirPlayButton(tint: .white).frame(width: 22, height: 22)
+            Divider().frame(height: 18)
+            VolumeSlider(tint: .white).frame(width: 120)
+            Image(systemName: volumeSymbol(model.player.volume)).frame(width: 22)
+        }
+        .padding(.horizontal, 14).frame(height: 36)
+        .glass(in: Capsule())
+        .foregroundStyle(.white)
+        .environment(\.colorScheme, .dark)
+        .padding(.trailing, 16).padding(.top, 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        .ignoresSafeArea()
     }
 }
 
@@ -187,19 +200,25 @@ private struct LyricsPanel: View {
                             .id(i)
                     }
                 }
-                .padding(.vertical, 220).padding(.trailing, 40)
+                // Room for the blur on the left: the scroll view clips at its edge.
+                .padding(.vertical, 220).padding(.leading, 16).padding(.trailing, 40)
                 .animation(.easeOut(duration: 0.35), value: current)
             }
             .scrollIndicators(.never)
+            .padding(.leading, -16)
             .mask(LinearGradient(stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.12),
                                          .init(color: .black, location: 0.88), .init(color: .clear, location: 1)],
                                  startPoint: .top, endPoint: .bottom))
+            // The panel opens on the current line at once, then follows it smoothly.
+            .onAppear { if let current { proxy.scrollTo(current, anchor: Self.anchor) } }
             .onChange(of: current) {
                 guard let current else { return }
-                withAnimation(.smooth(duration: 0.6)) { proxy.scrollTo(current, anchor: UnitPoint(x: 0, y: 0.35)) }
+                withAnimation(.smooth(duration: 0.6)) { proxy.scrollTo(current, anchor: Self.anchor) }
             }
         }
     }
+
+    private static let anchor = UnitPoint(x: 0, y: 0.35)
 
     private func currentLine(_ lyrics: Lyrics) -> Int? {
         guard lyrics.isSynced else { return nil }

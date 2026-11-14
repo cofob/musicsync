@@ -49,16 +49,40 @@ struct LevelBar: View {
                 }
                 .frame(height: h)
                 .frame(maxHeight: .infinity)
-                .contentShape(Rectangle())
-                .gesture(DragGesture(minimumDistance: 0)
-                    .onChanged { onChange(fraction($0.location.x, geo.size.width)) }
-                    .onEnded { onCommit(fraction($0.location.x, geo.size.width)) })
+                .overlay(BarMouseArea(onChange: onChange, onCommit: onCommit))
         }
         .frame(height: max(14, height * 2))
         .onHover { h in withAnimation(.easeOut(duration: 0.15)) { hovering = h } }
     }
+}
 
-    private func fraction(_ x: CGFloat, _ width: CGFloat) -> Double { Double(min(max(x / max(width, 1), 0), 1)) }
+/// Clicks and drags on a `LevelBar`, as fractions of its width. An AppKit view, because a SwiftUI drag
+/// in the title bar area (Now Playing) or in a window movable by its background (MiniPlayer) moves the window.
+struct BarMouseArea: NSViewRepresentable {
+    let onChange: (Double) -> Void
+    let onCommit: (Double) -> Void
+
+    func makeNSView(context: Context) -> AreaView { AreaView() }
+
+    func updateNSView(_ view: AreaView, context: Context) {
+        view.onChange = onChange
+        view.onCommit = onCommit
+    }
+
+    final class AreaView: NSView {
+        var onChange: (Double) -> Void = { _ in }
+        var onCommit: (Double) -> Void = { _ in }
+
+        override var mouseDownCanMoveWindow: Bool { false }
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+        override func mouseDown(with event: NSEvent) { onChange(fraction(event)) }
+        override func mouseDragged(with event: NSEvent) { onChange(fraction(event)) }
+        override func mouseUp(with event: NSEvent) { onCommit(fraction(event)) }
+
+        private func fraction(_ event: NSEvent) -> Double {
+            Double(min(max(convert(event.locationInWindow, from: nil).x / max(bounds.width, 1), 0), 1))
+        }
+    }
 }
 
 /// Song progress with elapsed and remaining time; seeks on release.
