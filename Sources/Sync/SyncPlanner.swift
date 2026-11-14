@@ -7,9 +7,12 @@ public struct PlannerInput: Sendable {
     public var manifest: Manifest
     public var library: DeviceLibrary
     public var freeBytes: Int64
+    /// Space the sync must leave free.
+    public var reserveBytes: Int64
 
     public init(desired: [DesiredSong], playlists: [DesiredPlaylist] = [], manifest: Manifest,
-                library: DeviceLibrary, freeBytes: Int64) {
+                library: DeviceLibrary, freeBytes: Int64, reserveBytes: Int64 = SyncPlanner.reserveBytes) {
+        self.reserveBytes = reserveBytes
         self.desired = desired
         self.playlists = playlists
         self.manifest = manifest
@@ -28,6 +31,7 @@ public enum SyncPlanner {
     public static func plan(_ input: PlannerInput) -> SyncPlan {
         var plan = SyncPlan()
         plan.freeBytes = input.freeBytes
+        plan.reserveBytes = input.reserveBytes
         let manifest = input.manifest
         let library = input.library
 

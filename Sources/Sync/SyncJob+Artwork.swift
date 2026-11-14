@@ -67,9 +67,10 @@ extension SyncJob {
             guard !FileManager.default.fileExists(atPath: device.mountURL.appendingPathComponent(dir + "/cover.jpg").path) else { continue }
             folders[dir] = (cover, dir)
         }
-        let covers = await fetchCovers(folders.values.map(\.cover), size: 500)
+        let size = settings.rockboxCoverSize
+        let covers = await fetchCovers(folders.values.map(\.cover), size: size)
         for (cover, dir) in folders.values {
-            guard let jpeg = covers[cover].flatMap({ RockboxPaths.coverJPEG(from: $0) }) else { warn("No cover for \(dir)"); continue }
+            guard let jpeg = covers[cover].flatMap({ RockboxPaths.coverJPEG(from: $0, size: size) }) else { warn("No cover for \(dir)"); continue }
             try? jpeg.write(to: device.mountURL.appendingPathComponent(dir + "/cover.jpg"))
         }
     }

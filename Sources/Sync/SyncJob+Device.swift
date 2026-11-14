@@ -22,6 +22,10 @@ extension SyncJob {
             }
             await mergePlayStatistics()
             pruneStale()
+            if let name = plan.rename, db.name != name {
+                db.name = name
+                dbDirty = true
+            }
         }
         let fm = FileManager.default
         for (id, entry) in manifest.rockboxEntries where !fm.fileExists(atPath: device.mountURL.appendingPathComponent(entry.relativePath).path) {
@@ -42,7 +46,7 @@ extension SyncJob {
                 let counts = try PlayCounts.parse(data)
                 if counts.entries.count == db.tracks.count {
                     let deltas = db.merge(counts)
-                    await scrobbler.enqueue(scrobbleRequests(deltas), source: data)
+                    if settings.sendPlayCounts { await scrobbler.enqueue(scrobbleRequests(deltas), source: data) }
                 } else {
                     warn("Play Counts does not match the database (\(counts.entries.count) vs \(db.tracks.count) tracks), discarded with the On-The-Go playlists. A copy is kept in the Mac backup.")
                     return

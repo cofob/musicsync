@@ -34,6 +34,8 @@ public struct SyncPlan: Sendable, Equatable {
 
     /// iTunesDB tracks (by dbid) the user deleted from the iPod, foreign or managed.
     public var deleteTracks: Set<UInt64> = []
+    /// New iPod name, written into the iTunesDB.
+    public var rename: String?
 
     public var addBytes: Int64 = 0
     public var freedBytes: Int64 = 0
@@ -46,14 +48,14 @@ public struct SyncPlan: Sendable, Equatable {
 
     public var isEmpty: Bool {
         add.isEmpty && remove.isEmpty && deleteTracks.isEmpty && reencode.isEmpty && retag.isEmpty
-            && playlistsToCreate.isEmpty && playlistsToUpdate.isEmpty
+            && playlistsToCreate.isEmpty && playlistsToUpdate.isEmpty && rename == nil
     }
 
     /// True when the iTunesDB (and so the FireWire GUID) is needed.
     public var touchesStock: Bool {
         add.contains { $0.preset.target == .stock } || remove.contains { $0.target == .stock }
             || reencode.contains { $0.desired.preset.target == .stock } || !retag.isEmpty
-            || playlistsTouchStock || !deleteTracks.isEmpty
+            || playlistsTouchStock || !deleteTracks.isEmpty || rename != nil
     }
 
     public init() {}
