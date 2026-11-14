@@ -60,7 +60,7 @@ final class Player {
     var index: Int? { get { line.index } set { line.index = newValue } }
     var isPlaying = false
     var elapsed: TimeInterval = 0
-    private(set) var artwork: NSImage?
+    private(set) var artwork: NSImage? { didSet { CoverAccent.shared.image = artwork } }
     private(set) var errorMessage: String?
     var volume: Double = 1 { didSet { if let remote { remote.setGain(volume) } else { mixer.volume = Float(volume) } } }
     private(set) var shuffle = false

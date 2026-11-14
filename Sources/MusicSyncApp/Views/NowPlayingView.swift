@@ -16,7 +16,8 @@ struct NowPlayingView: View {
         let song: Song? = if case .server(let s)? = player.current { s } else { nil }
         let panel = model.nowPlayingPanel == .lyrics && !showLyrics ? .none : model.nowPlayingPanel
         ZStack {
-            ArtworkBackground(image: AppPreferences.shared.appearance.nowPlayingBackground == .artwork ? player.artwork : nil)
+            let background = AppPreferences.shared.appearance.nowPlayingBackground
+            ArtworkBackground(image: background == .plain ? nil : player.artwork, animated: background == .animated)
             HStack(spacing: 40) {
                 PlayerColumn().frame(maxWidth: 440)
                 if panel != .none {
@@ -148,16 +149,21 @@ private struct RoundGlassStyle: ButtonStyle {
 /// Gradient made from the cover's colors (a 3×3 sample), with a soft dark veil for contrast.
 struct ArtworkBackground: View {
     let image: NSImage?
+    /// The colors drift slowly, as in Music; still with Reduce Motion.
+    var animated = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var colors: [Color] = ArtworkBackground.fallback
 
     private static let fallback = Array(repeating: Color(white: 0.22), count: 9)
 
     var body: some View {
-        MeshGradient(width: 3, height: 3, points: [
-            [0, 0], [0.5, 0], [1, 0],
-            [0, 0.5], [0.55, 0.45], [1, 0.5],
-            [0, 1], [0.5, 1], [1, 1],
-        ], colors: colors)
+        Group {
+            if animated && !reduceMotion {
+                TimelineView(.animation(minimumInterval: 1 / 30)) { mesh(at: $0.date.timeIntervalSinceReferenceDate) }
+            } else {
+                mesh(at: 0)
+            }
+        }
         .overlay(Color.black.opacity(0.22))
         .ignoresSafeArea()
         .task(id: image.map(ObjectIdentifier.init)) {
@@ -165,18 +171,21 @@ struct ArtworkBackground: View {
         }
     }
 
-    /// Averages the image into a 3×3 grid of colors.
-    private static func sample(_ image: NSImage) -> [Color]? {
-        guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
-              let ctx = CGContext(data: nil, width: 3, height: 3, bitsPerComponent: 8, bytesPerRow: 12,
-                                  space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue),
-              let data = ctx.data else { return nil }
-        ctx.interpolationQuality = .medium
-        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: 3, height: 3))
-        let px = data.bindMemory(to: UInt8.self, capacity: 36)
-        return (0..<9).map { i in
-            Color(red: Double(px[4 * i]) / 255, green: Double(px[4 * i + 1]) / 255, blue: Double(px[4 * i + 2]) / 255)
+    /// The middle points circle slowly, edge points slide along their edge; at `time` 0 all rest
+    /// where the still background has them.
+    private func mesh(at time: TimeInterval) -> MeshGradient {
+        func point(_ x: Float, _ y: Float, _ phase: Double, x dx: Float = 0.12, y dy: Float = 0.12) -> SIMD2<Float> {
+            [x + dx * Float(sin(time / 7 + phase) - sin(phase)), y + dy * Float(cos(time / 9 + phase) - cos(phase))]
         }
+        return MeshGradient(width: 3, height: 3, points: [
+            [0, 0], point(0.5, 0, 1, y: 0), [1, 0],
+            point(0, 0.5, 2, x: 0), point(0.55, 0.45, 3), point(1, 0.5, 4, x: 0),
+            [0, 1], point(0.5, 1, 5, y: 0), [1, 1],
+        ], colors: colors)
+    }
+
+    private static func sample(_ image: NSImage) -> [Color]? {
+        coverSamples(image)?.map { Color(red: $0.red, green: $0.green, blue: $0.blue) }
     }
 }
 

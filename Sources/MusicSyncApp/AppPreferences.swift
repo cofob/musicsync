@@ -40,7 +40,7 @@ extension Player {
 }
 
 extension AppearanceSettings.Accent {
-    var color: Color { Color(red: rgb.red, green: rgb.green, blue: rgb.blue) }
+    @MainActor var color: Color { (self == .album ? CoverAccent.shared.color : nil) ?? Color(red: rgb.red, green: rgb.green, blue: rgb.blue) }
 
-    var title: String { rawValue.capitalized }
+    var title: String { self == .album ? "Album Color" : rawValue.capitalized }
 }
