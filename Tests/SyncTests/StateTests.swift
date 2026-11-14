@@ -50,6 +50,11 @@ import Testing
         try FileManager.default.removeItem(at: ManifestStore.url(for: pod.device))
         let missing = ManifestStore.load(for: pod.device, serverKey: "srv")
         #expect(missing.manifest.entries.isEmpty && missing.warning == nil)
+
+        // Present but not readable: a sync stops, the app gets a warning.
+        try FileManager.default.createDirectory(at: ManifestStore.url(for: pod.device), withIntermediateDirectories: true)
+        #expect(throws: (any Error).self) { try ManifestStore.read(for: pod.device, serverKey: "srv") }
+        #expect(ManifestStore.load(for: pod.device, serverKey: "srv").warning != nil)
     }
 
     @Test func corruptManifestNeverDeletesForeignTracksInASync() async throws {
