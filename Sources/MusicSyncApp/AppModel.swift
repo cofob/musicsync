@@ -78,8 +78,14 @@ final class AppModel {
 
     /// Home shelves, loaded by `loadHome()`.
     private(set) var shelves: [Shelf] = []
-    /// Star state changed in this session, by song id.
-    private var starOverrides: [String: Bool] = [:]
+    /// Star state changed in this session, by song, album or artist id.
+    var starOverrides: [String: Bool] = [:]
+    /// Ratings changed in this session, by song id.
+    var ratingOverrides: [String: Int] = [:]
+    /// Set when the server refuses `setRating`; the rating controls are hidden then.
+    var ratingUnsupported = false
+    /// New Playlist sheet, delete confirmation or duplicate warning (`PlaylistDialogs`).
+    var playlistPrompt: PlaylistPrompt?
 
     let player = Player()
     /// The connected iPod (read-only snapshot, eject). Sync UI hooks live here.
@@ -130,7 +136,7 @@ final class AppModel {
 
     private func connect() async {
         path = []
-        shelves = []; starOverrides = [:]; lyricsCache = [:]
+        shelves = []; starOverrides = [:]; ratingOverrides = [:]; ratingUnsupported = false; lyricsCache = [:]
         player.stop()
         await stopLibrary()
         let client = demo ? config.map { SubsonicClient(baseURL: $0.baseURL, username: $0.username, password: "demo") }
@@ -216,28 +222,6 @@ final class AppModel {
 
     func goToArtist(_ song: Song) {
         if let id = song.artistId { show(.artist(id)) }
-    }
-
-    func isStarred(_ song: Song) -> Bool { starOverrides[song.id] ?? (song.starred != nil) }
-
-    func toggleStar(_ song: Song) {
-        let star = !isStarred(song)
-        starOverrides[song.id] = star
-        Task {
-            do { try await star ? client?.star(ids: [song.id]) : client?.unstar(ids: [song.id]) } catch {
-                starOverrides[song.id] = !star
-                report(error)
-            }
-        }
-    }
-
-    func add(_ songs: [Song], to playlist: Playlist) {
-        Task {
-            do {
-                try await client?.updatePlaylist(id: playlist.id, songIdsToAdd: songs.map(\.id))
-                if let fresh = try await client?.getPlaylists() { apply(artists: artists, albums: albums, playlists: fresh) }
-            } catch { report(error) }
-        }
     }
 
     func copy(_ song: Song) {
