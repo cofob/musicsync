@@ -81,15 +81,20 @@ func runProcess(_ executable: URL, _ arguments: [String],
             process.standardOutput = outPipe
             process.standardError = errPipe
             let collector = Collector(onLine: onLine)
-            outPipe.fileHandleForReading.readabilityHandler = { collector.addOut($0.availableData) }
-            errPipe.fileHandleForReading.readabilityHandler = { collector.addErr($0.availableData) }
-            process.terminationHandler = { p in
-                outPipe.fileHandleForReading.readabilityHandler = nil
-                errPipe.fileHandleForReading.readabilityHandler = nil
-                collector.addOut((try? outPipe.fileHandleForReading.readToEnd()) ?? Data())
-                collector.addErr((try? errPipe.fileHandleForReading.readToEnd()) ?? Data())
+            // The result waits for the end of both pipes, so a chunk still in a handler is not lost or reordered.
+            let done = DispatchGroup()
+            for (pipe, add) in [(outPipe, collector.addOut), (errPipe, collector.addErr)] {
+                done.enter()
+                pipe.fileHandleForReading.readabilityHandler = { handle in
+                    let data = handle.availableData
+                    if data.isEmpty { handle.readabilityHandler = nil; done.leave() } else { add(data) }
+                }
+            }
+            done.enter()
+            process.terminationHandler = { _ in done.leave() }
+            done.notify(queue: .global()) {
                 let (out, err) = collector.result
-                cont.resume(returning: ProcessOutput(status: p.terminationStatus, stdout: out, stderr: err))
+                cont.resume(returning: ProcessOutput(status: process.terminationStatus, stdout: out, stderr: err))
             }
             do { try handle.run(process) } catch { cont.resume(throwing: error) }
         }
