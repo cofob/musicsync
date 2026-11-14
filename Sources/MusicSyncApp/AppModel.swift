@@ -312,6 +312,7 @@ final class AppModel {
 
     /// Plays iPod tracks from the local files.
     func play(_ tracks: [DeviceTrack], startAt: Int = 0, shuffled: Bool = false) {
+        guard ipod.current != nil else { return }  // offline: the files are not reachable
         player.play(ipod.playItems(shuffled ? tracks.shuffled() : tracks), startAt: shuffled ? 0 : startAt)
     }
 

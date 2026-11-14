@@ -64,10 +64,10 @@ struct Sidebar: View {
             Section("Library") {
                 ForEach(SidebarItem.libraryItems, id: \.self, content: row)
             }
-            if model.ipod.current != nil {
+            if model.ipod.current != nil || model.ipod.isOffline {
                 Section {
                     ForEach(SidebarItem.deviceItems, id: \.self, content: row)
-                    SyncStatusRow()
+                    if model.ipod.current != nil { SyncStatusRow() }
                 } header: { DeviceSectionHeader() }
             }
             Section("Playlists") {
@@ -132,11 +132,15 @@ private struct DeviceSectionHeader: View {
                 Text(name)
             }
             Spacer()
-            Button("Eject", systemImage: "eject.fill") { Task { await model.eject() } }
-                .labelStyle(.iconOnly).buttonStyle(.borderless).disabled(ipod.isEjecting || ipod.isSyncing)
-                // Sized like the header text and gray, as in the Finder sidebar.
-                .font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
-                .help("Eject \(name)")
+            if ipod.isOffline {
+                Text("Not Connected").font(.system(size: 11, weight: .medium)).foregroundStyle(.tertiary)
+            } else {
+                Button("Eject", systemImage: "eject.fill") { Task { await model.eject() } }
+                    .labelStyle(.iconOnly).buttonStyle(.borderless).disabled(ipod.isEjecting || ipod.isSyncing)
+                    // Sized like the header text and gray, as in the Finder sidebar.
+                    .font(.system(size: 11, weight: .medium)).foregroundStyle(.secondary)
+                    .help("Eject \(name)")
+            }
         }
     }
 

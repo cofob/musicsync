@@ -65,8 +65,10 @@ struct RootView: View {
             model.search.reload()
             if !model.searchText.isEmpty { Task { await model.search.suggest(model.searchText) } }
         }
+        .onChange(of: model.ipod.current == nil && model.ipod.snapshot == nil) { _, gone in
+            if gone, selection.isDevice { model.selection = .home }
+        }
         .onChange(of: model.ipod.current?.id) {
-            if model.ipod.current == nil, selection.isDevice { model.selection = .home }
             if model.ipod.current == nil, !model.sync.isRunning { model.sync.showSheet = false }
             if model.ipod.current == nil { model.search.scope = .library }
         }

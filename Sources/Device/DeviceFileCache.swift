@@ -17,7 +17,7 @@ public enum DeviceFileCache {
         let header = try handle.read(upToCount: headerSize) ?? Data()
         try? handle.close()
 
-        let prefix = hash(Data((device.volumeUUID ?? device.mountURL.path).utf8))
+        let prefix = hash(Data(device.cacheKey.utf8))
         let stamp = "\(values.fileSize ?? -1)|\(values.contentModificationDate?.timeIntervalSince1970 ?? 0)"
         let cached = directory.appendingPathComponent("\(prefix)-\(hash(Data(stamp.utf8) + header))")
         if let data = try? Data(contentsOf: cached) { return data }
@@ -34,12 +34,22 @@ public enum DeviceFileCache {
         return data
     }
 
+    /// The last copy stored for `device`, without reading the device (it can be disconnected).
+    public static func lastITunesDB(of device: IPodDevice, directory: URL = standardDirectory) -> Data? {
+        let prefix = hash(Data(device.cacheKey.utf8)) + "-"
+        let names = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
+        return names.first { $0.hasPrefix(prefix) }.flatMap { try? Data(contentsOf: directory.appendingPathComponent($0)) }
+    }
+
     private static func hash(_ data: Data) -> String {
         SHA256.hash(data: data).prefix(8).map { String(format: "%02x", $0) }.joined()
     }
 }
 
 public extension IPodDevice {
+    /// Names this device in the Mac caches.
+    var cacheKey: String { volumeUUID ?? mountURL.path }
+
     /// Stops Spotlight from indexing the iPod: indexing keeps the slow disk busy. Errors are ignored.
     func disableSpotlight() {
         let marker = mountURL.appendingPathComponent(".metadata_never_index")

@@ -41,8 +41,12 @@ final class DeviceModel {
     func start() {
         monitor.start()
         devicesChanged()
+        if current == nil { reload() }
         observe()
     }
+
+    /// The last iPod from the Mac caches is shown while no iPod is connected.
+    var isOffline: Bool { current == nil && snapshot != nil }
 
     /// Re-arms itself: `withObservationTracking` fires once per change.
     private func observe() {
@@ -67,7 +71,8 @@ final class DeviceModel {
         guard next != current else { return }
         let sameVolume = next?.id == current?.id
         current = next
-        if !sameVolume { snapshot = nil }
+        // On disconnect the snapshot stays until `reload` replaces it with the offline one.
+        if !sameVolume, next != nil { snapshot = nil }
         onDeviceChanged?(next)
         reload()
     }
@@ -76,7 +81,7 @@ final class DeviceModel {
     func reload() {
         loadTask?.cancel()
         prefetchTask?.cancel()
-        guard let device = current else { snapshot = nil; isLoading = false; return }
+        guard let device = current else { return loadOffline() }
         isLoading = true
         let guid = manualGuid(device)
         loadTask = Task {
@@ -87,9 +92,23 @@ final class DeviceModel {
             self.snapshot = snapshot
             version += 1
             isLoading = false
+            if snapshot.database != nil {
+                let last = LastDevice(snapshot)
+                Task.detached(priority: .utility) { last.save() }
+            }
             if let artwork = snapshot.artwork, !isSyncing {
                 prefetchTask = Task(priority: .utility) { await artwork.prefetchAll() }
             }
+        }
+    }
+
+    private func loadOffline() {
+        isLoading = false
+        loadTask = Task {
+            let offline = await Task.detached(priority: .utility) { LastDevice.load().flatMap(DeviceSnapshot.offline) }.value
+            guard !Task.isCancelled, current == nil else { return }
+            snapshot = offline
+            version += 1
         }
     }
 

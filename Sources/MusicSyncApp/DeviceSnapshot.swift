@@ -111,6 +111,40 @@ struct DeviceSnapshot: Sendable {
     var orphans: Orphans?
     var artwork: DeviceArtwork?
     var error: String?
+    /// Set when the iPod is not connected: the contents are the last ones read, at this time.
+    var lastSeen: Date?
+
+    static func artworkCache(_ device: IPodDevice) -> URL { Paths.caches("ipod-artwork", device.volumeUUID ?? device.volumeName) }
+
+    /// Tracks, albums and playlists of `db`.
+    mutating func fill(_ db: ITunesDB) {
+        database = db
+        if !db.name.isEmpty { name = db.name }
+        let all = db.tracks.map(DeviceTrack.init)
+        let byID = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        tracks = all
+        albums = DeviceAlbum.group(all)
+        playlists = db.playlists.enumerated().filter { !$0.element.isMaster }.map { i, p in
+            DevicePlaylist(id: i, name: p.name, tracks: p.trackIDs.compactMap { byID[$0] })
+        }
+        musicBytes = all.reduce(0) { $0 + $1.size }
+    }
+
+    /// The last iPod from the Mac caches, for browsing while it is not connected. Blocking.
+    static func offline(_ last: LastDevice) -> DeviceSnapshot? {
+        let device = IPodDevice(mountURL: URL(fileURLWithPath: last.mountPath), volumeName: last.volumeName, volumeUUID: last.volumeUUID)
+        guard let data = DeviceFileCache.lastITunesDB(of: device), let db = try? ITunesDB.parse(data) else { return nil }
+        var s = DeviceSnapshot(device: device, name: last.name)
+        s.modelName = last.modelName
+        s.firmware = last.firmware
+        s.serial = last.serial
+        s.guid = last.guid
+        s.capacity = last.capacity.map { Capacity(total: $0[0], available: $0[1]) }
+        s.lastSeen = last.seen
+        s.fill(db)
+        s.artwork = DeviceArtwork(cachedIn: artworkCache(device))
+        return s
+    }
 
     /// Blocking; call off the main actor.
     static func load(_ device: IPodDevice, manualGuid: String?) -> DeviceSnapshot {
@@ -130,23 +164,51 @@ struct DeviceSnapshot: Sendable {
             return s
         }
         do {
-            let db = try ITunesDB.parse(DeviceFileCache.iTunesDB(of: device))
-            s.database = db
-            if !db.name.isEmpty { s.name = db.name }
-            let all = db.tracks.map(DeviceTrack.init)
-            let byID = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-            s.tracks = all
-            s.albums = DeviceAlbum.group(all)
-            s.playlists = db.playlists.enumerated().filter { !$0.element.isMaster }.map { i, p in
-                DevicePlaylist(id: i, name: p.name, tracks: p.trackIDs.compactMap { byID[$0] })
-            }
-            s.musicBytes = all.reduce(0) { $0 + $1.size }
+            s.fill(try ITunesDB.parse(DeviceFileCache.iTunesDB(of: device)))
             // Orphans are found on demand (`DeviceModel.scanOrphans`): listing 50 folders is slow on the iPod disk.
-            s.artwork = DeviceArtwork(directory: device.artworkDir,
-                                      cacheDirectory: Paths.caches("ipod-artwork", device.volumeUUID ?? device.volumeName))
+            s.artwork = DeviceArtwork(directory: device.artworkDir, cacheDirectory: artworkCache(device))
         } catch {
             s.error = "Cannot read the iTunesDB: \(error.localizedDescription)"
         }
         return s
+    }
+}
+
+/// The last iPod read, saved so its contents can be browsed while it is not connected.
+struct LastDevice: Codable, Sendable {
+    var mountPath: String
+    var volumeName: String
+    var volumeUUID: String?
+    var name: String
+    var modelName: String?
+    var firmware: String?
+    var serial: String?
+    var guid: String?
+    /// Total and free bytes.
+    var capacity: [Int64]?
+    var seen: Date
+
+    private static var url: URL { DeviceFileCache.standardDirectory.appendingPathComponent("last-device.json") }
+
+    init(_ s: DeviceSnapshot, seen: Date = Date()) {
+        mountPath = s.device.mountURL.path
+        volumeName = s.device.volumeName
+        volumeUUID = s.device.volumeUUID
+        name = s.name
+        modelName = s.modelName
+        firmware = s.firmware
+        serial = s.serial
+        guid = s.guid
+        capacity = s.capacity.map { [$0.total, $0.available] }
+        self.seen = seen
+    }
+
+    static func load() -> LastDevice? {
+        (try? Data(contentsOf: url)).flatMap { try? JSONDecoder().decode(LastDevice.self, from: $0) }
+    }
+
+    func save() {
+        try? FileManager.default.createDirectory(at: Self.url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? JSONEncoder().encode(self).write(to: Self.url, options: .atomic)
     }
 }

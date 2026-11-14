@@ -12,6 +12,8 @@ actor DeviceArtwork {
     /// Mac copies of the covers (JPEG); nil reads the iPod every time.
     private let cacheDirectory: URL?
     private let cache = NSCache<NSNumber, NSImage>()
+    /// Cache-only mode (iPod not connected): image id -> Mac copy.
+    private var cachedFiles: [UInt32: URL] = [:]
 
     /// Nil when the iPod has no readable ArtworkDB or no images.
     init?(directory: URL, cacheDirectory: URL? = nil) {
@@ -28,13 +30,27 @@ actor DeviceArtwork {
         cache.countLimit = 200
     }
 
+    /// Covers copied to the Mac earlier; nil when there are none.
+    init?(cachedIn cacheDirectory: URL) {
+        var files: [UInt32: URL] = [:]
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: cacheDirectory.path)) ?? [] {
+            if let id = name.split(separator: "-").first.flatMap({ UInt32($0) }) { files[id] = cacheDirectory.appendingPathComponent(name) }
+        }
+        guard !files.isEmpty else { return nil }
+        directory = cacheDirectory
+        self.cacheDirectory = cacheDirectory
+        locations = [:]
+        cachedFiles = files
+        cache.countLimit = 200
+    }
+
     private static func rank(_ location: ArtworkLocation) -> Int {
         formatOrder.firstIndex(of: location.formatId) ?? formatOrder.count
     }
 
     func image(id: UInt32) -> NSImage? {
         if let hit = cache.object(forKey: NSNumber(value: id)) { return hit }
-        let file = cacheFile(id)
+        let file = cacheFile(id) ?? cachedFiles[id]
         let image = file.flatMap { NSImage(contentsOf: $0) } ?? readDevice(id).map { cg in
             if let file { Self.storeJPEG(cg, to: file) }
             return NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))

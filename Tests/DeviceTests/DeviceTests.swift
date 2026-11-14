@@ -202,6 +202,22 @@ private func write(_ text: String, to url: URL) throws {
     #expect(try FileManager.default.contentsOfDirectory(atPath: cache.path).count == 1)
 }
 
+@Test func lastITunesDBIsReadWithoutTheDevice() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("dbcache-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let volume = root.appendingPathComponent("IPOD"), cache = root.appendingPathComponent("cache")
+    let device = IPodDevice(mountURL: volume)
+    try FileManager.default.createDirectory(at: device.iTunesDir, withIntermediateDirectories: true)
+    try Data(repeating: 7, count: DeviceFileCache.headerSize + 10).write(to: device.iTunesDBURL)
+    _ = try DeviceFileCache.iTunesDB(of: device, directory: cache)
+    try FileManager.default.removeItem(at: volume)
+
+    let offline = IPodDevice(mountURL: volume, volumeName: device.volumeName, volumeUUID: device.volumeUUID)
+    #expect(DeviceFileCache.lastITunesDB(of: offline, directory: cache)?.count == DeviceFileCache.headerSize + 10)
+    let other = IPodDevice(mountURL: root.appendingPathComponent("OTHER"), volumeName: "OTHER", volumeUUID: nil)
+    #expect(DeviceFileCache.lastITunesDB(of: other, directory: cache) == nil)
+}
+
 /// Real iPod only: MUSICSYNC_TEST_VOLUME=/Volumes/<iPod>.
 @Test(.enabled(if: ProcessInfo.processInfo.environment["MUSICSYNC_TEST_VOLUME"] != nil))
 func usbSerialOfConnectedIPod() {

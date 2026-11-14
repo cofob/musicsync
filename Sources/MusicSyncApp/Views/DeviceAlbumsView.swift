@@ -175,6 +175,6 @@ struct DeleteFromIPodButton: View {
 
     var body: some View {
         Button("Delete from iPod…", systemImage: "trash", role: .destructive, action: action)
-            .disabled(model.sync.isRunning || model.client == nil)
+            .disabled(model.sync.isRunning || model.client == nil || model.ipod.current == nil)
     }
 }

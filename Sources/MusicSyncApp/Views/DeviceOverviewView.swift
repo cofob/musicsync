@@ -29,17 +29,19 @@ struct DeviceOverviewView: View {
                     LabeledContent("Songs", value: s.tracks.count.formatted())
                     LabeledContent("Albums", value: s.albums.count.formatted())
                     LabeledContent("Playlists", value: s.playlists.count.formatted())
-                    LabeledContent("Orphaned files") {
-                        HStack {
-                            if let orphans = s.orphans {
-                                Text(orphans.count == 0 ? "None" : "\(orphans.count) · \(formatBytes(orphans.bytes))")
-                                // HOOK: `DeviceModel.cleanOrphans` is provided by the sync feature.
-                                Button("Clean Up…") { Task { await ipod.cleanOrphans?() } }
-                                    .disabled(ipod.cleanOrphans == nil || orphans.count == 0)
-                            } else if ipod.isScanningOrphans {
-                                ProgressView().controlSize(.small)
-                            } else {
-                                Button("Check") { ipod.scanOrphans() }
+                    if s.lastSeen == nil {
+                        LabeledContent("Orphaned files") {
+                            HStack {
+                                if let orphans = s.orphans {
+                                    Text(orphans.count == 0 ? "None" : "\(orphans.count) · \(formatBytes(orphans.bytes))")
+                                    // HOOK: `DeviceModel.cleanOrphans` is provided by the sync feature.
+                                    Button("Clean Up…") { Task { await ipod.cleanOrphans?() } }
+                                        .disabled(ipod.cleanOrphans == nil || orphans.count == 0)
+                                } else if ipod.isScanningOrphans {
+                                    ProgressView().controlSize(.small)
+                                } else {
+                                    Button("Check") { ipod.scanOrphans() }
+                                }
                             }
                         }
                     }
@@ -58,20 +60,25 @@ struct DeviceOverviewView: View {
                 Image(systemName: "ipod").font(.system(size: 44)).foregroundStyle(Color.musicAccent)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(s.name).font(.title.bold())
-                    Text(s.device.mountURL.path).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+                    Text(s.lastSeen.map { "Not connected · last seen \($0.formatted(.relative(presentation: .named)))" }
+                         ?? s.device.mountURL.path).font(.callout).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer()
-                if model.ipod.isLoading { ProgressView().controlSize(.small) }
-                Button("Reload", systemImage: "arrow.clockwise") { model.ipod.reload() }
-                Button("Eject", systemImage: "eject.fill") { Task { await model.eject() } }
-                    .disabled(model.ipod.isEjecting || model.ipod.isSyncing)
-                // HOOK: `DeviceModel.startSync` is provided by the sync feature.
-                Button("Sync", systemImage: "arrow.triangle.2.circlepath") { model.ipod.startSync?() }
-                    .buttonStyle(.borderedProminent).tint(Color.musicAccent)
-                    .disabled(model.ipod.startSync == nil)
+                if s.lastSeen == nil { actions }
             }
             .buttonBorderShape(.capsule).controlSize(.large)
         }
+    }
+
+    @ViewBuilder private var actions: some View {
+        if model.ipod.isLoading { ProgressView().controlSize(.small) }
+        Button("Reload", systemImage: "arrow.clockwise") { model.ipod.reload() }
+        Button("Eject", systemImage: "eject.fill") { Task { await model.eject() } }
+            .disabled(model.ipod.isEjecting || model.ipod.isSyncing)
+        // HOOK: `DeviceModel.startSync` is provided by the sync feature.
+        Button("Sync", systemImage: "arrow.triangle.2.circlepath") { model.ipod.startSync?() }
+            .buttonStyle(.borderedProminent).tint(Color.musicAccent)
+            .disabled(model.ipod.startSync == nil)
     }
 
     @ViewBuilder private func guid(_ s: DeviceSnapshot) -> some View {

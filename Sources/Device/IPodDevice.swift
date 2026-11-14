@@ -78,6 +78,14 @@ public struct IPodDevice: Sendable, Equatable, Identifiable {
         return models[String(str.uppercased().suffix(4))]
     }
 
+    /// A device known from earlier (not connected): nothing is read from disk.
+    public init(mountURL: URL, volumeName: String, volumeUUID: String?) {
+        self.mountURL = mountURL
+        self.volumeName = volumeName
+        self.volumeUUID = volumeUUID
+        sysInfo = nil
+    }
+
     public init(mountURL: URL) {
         let values = try? mountURL.resourceValues(forKeys: [.volumeNameKey, .volumeUUIDStringKey])
         self.mountURL = mountURL
