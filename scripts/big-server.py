@@ -4,7 +4,7 @@
 Run the app against it with MUSICSYNC_DEMO_SERVER=http://127.0.0.1:<port> (demo mode only).
 Sizes (env): BIG_ARTISTS (2000), BIG_ALBUMS (5000), BIG_SONGS_PER_ALBUM (10), BIG_PLAYLISTS (500).
 Playlist pl-0 holds 10000 songs, the others 50; artist ar-0 has every 40th album as well. BIG_MEDIA=1 draws album covers
-in the asked size (up to 1000 px), streams (and downloads) 30 s of silence and gives synced lyrics for every song. Otherwise covers, streams and lyrics are
+in the asked size (up to 1000 px), streams (and downloads) silence of each song's length and size and gives synced lyrics for every song. Otherwise covers, streams and lyrics are
 missing, except for the podcasts:
 three channels with drawn covers, bookmarks kept in memory, and silent episode streams (seekable).
 The user has the jukebox role; the jukebox keeps its playlist in memory and plays no sound.
@@ -30,6 +30,7 @@ ARTISTS = int(os.environ.get("BIG_ARTISTS", 2000))
 ALBUMS = int(os.environ.get("BIG_ALBUMS", 5000))
 PER_ALBUM = int(os.environ.get("BIG_SONGS_PER_ALBUM", 10))
 PLAYLISTS = int(os.environ.get("BIG_PLAYLISTS", 500))
+MEDIA = os.environ.get("BIG_MEDIA") == "1"
 GENRES = ["Rock", "Jazz", "Electronic", "Ambient", "Hip-Hop", "Classical", "Folk", "Metal", "Pop", "Soul",
           "Блюз", "J-Pop", "Música Popular", "Post-Rock", "Drum & Bass", "Synthwave", "Trip-Hop", "Gospel", "Reggae", "K-Pop"]
 WORDS = ["Night", "Echo", "Blue", "Ocean", "Glass", "Fire", "Dream", "Silver", "Ghost", "Garden", "Signal", "River",
@@ -60,7 +61,7 @@ for a in range(ALBUMS):
         s = a * PER_ALBUM + t
         song = {"id": f"s-{s}", "parent": album["id"], "title": name(s, 2 + s % 3), "album": album["name"],
                 "albumId": album["id"], "artist": artist["name"], "artistId": artist["id"], "track": t + 1,
-                "discNumber": 1, "year": album["year"], "genre": genre, "duration": 120 + s % 300, "size": 5_000_000,
+                "discNumber": 1, "year": album["year"], "genre": genre, "duration": 120 + s % 300, "size": 44 + (120 + s % 300) * 8000 if MEDIA else 5_000_000,
                 "suffix": "flac", "bitRate": 900, "coverArt": album["id"], "playCount": s % 11, "created": album["created"]}
         if s % 50 == 0:
             song["starred"] = day(s)
@@ -107,15 +108,13 @@ def png(top, bottom, size=300):
             + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
 
 
-MEDIA = os.environ.get("BIG_MEDIA") == "1"
-
-
 @functools.lru_cache(maxsize=None)
 def album_cover(n, size):
     """One of 24 gradients."""
     return png(((n * 53) % 256, (n * 97) % 256, (n * 151) % 256), ((n * 29) % 256, 40, (n * 71) % 256), size)
 
 
+@functools.lru_cache(maxsize=16)
 def silence(seconds):
     """8 kHz mono 8-bit WAV."""
     n = seconds * 8000
@@ -321,10 +320,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(album_cover(int(q["id"][3:]) % 24, min(int(q.get("size", 1000)), 1000)), "image/png")
         if method == "stream" and q.get("id", "").startswith("st-"):
             return self.send(SILENCE, "audio/wav")
-        if method in ("stream", "download") and MEDIA and q.get("id", "").startswith("s-"):
-            return self.send(SONG, "audio/wav")
+        song = song_by_id.get(q.get("id")) if MEDIA else None
+        audio = silence(song["duration"]) if song else SONG
         if method in ("stream", "download") and fault("truncate"):
-            return self.send(SONG[:len(SONG) // 10], "audio/wav")
+            return self.send(audio[:len(audio) // 10], "audio/wav")
+        if method in ("stream", "download") and song:
+            if method == "download" and "Range" in self.headers:
+                print(f"resume {q['id']} {self.headers['Range']}", flush=True)
+            return self.send(audio, "audio/wav")
         if in_window(faults["auth"], AUTH) and method not in ("getCoverArt", "stream", "download"):
             body = {"error": {"code": 40, "message": "Wrong username or password"}}
         else:
@@ -345,6 +348,11 @@ class Handler(BaseHTTPRequestHandler):
         if spec.startswith("bytes="):
             first, _, last = spec[6:].partition("-")
             start, end = int(first or 0), min(int(last) if last else end, end)
+        if start > end:
+            self.send_response(416)
+            self.send_header("Content-Range", f"bytes */{len(data)}")
+            self.send_header("Content-Length", "0")
+            return self.end_headers()
         self.send_response(206 if spec and status == 200 else status)
         self.send_header("Content-Type", kind)
         self.send_header("Accept-Ranges", "bytes")
