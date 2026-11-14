@@ -42,6 +42,16 @@ extension LibraryDatabase {
         }
     }
 
+    /// Ids of the artist's albums. Nil when the artist is unknown or its album count does not match the albums here
+    /// (e.g. albums it shares with other artists), so the caller asks the server.
+    public func albumIDs(ofArtist id: String) -> [String]? {
+        read(nil) { db in
+            guard let count = try db.prepare("SELECT albumCount FROM artists WHERE id = ?").first([id], { $0.isNull(0) ? nil : $0.int(0) }) else { return nil }
+            let ids = try db.rows("SELECT id FROM albums WHERE artistId = ? ORDER BY id", [id]) { $0.text(0) }.compactMap { $0 }
+            return count.map { $0 == ids.count } == false ? nil : ids
+        }
+    }
+
     public func songs(sort: SongSort = .title, limit: Int? = nil, offset: Int = 0) -> [Song] {
         read([]) { try decodeAll($0, Song.self, "SELECT json FROM songs ORDER BY \(sort.sql) LIMIT ? OFFSET ?", [limit ?? -1, offset]) }
     }

@@ -17,25 +17,46 @@ public enum ExpansionError: Error, LocalizedError, Equatable {
     }
 }
 
-/// Turns a `Selection` into songs through the Subsonic API (8 requests in parallel, cached).
+/// A local copy of the server library. Each read gives nil for an id it does not know; then the server is asked.
+public struct LocalLibrary: Sendable {
+    /// The album with its songs.
+    public var album: @Sendable (String) async -> Album?
+    /// Ids of the artist's albums.
+    public var artistAlbumIDs: @Sendable (String) async -> [String]?
+    /// The playlist with its entries.
+    public var playlist: @Sendable (String) async -> Playlist?
+
+    public init(album: @escaping @Sendable (String) async -> Album?, artistAlbumIDs: @escaping @Sendable (String) async -> [String]?,
+                playlist: @escaping @Sendable (String) async -> Playlist?) {
+        self.album = album
+        self.artistAlbumIDs = artistAlbumIDs
+        self.playlist = playlist
+    }
+}
+
+/// Turns a `Selection` into songs through a local library or the Subsonic API (8 requests in parallel, cached).
 public actor SelectionExpander {
-    /// An album with its songs from a local copy of the library; nil asks the server.
-    public typealias LocalAlbum = @Sendable (String) async -> Album?
     /// Albums resolved so far and in all.
     public typealias Progress = @Sendable (_ done: Int, _ total: Int) -> Void
 
     private let client: SubsonicClient
     private let concurrency: Int
-    private let local: LocalAlbum?
+    private let local: LocalLibrary?
     private var albums: [String: Album] = [:]
+    private var artistAlbums: [String: [String]] = [:]
+    private var playlists: [String: Playlist] = [:]
 
-    public init(client: SubsonicClient, concurrency: Int = 8, local: LocalAlbum? = nil) {
+    public init(client: SubsonicClient, concurrency: Int = 8, local: LocalLibrary? = nil) {
         self.client = client
         self.concurrency = concurrency
         self.local = local
     }
 
-    public func clearCache() { albums = [:] }
+    public func clearCache() {
+        albums = [:]
+        artistAlbums = [:]
+        playlists = [:]
+    }
 
     /// Throws on network errors: guessing here would make the planner delete songs.
     /// `fullAlbums`: playlist songs bring their whole albums (the iPod playlist still holds only its own songs).
@@ -44,11 +65,11 @@ public actor SelectionExpander {
                        progress: Progress? = nil) async throws -> Expansion {
         var result = Expansion()
         var albumIDs = selection.albums.sorted()
-        async let fetchedArtists = fetchAll(selection.artists.sorted()) { try await self.client.getArtist(id: $0) }
-        async let fetchedLists = fetchAll(selection.playlists.sorted()) { try await self.client.getPlaylist(id: $0) }
+        async let fetchedArtists = fetchAll(selection.artists.sorted()) { try await self.albumIDs(ofArtist: $0) }
+        async let fetchedLists = fetchAll(selection.playlists.sorted()) { try await self.playlist($0) }
         let (artists, lists) = try await (fetchedArtists, fetchedLists)
-        for (id, artist) in artists {
-            if let artist { albumIDs += (artist.album ?? []).map(\.id).filter { !selection.excludedAlbums.contains($0) } } else { result.missing.append(id) }
+        for (id, owned) in artists {
+            if let owned { albumIDs += owned.filter { !selection.excludedAlbums.contains($0) } } else { result.missing.append(id) }
         }
         var listed: [(Playlist, [Song])] = []
         for (id, list) in lists {
@@ -90,9 +111,23 @@ public actor SelectionExpander {
 
     private func album(_ id: String) async throws -> Album {
         if let cached = albums[id] { return cached }
-        let album = if let found = await local?(id) { found } else { try await client.getAlbum(id: id) }
+        let album = if let found = await local?.album(id) { found } else { try await client.getAlbum(id: id) }
         albums[id] = album
         return album
+    }
+
+    private func albumIDs(ofArtist id: String) async throws -> [String] {
+        if let cached = artistAlbums[id] { return cached }
+        let ids = if let found = await local?.artistAlbumIDs(id) { found } else { (try await client.getArtist(id: id).album ?? []).map(\.id) }
+        artistAlbums[id] = ids
+        return ids
+    }
+
+    private func playlist(_ id: String) async throws -> Playlist {
+        if let cached = playlists[id] { return cached }
+        let list = if let found = await local?.playlist(id) { found } else { try await client.getPlaylist(id: id) }
+        playlists[id] = list
+        return list
     }
 
     /// Runs `body` for every id, `concurrency` at a time. A server "not found" gives nil; other errors are thrown.

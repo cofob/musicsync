@@ -43,6 +43,15 @@ import Subsonic
         #expect(await db.album(id: "missing") == nil)
     }
 
+    @Test func artistAlbumsAreServedOnlyWhenTheCountMatches() async throws {
+        let db = try await seeded()  // every album has artist "ar"
+        try await db.replaceArtists([decode(["id": "ar", "name": "Artist", "albumCount": 3]),
+                                     decode(["id": "other", "name": "Other", "albumCount": 1])])
+        #expect(await db.albumIDs(ofArtist: "ar") == ["a1", "a2", "a3"])
+        #expect(await db.albumIDs(ofArtist: "other") == nil)  // its album is not here: ask the server
+        #expect(await db.albumIDs(ofArtist: "missing") == nil)
+    }
+
     @Test func albumWithoutSyncedTracksIsNotServed() async throws {
         let db = tempDatabase()
         try await db.storeAlbumPage([album("a1", "Pending")], run: "r", nextOffset: 1)
