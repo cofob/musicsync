@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import Subsonic
+import Support
 
 enum NowPlayingPanel: String { case none, lyrics, queue }
 
@@ -114,7 +115,7 @@ private struct PlayerColumn: View {
             HStack(alignment: .center, spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(player.current?.title ?? "Not Playing").font(.title3.weight(.semibold)).lineLimit(1)
-                    Text([player.current?.artist, player.current?.album].compactMap { $0 }.joined(separator: " — "))
+                    Text(byline(player.current?.artist, player.current?.album))
                         .foregroundStyle(.white.opacity(0.65)).lineLimit(1)
                 }
                 Spacer(minLength: 0)

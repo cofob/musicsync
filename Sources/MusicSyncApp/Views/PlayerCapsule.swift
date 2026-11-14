@@ -1,3 +1,4 @@
+import Support
 import SwiftUI
 
 /// Floating glass capsule at the bottom of the window, as in Apple Music: small transport on the left, the song
@@ -45,7 +46,7 @@ struct PlayerCapsule: View {
                             } else if model.jukebox.isActive {
                                 PlayingOnServerLabel().font(.callout).foregroundStyle(Color.musicAccent)
                             } else {
-                                Marquee(text: [item.artist, item.album].compactMap { $0 }.joined(separator: " — "))
+                                Marquee(text: byline(item.artist, item.album))
                                     .font(.callout).foregroundStyle(.secondary)
                             }
                         }

@@ -1,6 +1,7 @@
 import Library
 import SwiftUI
 import Subsonic
+import Support
 
 /// Search page: Browse genres (empty query), or the results of the committed query (Apple Music layout).
 struct SearchResultsView: View {
@@ -313,7 +314,7 @@ private struct DeviceSearchResults: View {
                             ShelfHeader(title: "Songs")
                             LazyVStack(spacing: 0) {
                                 ForEach(Array(result.tracks.enumerated()), id: \.element.id) { index, track in
-                                    TrackRow(title: track.title, subtitle: [track.artist, track.album].filter { !$0.isEmpty }.joined(separator: " — "),
+                                    TrackRow(title: track.title, subtitle: byline(track.artist, track.album),
                                              time: track.duration) {
                                         DeviceCoverImage(imageID: track.imageID, cornerRadius: 4).frame(width: 40, height: 40)
                                     } menu: {

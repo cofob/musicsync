@@ -16,7 +16,7 @@ extension SystemServices {
         guard notifiesTrackChange, Self.mayNotify, !NSApp.isActive, let item = app.player.current else { return }
         let content = UNMutableNotificationContent()
         content.title = item.title
-        content.body = [item.artist, item.album].compactMap { $0 }.joined(separator: " — ")
+        content.body = byline(item.artist, item.album)
         let covers = app.covers, cover = item.coverArt, id = item.id
         Task {
             if let cover, let image = await covers?.image(id: cover, size: 600), let file = await Self.writeJPEG(image) {

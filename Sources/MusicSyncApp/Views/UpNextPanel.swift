@@ -1,6 +1,7 @@
 import Playback
 import SwiftUI
 import Subsonic
+import Support
 
 /// Now Playing queue panel, as Apple Music's Up Next: History above (scroll up), the current song, then Playing Next
 /// (added by the user), Continue Playing (the album or playlist) and AutoPlay. Drag to reorder within a section,
@@ -197,7 +198,7 @@ private struct QueueRow<Actions: View>: View {
             CoverImage(id: item.coverArt, size: 100, cornerRadius: 5).frame(width: 40, height: 40)
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title).lineLimit(1).fontWeight(playing ? .semibold : .regular)
-                Text([item.artist, item.album].compactMap { $0 }.joined(separator: " — "))
+                Text(byline(item.artist, item.album))
                     .font(.callout).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()

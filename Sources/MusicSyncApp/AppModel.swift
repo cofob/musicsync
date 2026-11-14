@@ -264,7 +264,7 @@ final class AppModel {
 
     func copy(_ song: Song) {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString([song.title, song.artistName, song.album].compactMap { $0 }.joined(separator: " — "), forType: .string)
+        NSPasteboard.general.setString(byline(song.title, song.artistName, song.album), forType: .string)
     }
 
     // MARK: Home and songs

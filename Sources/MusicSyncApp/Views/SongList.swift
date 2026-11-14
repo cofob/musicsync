@@ -171,7 +171,7 @@ struct SongList: View {
 
     private func subtitle(_ song: Song) -> String? {
         switch leading {
-        case .cover: [song.artistName, song.album].compactMap { $0 }.joined(separator: " — ")
+        case .cover: byline(song.artistName, song.album)
         case .track: song.artistName == albumArtist ? nil : song.artistName
         }
     }
@@ -200,7 +200,7 @@ struct SongInfoView: View {
                 CoverImage(id: song.coverArt, size: 200).frame(width: 72, height: 72)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(song.title).font(.title3.bold())
-                    Text([song.artistName, song.album].compactMap { $0 }.joined(separator: " — ")).foregroundStyle(.secondary)
+                    Text(byline(song.artistName, song.album)).foregroundStyle(.secondary)
                 }
             }
             Form {
