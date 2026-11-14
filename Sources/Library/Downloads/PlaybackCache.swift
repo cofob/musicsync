@@ -89,15 +89,20 @@ public actor PlaybackCache {
         if let item = index.items[song.id] { return directory.appendingPathComponent(item.fileName) }
         let estimate = Int64(song.size ?? min(song.duration ?? 300, 1_000_000) * 40_000)
         guard limit > 0, estimate <= limit, let free = freeDisk(), free > estimate + SmartPlanner.reserveBytes else { return nil }
-        let tmp = try await client.download(id: song.id, format: format, maxBitRate: maxBitRate)
-        defer { try? FileManager.default.removeItem(at: tmp) }
-        try Task.checkCancellation()
         // The suffix comes from the server: only letters and digits, so the name stays in the folder.
         let suffix = String((format == "raw" ? (song.suffix ?? "audio") : format).filter { $0.isASCII && ($0.isLetter || $0.isNumber) }.prefix(8))
         let name = "\(LibraryDatabase.hash(song.id)).\(suffix)"
-        let dest = directory.appendingPathComponent(name)
+        let dest = directory.appendingPathComponent(name), part = directory.appendingPathComponent(DownloadManager.partPrefix + name)
+        defer { try? FileManager.default.removeItem(at: part) }
+        // A lost connection goes on from the bytes that arrived; a conversion may differ between requests, so it starts over.
+        try await client.retry.run(retries: RetryPolicy.isTransientBinary) {
+            if format != "raw" { try? FileManager.default.removeItem(at: part) }
+            try await client.download(id: song.id, format: format, maxBitRate: maxBitRate, resuming: part)
+        }
+        try Task.checkCancellation()
+        try await DownloadCheck.verify(part, song: song, original: format == "raw")
         try? FileManager.default.removeItem(at: dest)
-        try FileManager.default.moveItem(at: tmp, to: dest)
+        try FileManager.default.moveItem(at: part, to: dest)
         let size = Int64((try? dest.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
         remove(index.insert(song.id, .init(fileName: name, size: size, used: Date().timeIntervalSince1970), limit: limit))
         save()

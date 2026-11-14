@@ -55,9 +55,9 @@ import Testing
     @Test func serverSuffixStaysInTheCacheFolder() async throws {
         let dir = TempDir(), server = StubLibraryServer()
         let cache = PlaybackCache(serverKey: "k", directory: dir.url.appendingPathComponent("cache"), limitGB: 1)
-        let song: Song = decode(["id": "s-1", "title": "T", "suffix": "../../escape", "size": 1000])
+        let song: Song = decode(["id": "s-1", "title": "T", "suffix": "../../flac", "size": 1000])
         let file = try #require(try await cache.store(song, format: "raw", maxBitRate: nil, client: server.client))
-        #expect(file.deletingLastPathComponent().lastPathComponent == "cache" && file.pathExtension == "escape")
+        #expect(file.deletingLastPathComponent().lastPathComponent == "cache" && file.pathExtension == "flac")
         let huge: Song = decode(["id": "s-2", "title": "T", "duration": Int.max])
         _ = try await cache.store(huge, format: "mp3", maxBitRate: nil, client: server.client)
     }

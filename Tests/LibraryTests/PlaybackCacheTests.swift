@@ -68,6 +68,20 @@ private func track(_ id: String) -> Song {
         #expect(!FileManager.default.fileExists(atPath: file.path))
     }
 
+    /// A lost connection is tried again; a file shorter than the song is not kept, and no part file is left.
+    @Test func checksAndRetriesTheDownload() async throws {
+        let dir = TempDir(), server = makeServer()
+        let cache = PlaybackCache(serverKey: "demo@http://stub", directory: dir.url, limitGB: 1)
+        server.dropDownloads = 2
+        #expect(try await cache.store(track("a"), format: "raw", maxBitRate: nil, client: server.client) != nil)
+        #expect(server.requests("stream:a").count == 3)
+        let long: Song = decode(["id": "b", "title": "Long", "duration": 1000, "suffix": "flac", "size": 1000])
+        await #expect(throws: (any Error).self) { try await cache.store(long, format: "raw", maxBitRate: nil, client: server.client) }
+        #expect(Set(await cache.files().keys) == ["a"])
+        let names = try FileManager.default.contentsOfDirectory(atPath: dir.url.path)
+        #expect(!names.contains { $0.hasPrefix(DownloadManager.partPrefix) })
+    }
+
     @Test func offCacheStoresNothing() async throws {
         let dir = TempDir(), server = makeServer()
         let cache = PlaybackCache(serverKey: "demo@http://stub", directory: dir.url, limitGB: 0)
