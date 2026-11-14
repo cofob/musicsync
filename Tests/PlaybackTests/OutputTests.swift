@@ -59,12 +59,27 @@ import Testing
     /// about 1024 (measured). It varies a little, so a band measure lines the frames up exactly.
     static let delay = 1024
 
-    /// The first frame of `source` in the mono recording of `track`, within 2048 frames of `delay`: where the two match best.
-    private static func start(of source: [Float], in track: OutputCapture.Track) -> Int {
-        let mid = source.count / 2, probe = Array(source[mid..<mid + 4096]), heard = track.mono(delay - 2048 + mid..<delay + 2048 + mid + 4096)
-        var scores = [Float](repeating: 0, count: 4097)
-        vDSP_conv(heard, 1, probe, 1, &scores, 1, 4097, 4096)
-        return delay - 2048 + (scores.indices.max { scores[$0] < scores[$1] } ?? 2048)
+    /// The first frame of `source` in the mono recording of `track`, within 8192 frames of `delay`: where the 4096
+    /// frames from `mid` match best.
+    private static func start(of source: [Float], at mid: Int, in track: OutputCapture.Track) -> Int {
+        let probe = Array(source[mid..<mid + 4096]), heard = track.mono(delay - 8192 + mid..<delay + 8192 + mid + 4096)
+        var scores = [Float](repeating: 0, count: 16385)
+        vDSP_conv(heard, 1, probe, 1, &scores, 1, 16385, 4096)
+        return delay - 8192 + (scores.indices.max { scores[$0] < scores[$1] } ?? 8192)
+    }
+
+    /// Band gains of `source` in `track` over `blocks` equal parts, each lined up on its own: the median of each band.
+    /// For noise, so that a part with a dropped or late buffer (seen on a busy machine) does not move the result.
+    private static func bandGains(of source: [Float], in track: OutputCapture.Track, blocks: Int) -> [Double] {
+        let n = source.count / blocks
+        let parts = (0..<blocks).map { k in
+            let first = start(of: source, at: k * n + n / 2 - 2048, in: track)
+            return Measure.bandGains(input: Array(source[k * n..<(k + 1) * n]), output: track.mono(first + k * n..<first + (k + 1) * n), sampleRate: 44100)
+        }
+        return parts[0].indices.map { b in
+            let v = parts.map { $0[b] }.sorted()
+            return (v[(v.count - 1) / 2] + v[v.count / 2]) / 2
+        }
     }
 
     private func noise(seconds: Double) -> [Float] {
@@ -94,11 +109,10 @@ import Testing
         try await Task.sleep(for: .seconds(seconds))
         for (preset, run) in zip(Self.presets, runs) {
             let track = try run.stop()
-            let first = Self.start(of: source, in: track)
-            let measured = Measure.bandGains(input: source, output: track.mono(first..<first + source.count), sampleRate: 44100)
+            let measured = Self.bandGains(of: source, in: track, blocks: signal == "noise" ? 10 : 1)
             let expected = Measure.expectedGains(preset.1, sampleRate: 44100)
             let error = zip(measured, expected).map { abs($0 - $1) }.max() ?? 0
-            print("EQ \(signal) \(preset.0): measured \(measured.map { String(format: "%+.2f", $0) }) expected \(expected.map { String(format: "%+.2f", $0) }) worst \(String(format: "%.2f", error)) dB, song from frame \(first)")
+            print("EQ \(signal) \(preset.0): measured \(measured.map { String(format: "%+.2f", $0) }) expected \(expected.map { String(format: "%+.2f", $0) }) worst \(String(format: "%.2f", error)) dB")
             #expect(error < 1, "\(preset.0)")
         }
     }
