@@ -79,7 +79,7 @@ struct AlbumsView: View {
             if list != nil { try? await Task.sleep(for: .milliseconds(150)) }  // typing
             guard !Task.isCancelled else { return }
             let order = recentlyAdded ? AlbumOrder.added : sort
-            let query = model.searchText.trimmingCharacters(in: .whitespaces)
+            let query = model.query
             let found = await model.albumPages(sort: order.database, query: query) {
                 let sorted = order.sorted(model.albums)
                 return query.isEmpty ? sorted : sorted.filter {

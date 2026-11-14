@@ -48,7 +48,7 @@ struct ArtistsView: View {
         .task(id: [String(model.libraryVersion), model.searchText]) {
             if list != nil { try? await Task.sleep(for: .milliseconds(150)) }  // typing
             guard !Task.isCancelled else { return }
-            let found = await model.artistPages(query: model.searchText.trimmingCharacters(in: .whitespaces))
+            let found = await model.artistPages(query: model.query)
             guard !Task.isCancelled else { return }
             list = found
             if selectedID == nil { selectedID = found.item(at: 0)?.id }

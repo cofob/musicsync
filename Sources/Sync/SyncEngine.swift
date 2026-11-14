@@ -21,8 +21,6 @@ public actor SyncEngine {
             ?? (locations.scrobbleQueue == SyncLocations.standard.scrobbleQueue ? .shared : Scrobbler(queueURL: locations.scrobbleQueue))
     }
 
-    public var isRunning: Bool { current != nil }
-
     /// Starts a sync. Events end with `.finished`; a cancelled run (see `cancel()` or cancelling the consumer)
     /// writes what it finished, emits `.finished` with `cancelled == true` and then throws `CancellationError`.
     /// Errors before any change (no GUID, no ffmpeg, no space) are thrown through the stream.

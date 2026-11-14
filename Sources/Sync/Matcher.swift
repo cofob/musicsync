@@ -54,7 +54,7 @@ public struct Matcher: Sendable {
     }
 
     static func isForeign(_ foreign: [String: [Int]], artist: String, album: String, songCount: Int?) -> Bool {
-        guard let counts = foreign[key(artist: artist, album: album)] else { return false }
+        guard !foreign.isEmpty, let counts = foreign[key(artist: artist, album: album)] else { return false }
         return songCount.map { n in counts.contains { similar($0, n) } } ?? true
     }
 

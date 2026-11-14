@@ -45,7 +45,7 @@ struct PlaylistDetailView: View {
 
     /// "Find in Playlist".
     private func filter(_ songs: [Song]) -> [Song] {
-        let query = model.searchText.trimmingCharacters(in: .whitespaces)
+        let query = model.query
         guard !query.isEmpty else { return songs }
         return songs.filter { [$0.title, $0.artistName, $0.album].contains { $0?.localizedCaseInsensitiveContains(query) == true } }
     }

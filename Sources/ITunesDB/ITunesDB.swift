@@ -66,8 +66,12 @@ public struct ITunesDB: Sendable, Equatable {
     }
 
     /// Removes a track from the library and from every playlist.
-    public mutating func removeTrack(id: UInt32) {
-        tracks.removeAll { $0.id == id }
-        for i in playlists.indices { playlists[i].trackIDs.removeAll { $0 == id } }
+    public mutating func removeTrack(id: UInt32) { removeTracks(ids: [id]) }
+
+    /// Removes tracks from the library and from every playlist, in one pass per list.
+    public mutating func removeTracks(ids: Set<UInt32>) {
+        guard !ids.isEmpty else { return }
+        tracks.removeAll { ids.contains($0.id) }
+        for i in playlists.indices { playlists[i].trackIDs.removeAll { ids.contains($0) } }
     }
 }

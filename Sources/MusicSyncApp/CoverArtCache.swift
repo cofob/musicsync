@@ -61,7 +61,7 @@ actor CoverArtCache {
         if let cached = try? Data(contentsOf: file) {
             data = cached
         } else {
-            data = await download(key: key, url: client.coverArtURL(id: id, size: size), to: file)
+            data = await download(key: key, id: id, size: size, to: file)
         }
         guard let data, let image = NSImage(data: data) else { return nil }
         sizesOnDisk[Self.fileID(id), default: []].insert(size)
@@ -69,11 +69,10 @@ actor CoverArtCache {
         return image
     }
 
-    private func download(key: String, url: URL, to file: URL) async -> Data? {
+    private func download(key: String, id: String, size: Int, to file: URL) async -> Data? {
         if let task = inFlight[key] { return await task.value }
-        let task = Task<Data?, Never> {
-            guard let (data, response) = try? await URLSession.shared.data(from: url),
-                  (response as? HTTPURLResponse)?.statusCode == 200, NSImage(data: data) != nil else { return nil }
+        let task = Task<Data?, Never> { [client] in
+            guard let data = try? await client.coverArt(id: id, size: size), NSImage(data: data) != nil else { return nil }
             try? data.write(to: file, options: .atomic)
             return data
         }

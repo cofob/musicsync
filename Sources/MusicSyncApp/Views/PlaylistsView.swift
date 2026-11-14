@@ -6,7 +6,7 @@ struct PlaylistsView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        let query = model.searchText.trimmingCharacters(in: .whitespaces)
+        let query = model.query
         let playlists = query.isEmpty ? model.playlists : model.playlists.filter { $0.name.localizedCaseInsensitiveContains(query) }
         ScrollView {
             LazyVGrid(columns: albumGridColumns, spacing: 28) {

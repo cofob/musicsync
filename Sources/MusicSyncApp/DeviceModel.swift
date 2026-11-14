@@ -24,14 +24,6 @@ final class DeviceModel {
     /// Manual FirewireGuid for a device (from the app settings). Set by `AppModel`.
     @ObservationIgnored var manualGuid: (IPodDevice) -> String? = { _ in nil }
 
-    // MARK: Hooks for the sync UI (later task). Nil / unset = feature not available, UI stays disabled.
-
-    /// Called when the current device is connected, switched or removed (nil).
-    @ObservationIgnored var onDeviceChanged: ((IPodDevice?) -> Void)?
-    /// Opens the sync flow (selection, plan, progress) for `current`.
-    var startSync: (() -> Void)?
-    /// Deletes files under `Music/Fxx` that no track references (`snapshot.orphans`).
-    var cleanOrphans: (() async -> Void)?
     /// Estimated change of the music size in bytes after the planned sync; drawn in the capacity bar.
     var projectedSyncDelta: Int64?
     /// Set while a sync writes to `current`; eject waits for it. Cover prefetch stops so it does not compete for the disk.
@@ -73,7 +65,6 @@ final class DeviceModel {
         current = next
         // On disconnect the snapshot stays until `reload` replaces it with the offline one.
         if !sameVolume, next != nil { snapshot = nil }
-        onDeviceChanged?(next)
         reload()
     }
 

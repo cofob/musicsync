@@ -70,7 +70,7 @@ struct SongsView: View {
             if list != nil { try? await Task.sleep(for: .milliseconds(150)) }  // typing
             guard !Task.isCancelled else { return }
             let (sort, descending) = databaseSort
-            let found = await model.songPages(sort: sort, descending: descending, query: model.searchText.trimmingCharacters(in: .whitespaces))
+            let found = await model.songPages(sort: sort, descending: descending, query: model.query)
             guard !Task.isCancelled else { return }
             selection = []
             list = found

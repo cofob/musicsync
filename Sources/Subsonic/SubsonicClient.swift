@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import Support
 
 /// Subsonic/OpenSubsonic client with per-request token authentication.
 public struct SubsonicClient: Sendable {
@@ -28,14 +29,14 @@ public struct SubsonicClient: Sendable {
 
     /// Lowercase hex md5 of `password + salt`.
     public static func token(password: String, salt: String) -> String {
-        Insecure.MD5.hash(data: Data((password + salt).utf8)).map { String(format: "%02x", $0) }.joined()
+        Insecure.MD5.hash(data: Data((password + salt).utf8)).hex
     }
 
     // MARK: URLs
 
     /// Builds a URL with fresh auth parameters. Never cache the result.
     public func url(_ method: String, _ query: [(String, String)] = [], json: Bool = true) -> URL {
-        let salt = (0..<6).map { _ in String(format: "%02x", UInt8.random(in: .min ... .max)) }.joined()
+        let salt = (0..<6).map { _ in UInt8.random(in: .min ... .max) }.hex
         var items: [(String, String)] = [
             ("u", username), ("s", salt), ("t", Self.token(password: password, salt: salt)),
             ("v", Self.apiVersion), ("c", Self.clientName),
@@ -117,10 +118,6 @@ public struct SubsonicClient: Sendable {
         try await fetch("getAlbum", "album", [("id", id)])
     }
 
-    public func getSong(id: String) async throws -> Song {
-        try await fetch("getSong", "song", [("id", id)])
-    }
-
     public func getPlaylists() async throws -> [Playlist] {
         try await (fetch("getPlaylists", "playlists") as PlaylistsBody).playlist ?? []
     }
@@ -157,7 +154,6 @@ public struct SubsonicClient: Sendable {
         return data
     }
 
-    /// Downloads the original file to a temp file. The caller moves or deletes it.
     /// Downloads the original file to a temp file. The caller moves or deletes it.
     /// `progress` gets bytes received and expected (-1 when unknown), at most 5 times a second.
     /// A download task, not `session.download(from:delegate:)`: that one never reports progress.

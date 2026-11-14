@@ -91,9 +91,12 @@ extension SyncJob {
     // MARK: Removal and retagging
 
     func removeAndRetag() {
+        var stock = Set<UInt64>()
         for removal in plan.remove {
             switch removal.target {
-            case .stock: removeStock(removal)
+            case .stock:
+                manifest.entries[removal.songID] = nil
+                stock.insert(removal.entry.dbid)
             case .rockbox:
                 manifest.rockboxEntries[removal.songID] = nil
                 pendingDeletes.append(removal.entry.relativePath)
@@ -101,18 +104,22 @@ extension SyncJob {
             manifestDirty = true
             summary.removed += 1
         }
-        for track in db.tracks where plan.deleteTracks.contains(track.dbid) {
-            db.removeTrack(id: track.id)
+        let doomed = db.tracks.filter { stock.contains($0.dbid) || plan.deleteTracks.contains($0.dbid) }
+        for track in doomed {
             pendingDeletes.append(ITunesDB.relativePath(ipodLocation: track.location))
+            if !stock.contains(track.dbid) { summary.removed += 1 }
+        }
+        if !doomed.isEmpty {
+            db.removeTracks(ids: Set(doomed.map(\.id)))
             dbDirty = true
-            summary.removed += 1
         }
         for (id, entry) in manifest.entries where plan.deleteTracks.contains(entry.dbid) {
             manifest.entries[id] = nil
             manifestDirty = true
         }
+        let index = Dictionary(db.tracks.indices.map { (db.tracks[$0].dbid, $0) }) { a, _ in a }
         for change in plan.retag {
-            guard let i = db.tracks.firstIndex(where: { $0.dbid == change.entry.dbid }),
+            guard let i = index[change.entry.dbid],
                   var entry = manifest.entries[change.desired.id] else { continue }
             TrackBuilder.applyTags(change.desired, to: &db.tracks[i])
             entry.fingerprint = change.desired.fingerprint
@@ -121,13 +128,5 @@ extension SyncJob {
             dbDirty = true
             summary.retagged += 1
         }
-    }
-
-    private func removeStock(_ removal: SyncPlan.Removal) {
-        manifest.entries[removal.songID] = nil
-        guard let track = db.tracks.first(where: { $0.dbid == removal.entry.dbid }) else { return }
-        db.removeTrack(id: track.id)
-        pendingDeletes.append(ITunesDB.relativePath(ipodLocation: track.location))
-        dbDirty = true
     }
 }

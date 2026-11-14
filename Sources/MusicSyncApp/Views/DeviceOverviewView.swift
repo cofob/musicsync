@@ -34,9 +34,8 @@ struct DeviceOverviewView: View {
                             HStack {
                                 if let orphans = s.orphans {
                                     Text(orphans.count == 0 ? "None" : "\(orphans.count) · \(formatBytes(orphans.bytes))")
-                                    // HOOK: `DeviceModel.cleanOrphans` is provided by the sync feature.
-                                    Button("Clean Up…") { Task { await ipod.cleanOrphans?() } }
-                                        .disabled(ipod.cleanOrphans == nil || orphans.count == 0)
+                                    Button("Clean Up…") { model.sync.confirmCleanUp = true }
+                                        .disabled(orphans.count == 0)
                                 } else if ipod.isScanningOrphans {
                                     ProgressView().controlSize(.small)
                                 } else {
@@ -75,10 +74,8 @@ struct DeviceOverviewView: View {
         Button("Reload", systemImage: "arrow.clockwise") { model.ipod.reload() }
         Button("Eject", systemImage: "eject.fill") { Task { await model.eject() } }
             .disabled(model.ipod.isEjecting || model.ipod.isSyncing)
-        // HOOK: `DeviceModel.startSync` is provided by the sync feature.
-        Button("Sync", systemImage: "arrow.triangle.2.circlepath") { model.ipod.startSync?() }
+        Button("Sync", systemImage: "arrow.triangle.2.circlepath") { model.sync.showSheet = true }
             .buttonStyle(.borderedProminent).tint(Color.musicAccent)
-            .disabled(model.ipod.startSync == nil)
     }
 
     @ViewBuilder private func guid(_ s: DeviceSnapshot) -> some View {

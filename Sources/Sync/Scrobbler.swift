@@ -46,7 +46,7 @@ public actor Scrobbler {
     /// Queues requests; `source` identifies the Play Counts file they came from.
     public func enqueue(_ requests: [ScrobbleRequest], source: Data? = nil) {
         if let source {
-            let digest = SHA256.hash(data: source).map { String(format: "%02x", $0) }.joined()
+            let digest = SHA256.hash(data: source).hex
             guard !state.seen.contains(digest) else { return }
             state.seen = Array((state.seen + [digest]).suffix(20))
         }

@@ -54,7 +54,7 @@ struct DeviceSongsView: View {
     }
 
     private func rebuild() {
-        let query = model.searchText.trimmingCharacters(in: .whitespaces)
+        let query = model.query
         let all = model.ipod.snapshot?.tracks ?? []
         let matching = query.isEmpty ? all : all.filter {
             $0.title.localizedCaseInsensitiveContains(query) || $0.artist.localizedCaseInsensitiveContains(query)

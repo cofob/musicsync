@@ -174,9 +174,9 @@ struct SyncSheet: View {
         } else if let preview = sync.preview {
             let plan = preview.plan
             Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
-                row("Add", count: plan.add.count, bytes: plan.add.isEmpty ? nil : plan.addBytes)
+                row("Add", count: plan.add.count, bytes: plan.addBytes)
                 row("Update", count: plan.reencode.count + plan.retag.count)
-                row("Remove", count: plan.remove.count, bytes: plan.remove.isEmpty ? nil : plan.freedBytes)
+                row("Remove", count: plan.remove.count, bytes: plan.freedBytes)
                 row("Playlists", count: plan.playlistsToCreate.count + plan.playlistsToUpdate.count + plan.playlistsToDelete.count,
                     unit: "changes")
                 Divider()

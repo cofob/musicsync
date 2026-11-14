@@ -34,7 +34,7 @@ public actor LibraryDatabase {
     }
 
     static func hash(_ text: String) -> String {
-        SHA256.hash(data: Data(text.utf8)).prefix(8).map { String(format: "%02x", $0) }.joined()
+        SHA256.hash(data: Data(text.utf8)).prefix(8).hex
     }
 
     /// False when the file cannot be opened or keeps failing; callers should use the network.

@@ -66,7 +66,7 @@ final class SyncModel {
     }
 
     @ObservationIgnored private weak var app: AppModel?
-    @ObservationIgnored private let demo = ProcessInfo.processInfo.environment["MUSICSYNC_DEMO"] == "1"
+    @ObservationIgnored private let demo = AppModel.isDemo
     @ObservationIgnored private let locations: SyncLocations
     @ObservationIgnored private let scrobbler: Scrobbler
     @ObservationIgnored private let engine: SyncEngine
@@ -79,7 +79,7 @@ final class SyncModel {
 
     init() {
         if demo {
-            let base = FileManager.default.temporaryDirectory.appendingPathComponent("musicsync-demo")
+            let base = AppModel.demoDirectory
             locations = SyncLocations(appSupport: base.appendingPathComponent("sync"), caches: base.appendingPathComponent("sync-cache"))
             scrobbler = Scrobbler(queueURL: locations.scrobbleQueue)
         } else {
@@ -91,9 +91,6 @@ final class SyncModel {
 
     func attach(_ app: AppModel) {
         self.app = app
-        app.ipod.onDeviceChanged = { [weak self] _ in self?.deviceUpdated() }
-        app.ipod.startSync = { [weak self] in self?.showSheet = true }
-        app.ipod.cleanOrphans = { [weak self] in self?.confirmCleanUp = true }
         if !demo, let key = UserDefaults.standard.string(forKey: Self.lastDeviceKey) { setKey(key) }
     }
 

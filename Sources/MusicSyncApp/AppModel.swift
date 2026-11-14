@@ -57,6 +57,8 @@ final class AppModel {
     var selection: SidebarItem? = .home
     var path: [Route] = []
     var searchText = ""
+    /// `searchText` without leading and trailing spaces; the filter of the list pages.
+    var query: String { searchText.trimmingCharacters(in: .whitespaces) }
     /// Bumped by Edit > Find; the toolbar search field takes focus.
     var searchFocusRequest = 0
     /// Set by the toolbar search field.
@@ -90,9 +92,10 @@ final class AppModel {
     @ObservationIgnored private var spaceMonitor: Any?
 
     /// Development only: `MUSICSYNC_DEMO=1` uses the public Navidrome demo and stores nothing in the Keychain or defaults.
-    @ObservationIgnored let demo = ProcessInfo.processInfo.environment["MUSICSYNC_DEMO"] == "1"
+    @ObservationIgnored let demo = AppModel.isDemo
+    nonisolated static let isDemo = ProcessInfo.processInfo.environment["MUSICSYNC_DEMO"] == "1"
     /// Demo mode keeps the library and its covers here and removes nothing else.
-    @ObservationIgnored private lazy var demoDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("musicsync-demo")
+    nonisolated static let demoDirectory = FileManager.default.temporaryDirectory.appendingPathComponent("musicsync-demo")
 
     init() {
         if demo {
@@ -137,7 +140,7 @@ final class AppModel {
             apply(artists: [], albums: [], playlists: [])
             return
         }
-        let store = demo ? LibraryStore(client: client, directory: demoDirectory) : LibraryStore(client: client)
+        let store = demo ? LibraryStore(client: client, directory: Self.demoDirectory) : LibraryStore(client: client)
         let covers = CoverArtCache(client: client)
         self.client = client; self.store = store; self.covers = covers
         player.client = client; player.covers = covers
@@ -264,10 +267,13 @@ final class AppModel {
         let kinds = [("newest", "Recently Added"), ("recent", "Recently Played"), ("frequent", "Most Played"), ("random", "Discover")]
         var result: [Shelf] = []
         do {
-            for (type, title) in kinds {
-                let albums = try await client.getAlbumList2(type: type, size: 20)
-                if !albums.isEmpty { result.append(Shelf(id: type, title: title, albums: albums)) }
+            let lists = try await withThrowingTaskGroup(of: (String, [Album]).self) { group in
+                for (type, _) in kinds { group.addTask { (type, try await client.getAlbumList2(type: type, size: 20)) } }
+                var lists: [String: [Album]] = [:]
+                for try await (type, albums) in group { lists[type] = albums }
+                return lists
             }
+            result = kinds.compactMap { type, title in lists[type].flatMap { $0.isEmpty ? nil : Shelf(id: type, title: title, albums: $0) } }
             libraryError = nil
         } catch where !error.isCancellation {
             libraryError = error.localizedDescription

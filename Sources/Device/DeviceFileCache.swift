@@ -42,7 +42,7 @@ public enum DeviceFileCache {
     }
 
     private static func hash(_ data: Data) -> String {
-        SHA256.hash(data: data).prefix(8).map { String(format: "%02x", $0) }.joined()
+        SHA256.hash(data: data).prefix(8).hex
     }
 }
 

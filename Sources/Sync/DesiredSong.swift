@@ -2,6 +2,7 @@ import CryptoKit
 import Foundation
 import ITunesDB
 import Subsonic
+import Support
 import Transcode
 
 /// A song the selection wants on the device, with everything needed to write it.
@@ -30,7 +31,7 @@ public struct DesiredSong: Sendable, Hashable, Identifiable {
         // Rockbox files carry no Sound Check value.
         if preset.target == .stock { parts.append(String(soundCheckGain.map(soundcheck(fromReplayGainDB:)) ?? 0)) }
         let digest = SHA256.hash(data: Data(parts.joined(separator: "\u{1F}").utf8))
-        fingerprint = digest.prefix(8).map { String(format: "%02x", $0) }.joined()
+        fingerprint = digest.prefix(8).hex
     }
 }
 

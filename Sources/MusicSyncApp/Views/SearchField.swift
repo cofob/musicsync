@@ -158,11 +158,4 @@ extension SearchModel.Item {
         case .deviceTrack(let t): join("Song", t.artist)
         }
     }
-
-    var isSong: Bool {
-        switch self {
-        case .song, .deviceTrack: true
-        default: false
-        }
-    }
 }

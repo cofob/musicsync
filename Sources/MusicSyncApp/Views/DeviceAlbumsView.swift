@@ -51,7 +51,7 @@ struct DeviceAlbumsView: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        let query = model.searchText.trimmingCharacters(in: .whitespaces)
+        let query = model.query
         let all = model.ipod.snapshot?.albums ?? []
         let albums = query.isEmpty ? all : all.filter {
             $0.name.localizedCaseInsensitiveContains(query) || $0.artist.localizedCaseInsensitiveContains(query)

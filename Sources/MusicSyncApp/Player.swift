@@ -119,8 +119,6 @@ final class Player {
 
     // MARK: Controls
 
-    func play(_ songs: [Song], startAt: Int = 0) { play(songs.map(PlayItem.server), startAt: startAt) }
-
     /// `shuffled` turns shuffle on (true) or off (false); nil keeps the current mode.
     func play(_ items: [PlayItem], startAt: Int = 0, shuffled: Bool? = nil) {
         if let shuffled { shuffle = shuffled }
@@ -138,7 +136,7 @@ final class Player {
         }
     }
 
-    func play(_ songs: [Song], startAt: Int = 0, shuffled: Bool?) { play(songs.map(PlayItem.server), startAt: startAt, shuffled: shuffled) }
+    func play(_ songs: [Song], startAt: Int = 0, shuffled: Bool? = nil) { play(songs.map(PlayItem.server), startAt: startAt, shuffled: shuffled) }
 
     /// Shuffles the entries after the current one, or restores their order.
     func setShuffle(_ on: Bool) {

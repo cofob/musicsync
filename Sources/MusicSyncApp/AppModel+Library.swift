@@ -7,7 +7,7 @@ import Subsonic
 extension AppModel {
     func makeLibrary(_ server: ServerConfig) -> Library {
         guard demo else { return Library(server: server, settings: mirrorSettings) }
-        let base = FileManager.default.temporaryDirectory.appendingPathComponent("musicsync-demo")
+        let base = Self.demoDirectory
         try? FileManager.default.createDirectory(at: base.appendingPathComponent("library"), withIntermediateDirectories: true)
         return Library(server: server, settings: mirrorSettings, directory: base.appendingPathComponent("library"),
                        coversDirectory: base.appendingPathComponent("covers-small"))
@@ -75,7 +75,6 @@ extension AppModel {
         return try await store?.playlist(id)
     }
 
-    /// Mirrored lyrics, else OpenSubsonic `getLyricsBySongId`, else classic `getLyrics`. Nil when none.
     /// Lyrics from memory, then the library database, then the server; server replies (also "none") are kept.
     func lyrics(for song: Song) async -> Lyrics? {
         if let hit = lyricsCache[song.id] { return hit }

@@ -73,10 +73,9 @@ struct MusicSyncApp: App {
                     .disabled(model.library == nil || model.isMirrorRunning)
             }
             CommandMenu("Device") {
-                // HOOK: `DeviceModel.startSync` is set by the sync feature.
-                Button("Sync Now") { model.ipod.startSync?() }
+                Button("Sync Now") { model.sync.showSheet = true }
                     .keyboardShortcut("s")
-                    .disabled(model.ipod.current == nil || model.ipod.startSync == nil)
+                    .disabled(model.ipod.current == nil)
                 Divider()
                 Button("Eject") { Task { await model.eject() } }
                     .keyboardShortcut("e")
