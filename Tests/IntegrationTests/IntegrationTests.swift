@@ -46,6 +46,8 @@ import Testing
         let link = try #require(URL(string: "https://music.example.com/share/xyz"))
         #expect(target.text(link: link) == "Selected Ambient Works — Aphex Twin\nhttps://music.example.com/share/xyz")
         #expect(ShareTarget(kind: .playlist, id: "p", title: "Mix", artist: "").label == "Mix")
+        let song: Song = try decode(#"{"id":"s-1","title":"Xtal","artist":"AFX","displayArtist":"Aphex Twin","coverArt":"c-1"}"#)
+        #expect(ShareTarget(song: song) == ShareTarget(kind: .song, id: "s-1", title: "Xtal", artist: "Aphex Twin", coverArt: "c-1"))
     }
 }
 
@@ -93,8 +95,10 @@ private func decode<T: Decodable>(_ json: String) throws -> T { try JSONDecoder(
         let indexer = SpotlightIndexer(sink: sink, stateURL: state)
         try await indexer.update(serverKey: "s1", entries: [a, b])
         try await indexer.update(serverKey: "s1", entries: [a])
+        try await indexer.use(serverKey: "s1")
         try await indexer.update(serverKey: "s2", entries: [a])
-        try await indexer.clear()
+        try await indexer.use(serverKey: nil)
+        try await indexer.use(serverKey: nil)
         #expect(sink.calls == ["index 1,2", "delete 2", "deleteAll", "index 1", "deleteAll"])
         #expect(!FileManager.default.fileExists(atPath: state.path))
     }

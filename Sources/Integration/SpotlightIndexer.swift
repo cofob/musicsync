@@ -26,9 +26,14 @@ public actor SpotlightIndexer {
         state = (try? Data(contentsOf: stateURL)).flatMap { try? JSONDecoder().decode(State.self, from: $0) }
     }
 
+    /// Clears the index when it holds the items of another server (nil: signed out).
+    public func use(serverKey: String?) async throws {
+        if let state, state.serverKey != serverKey { try await clear() }
+    }
+
     /// Sends the difference to the last update. Another server first clears the index.
     public func update(serverKey: String, entries: [SpotlightEntry]) async throws {
-        if let state, state.serverKey != serverKey { try await clear() }
+        try await use(serverKey: serverKey)
         let new = Dictionary(entries.map { ($0.id, $0) }) { _, last in last }
         let plan = SpotlightPlan(old: state?.entries ?? [:], new: Array(new.values))
         if !plan.removals.isEmpty { try await sink.delete(ids: plan.removals) }

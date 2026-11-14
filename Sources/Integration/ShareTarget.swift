@@ -1,4 +1,5 @@
 import Foundation
+import Subsonic
 
 /// A song, album, playlist or artist to share.
 public struct ShareTarget: Hashable, Sendable {
@@ -24,4 +25,11 @@ public struct ShareTarget: Hashable, Sendable {
 
     /// The shared text: the label, then the server's public link or else the deep link.
     public func text(link: URL? = nil) -> String { label + "\n" + (link ?? deepLink).absoluteString }
+}
+
+public extension ShareTarget {
+    init(song: Song) { self.init(kind: .song, id: song.id, title: song.title, artist: song.artistName, coverArt: song.coverArt) }
+    init(album: Album) { self.init(kind: .album, id: album.id, title: album.name, artist: album.artistName, coverArt: album.coverArt) }
+    init(artist: Artist) { self.init(kind: .artist, id: artist.id, title: artist.name, coverArt: artist.coverArt) }
+    init(playlist: Playlist) { self.init(kind: .playlist, id: playlist.id, title: playlist.name, coverArt: playlist.coverArt) }
 }
