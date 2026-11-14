@@ -11,6 +11,7 @@ struct GeneralSettingsView: View {
                 Toggle("Show player in the menu bar", isOn: $showsItem)
                 Toggle("Show song title next to the icon", isOn: $showsTitle).disabled(!showsItem)
             }
+            SystemSettingsSections()
         }
         .formStyle(.grouped)
         .frame(width: 480)

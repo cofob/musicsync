@@ -1,3 +1,4 @@
+import Integration
 import SwiftUI
 import Subsonic
 
@@ -31,6 +32,7 @@ struct PlaylistSidebarRow: View {
             PinMenuItem(reason: .playlist(playlist.id)) { model.download(playlist) }
             StationButton(seed: .playlist(playlist))
             SyncMenuItem(isOn: model.sync.isPlaylistSelected(playlist.id)) { model.sync.togglePlaylist(playlist.id) }
+            ShareMenuItems(target: ShareTarget(playlist: playlist))
             Divider()
             if editable {
                 Button("Rename", systemImage: "pencil") { startRename() }

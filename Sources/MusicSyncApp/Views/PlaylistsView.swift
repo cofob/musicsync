@@ -1,3 +1,4 @@
+import Integration
 import SwiftUI
 import Subsonic
 
@@ -28,6 +29,7 @@ struct PlaylistsView: View {
                         PinMenuItem(reason: .playlist(playlist.id)) { model.download(playlist) }
                         StationButton(seed: .playlist(playlist))
                         SyncMenuItem(isOn: model.sync.isPlaylistSelected(playlist.id)) { model.sync.togglePlaylist(playlist.id) }
+                        ShareMenuItems(target: ShareTarget(playlist: playlist))
                         if model.canEdit(playlist) {
                             Divider()
                             Button("Delete Playlist…", systemImage: "trash") { model.playlistPrompt = .delete(playlist) }

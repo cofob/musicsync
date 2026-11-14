@@ -1,3 +1,4 @@
+import Integration
 import SwiftUI
 import Subsonic
 
@@ -26,6 +27,7 @@ struct SongMenuItems: View {
         Button("Go to Album", systemImage: "square.stack") { model.goToAlbum(song) }.disabled(song.albumId == nil)
         Button("Go to Artist", systemImage: "music.microphone") { model.goToArtist(song) }.disabled(song.artistId == nil)
         Divider()
+        ShareMenuItems(target: ShareTarget(song: song))
         Button("Copy", systemImage: "doc.on.doc") { model.copy(song) }
     }
 }

@@ -1,3 +1,4 @@
+import Integration
 import SwiftUI
 import Subsonic
 
@@ -55,6 +56,8 @@ struct AlbumMenuItems: View {
         }
         PinMenuItem(reason: .album(album.id)) { model.download(album) }
         SyncMenuItem(isOn: model.sync.isSelected(album), isEnabled: !model.sync.isSelectedByArtist(album)) { model.sync.toggle(album) }
+        Divider()
+        ShareMenuItems(target: ShareTarget(album: album))
     }
 
     private func songs(_ action: @escaping ([Song]) -> Void) {

@@ -2,6 +2,8 @@ import AppKit
 import Library
 import Recommend
 import Subsonic
+import Carbon.HIToolbox
+import Integration
 import SwiftUI
 
 /// Development only: `MUSICSYNC_SHOT=<png>` opens `MUSICSYNC_SCENE`, waits `MUSICSYNC_SHOT_DELAY` seconds (default 6),
@@ -99,6 +101,23 @@ import SwiftUI
             await select(.search, model)
             model.searchText = String(s.dropFirst(7))
             model.search.submit(model.searchText)
+        case "settings-general": open(GeneralSettingsView(), "General", model)
+        case "settings-shortcuts", "settings-shortcuts-recording":
+            model.system.hotKeys.enabled = true
+            model.system.hotKeys.assign(KeyCombo(keyCode: UInt32(kVK_ANSI_P), modifiers: UInt32(controlKey | optionKey), key: "P"), to: .playPause)
+            model.system.hotKeys.assign(KeyCombo(keyCode: UInt32(kVK_RightArrow), modifiers: UInt32(controlKey | optionKey), key: "→"), to: .next)
+            open(ShortcutsSettingsView(recording: scene.hasSuffix("recording") ? .favorite : nil), "Shortcuts", model)
+        case "settings-sharing": open(SharesSettingsView(), "Sharing", model)
+        case "share-menu":
+            guard let album = await first({ model.albums.first }), let song = try? await model.album(album.id)?.song?.first else { break }
+            open(VStack(alignment: .leading) { SongMenuItems(song: song) }.buttonStyle(.borderless).padding(20).frame(width: 280), "Song Menu", model)
+        case let s where s.hasPrefix("link:"):
+            // Opens an item through its deep link, parsed back from the URL as the system would hand it over.
+            guard let album = await first({ model.albums.first }), let song = try? await model.album(album.id)?.song?.first else { break }
+            let links: [String: DeepLink] = ["album": .show(.album, id: album.id), "artist": .show(.artist, id: album.artistId ?? ""),
+                                             "song": .show(.song, id: song.id), "search": .search(album.name)]
+            await select(.home, model)
+            links[String(s.dropFirst(5))].flatMap { DeepLink(url: $0.url) }.map(model.system.open)
         default:
             print("Unknown scene: \(scene)")
             exit(2)

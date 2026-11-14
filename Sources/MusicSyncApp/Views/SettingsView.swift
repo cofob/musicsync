@@ -2,6 +2,8 @@ import SwiftUI
 import Subsonic
 
 struct SettingsView: View {
+    @Environment(AppModel.self) private var model
+
     var body: some View {
         TabView {
             GeneralSettingsView().tabItem { Label("General", systemImage: "gearshape") }
@@ -9,6 +11,8 @@ struct SettingsView: View {
             LibrarySettingsView().tabItem { Label("Library", systemImage: "books.vertical") }
             DownloadSettingsView().tabItem { Label("Downloads", systemImage: "arrow.down.circle") }
             SyncSettingsView().tabItem { Label("Sync", systemImage: "arrow.triangle.2.circlepath") }
+            ShortcutsSettingsView().tabItem { Label("Shortcuts", systemImage: "keyboard") }
+            if model.system.sharesSupported { SharesSettingsView().tabItem { Label("Sharing", systemImage: "square.and.arrow.up") } }
         }
     }
 }
