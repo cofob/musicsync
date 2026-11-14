@@ -80,14 +80,23 @@ private func request(_ text: String) throws -> HTTPRequest {
         #expect(try route("GET / HTTP/1.1\r\n\r\n") == .success(.page))
         #expect(try route("GET /manifest.webmanifest HTTP/1.1\r\n\r\n") == .success(.manifest))
         #expect(try route("GET /apple-touch-icon.png HTTP/1.1\r\n\r\n") == .success(.icon))
-        #expect(try route("GET /pair?t=abc HTTP/1.1\r\n\r\n") == .success(.pairLink("abc")))
+        #expect(try route("GET /pair?t=abc HTTP/1.1\r\n\r\n") == .success(.page))  // the page pairs with a POST
+        #expect(try route("POST /api/pair?link=abc HTTP/1.1\r\n\r\n") == .success(.pairLink("abc", name: "")))
+        #expect(try route("GET /silence.wav HTTP/1.1\r\n\r\n") == .success(.silence))
+        #expect(try route("GET /api/lyrics HTTP/1.1\r\n\r\n") == .success(.lyrics))
+        #expect(try route("GET /api/browse/artist HTTP/1.1\r\n\r\n") == .success(.list(.artist, offset: 0)))
+        #expect(try route("GET /api/browse/mix?offset=100 HTTP/1.1\r\n\r\n") == .success(.list(.mix, offset: 100)))
+        #expect(try route("GET /api/browse/album/al%2F1?offset=5 HTTP/1.1\r\n\r\n") == .success(.detail(.album, id: "al/1", offset: 5)))
+        #expect(try route("POST /api/play/song/s1?mode=next HTTP/1.1\r\n\r\n") == .success(.play(.song, id: "s1", mode: .next, start: 0)))
+        #expect(try route("POST /api/play/mix/daily-1?mode=last HTTP/1.1\r\n\r\n") == .success(.play(.mix, id: "daily-1", mode: .last, start: 0)))
         #expect(try route("GET /cover/al-1 HTTP/1.1\r\n\r\n") == .success(.cover("al-1")))
         #expect(try route("POST /api/pair?code=123456&name=iPhone HTTP/1.1\r\n\r\n") == .success(.pair(code: "123456", name: "iPhone")))
         #expect(try route("GET /api/state HTTP/1.1\r\n\r\n") == .success(.state))
         #expect(try route("GET /api/events HTTP/1.1\r\n\r\n") == .success(.events))
         #expect(try route("GET /api/search?q=abba HTTP/1.1\r\n\r\n") == .success(.search("abba")))
-        #expect(try route("POST /api/play/album/al%2F1 HTTP/1.1\r\n\r\n") == .success(.playAlbum("al/1")))
-        #expect(try route("POST /api/play/playlist/p1 HTTP/1.1\r\n\r\n") == .success(.playPlaylist("p1")))
+        #expect(try route("POST /api/play/album/al%2F1 HTTP/1.1\r\n\r\n") == .success(.play(.album, id: "al/1", mode: .now, start: 0)))
+        let body = "POST /api/play/playlist/p1 HTTP/1.1\r\nContent-Length: 12\r\n\r\n{\"start\":42}"
+        #expect(try route(body) == .success(.play(.playlist, id: "p1", mode: .now, start: 42)))
     }
 
     @Test func parsesCommands() throws {
@@ -96,12 +105,15 @@ private func request(_ text: String) throws -> HTTPRequest {
             ("shuffle", .shuffle(nil)), ("shuffle?on=true", .shuffle(true)), ("shuffle?on=0", .shuffle(false)),
             ("repeat", .repeatMode(nil)), ("repeat?mode=one", .repeatMode(.one)), ("seek?time=42.5", .seek(42.5)),
             ("volume?value=1.7", .volume(1)), ("volume?value=-1", .volume(0)), ("queue?offset=3&id=s1", .playQueue(offset: 3, id: "s1")),
+            ("remove?offset=2&id=s3", .removeQueue(offset: 2, id: "s3")), ("move?from=4&to=0&id=s5", .moveQueue(from: 4, to: 0, id: "s5")),
+            ("move?from=0&to=3", .moveQueue(from: 0, to: 3, id: nil)), ("output?server=1", .output(server: true)), ("output?server=off", .output(server: false)),
         ]
         for (path, command) in cases {
             #expect(try route("POST /api/command/\(path) HTTP/1.1\r\n\r\n") == .success(.command(command)), "\(path)")
         }
         for bad in ["stop", "seek", "seek?time=-1", "seek?time=nan", "volume?value=x", "shuffle?on=maybe", "repeat?mode=x", "queue?offset=-1",
-                    "queue?offset=9223372036854775807", "seek?time=1e999"] {
+                    "queue?offset=9223372036854775807", "seek?time=1e999", "remove", "remove?offset=-2", "move?from=1", "move?from=1&to=x",
+                    "output", "output?server=maybe"] {
             #expect(try route("POST /api/command/\(bad) HTTP/1.1\r\n\r\n") == .failure(.badRequest), "\(bad)")
         }
         let body = "POST /api/command/seek HTTP/1.1\r\nContent-Length: 11\r\n\r\n{\"time\":30}"
@@ -114,8 +126,15 @@ private func request(_ text: String) throws -> HTTPRequest {
         #expect(try route("DELETE / HTTP/1.1\r\n\r\n") == .failure(.methodNotAllowed))
         #expect(try route("GET /etc/passwd HTTP/1.1\r\n\r\n") == .failure(.notFound))
         #expect(try route("GET /cover/a/b HTTP/1.1\r\n\r\n") == .failure(.notFound))
-        #expect(try route("GET /pair HTTP/1.1\r\n\r\n") == .failure(.badRequest))
+        #expect(try route("POST /pair?t=abc HTTP/1.1\r\n\r\n") == .failure(.methodNotAllowed))
         #expect(try route("POST /api/pair HTTP/1.1\r\n\r\n") == .failure(.badRequest))
+        #expect(try route("GET /api/play/album/a HTTP/1.1\r\n\r\n") == .failure(.methodNotAllowed))  // no state change by GET
+        #expect(try route("POST /api/browse/album HTTP/1.1\r\n\r\n") == .failure(.methodNotAllowed))
+        #expect(try route("POST /api/lyrics HTTP/1.1\r\n\r\n") == .failure(.methodNotAllowed))
+        for bad in ["GET /api/browse/song", "GET /api/browse/genre", "GET /api/browse/song/s1", "GET /api/browse/album?offset=-1",
+                    "POST /api/play/genre/g1", "POST /api/play/album/a?mode=soon", "POST /api/play/album/a?start=-1"] {
+            #expect(try route("\(bad) HTTP/1.1\r\n\r\n") == .failure(.badRequest), "\(bad)")
+        }
     }
 
     @Test func checksOrigin() throws {
@@ -125,6 +144,17 @@ private func request(_ text: String) throws -> HTTPRequest {
         #expect(try route(host + "Origin: http://evil.example\r\n\r\n") == .failure(.forbidden))
         #expect(try route(host + "Origin: null\r\n\r\n") == .failure(.forbidden))
         #expect(try route("POST /api/command/next HTTP/1.1\r\nOrigin: http://mac.local:8686\r\n\r\n") == .failure(.forbidden))
+    }
+
+    @Test func servesLocalNamesOnly() throws {
+        for host in ["mac.local:8686", "MAC.LOCAL", "192.168.1.5:8686", "127.0.0.1", "localhost:8686", "[fe80::1]:8686"] {
+            #expect(try route("GET /api/state HTTP/1.1\r\nHost: \(host)\r\n\r\n") == .success(.state), "\(host)")
+        }
+        // A rebound name of another site: same origin to the browser, but not this Mac's name.
+        for host in ["evil.example:8686", "evil.example", "local", "x.local.evil.example", ":8686"] {
+            let text = "GET /api/state HTTP/1.1\r\nHost: \(host)\r\nOrigin: http://\(host)\r\n\r\n"
+            #expect(try route(text) == .failure(.forbidden), "\(host)")
+        }
     }
 }
 
@@ -143,7 +173,8 @@ private func request(_ text: String) throws -> HTTPRequest {
     @Test func needsToken() throws {
         var access = RemoteAccess()
         let token = access.tokens.pair(name: "iPhone", now: now)
-        for path in ["GET /api/state", "GET /api/events", "GET /cover/c1", "GET /api/search?q=a", "POST /api/command/next", "POST /api/play/album/a"] {
+        for path in ["GET /api/state", "GET /api/events", "GET /cover/c1", "GET /api/search?q=a", "POST /api/command/next", "POST /api/play/album/a",
+                     "GET /api/lyrics", "GET /api/browse/artist", "GET /api/browse/album/a", "GET /silence.wav", "POST /api/command/move?from=0&to=1"] {
             #expect(status(try decide(&access, "\(path) HTTP/1.1\r\n\r\n")) == 401, "\(path)")
             #expect(status(try decide(&access, "\(path) HTTP/1.1\r\nAuthorization: Bearer wrong\r\n\r\n")) == 401, "\(path)")
             #expect(status(try decide(&access, "\(path) HTTP/1.1\r\nCookie: musicsync_token=\r\n\r\n")) == 401, "\(path)")
@@ -174,12 +205,16 @@ private func request(_ text: String) throws -> HTTPRequest {
         var access = RemoteAccess()
         access.gate.open(now: now)
         let link = access.gate.linkToken
-        let d = try decide(&access, "GET /pair?t=\(link) HTTP/1.1\r\nUser-Agent: Mozilla (iPhone; CPU iPhone OS 18)\r\n\r\n")
+        // Opening the link only shows the page; a link preview or prefetch pairs nothing.
+        #expect(try decide(&access, "GET /pair?t=\(link) HTTP/1.1\r\n\r\n") == .serve(.page, device: nil))
+        #expect(access.tokens.devices.isEmpty)
+        let d = try decide(&access, "POST /api/pair?link=\(link) HTTP/1.1\r\nUser-Agent: Mozilla (iPhone; CPU iPhone OS 18)\r\n\r\n")
         guard case .respond(let r) = d else { Issue.record("no response"); return }
-        #expect(r.status == .seeOther && r.header("Location") == "/")
+        #expect(r.status == .ok && r.header("Set-Cookie") != nil)
         #expect(access.tokens.devices.map(\.name) == ["iPhone"])
-        guard case .respond(let again) = try decide(&access, "GET /pair?t=\(link) HTTP/1.1\r\n\r\n") else { return }
-        #expect(again.status == .seeOther && again.header("Set-Cookie") == nil)
+        #expect(status(try decide(&access, "POST /api/pair?link=\(link) HTTP/1.1\r\n\r\n")) == 403)  // used up
+        access.gate.open(now: now)
+        #expect(status(try decide(&access, "POST /api/pair?link=\(access.gate.code) HTTP/1.1\r\n\r\n")) == 401)  // a code is not a link
     }
 
     @Test func limitsAttempts() throws {
@@ -225,11 +260,16 @@ private func request(_ text: String) throws -> HTTPRequest {
 @Suite struct StateTests {
     @Test func encodes() throws {
         let item = RemoteState.Item(id: "s1", title: "Song", artist: "A", album: nil, coverArt: "al-1/x")
-        let state = RemoteState(song: item, elapsed: .nan, duration: 200, playing: true, volume: 0.5, shuffle: false,
+        var state = RemoteState(song: item, elapsed: .nan, duration: 200, playing: true, volume: 0.5, shuffle: false,
                                 repeatMode: .all, starred: true, queue: Array(repeating: item, count: 30))
-        #expect(state.queue.count == 20)
+        #expect(state.queue.count == 30)
+        #expect(RemoteState(song: nil, elapsed: 0, duration: 0, playing: false, volume: 1, shuffle: false, repeatMode: .off, starred: false,
+                            queue: Array(repeating: item, count: 150)).queue.count == RemoteState.queueLimit)
         #expect(state.elapsed == 0)
+        state.output = "AirPlay Speaker"
+        state.jukebox = false
         let json = state.json
+        #expect(json.contains("\"output\":\"AirPlay Speaker\"") && json.contains("\"jukebox\":false"))
         #expect(json.contains("\"repeat\":\"all\""))
         #expect(json.contains("\"cover\":\"\\/cover\\/al-1%2Fx\""))
         #expect(try JSONDecoder().decode(RemoteState.self, from: Data(json.utf8)) == state)

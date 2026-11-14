@@ -6,7 +6,7 @@ public struct HTTPStatus: Error, Sendable, Equatable {
 
     public static let ok = HTTPStatus(code: 200, reason: "OK")
     public static let noContent = HTTPStatus(code: 204, reason: "No Content")
-    public static let seeOther = HTTPStatus(code: 303, reason: "See Other")
+    public static let partialContent = HTTPStatus(code: 206, reason: "Partial Content")
     public static let badRequest = HTTPStatus(code: 400, reason: "Bad Request")
     public static let unauthorized = HTTPStatus(code: 401, reason: "Unauthorized")
     public static let forbidden = HTTPStatus(code: 403, reason: "Forbidden")
@@ -15,6 +15,7 @@ public struct HTTPStatus: Error, Sendable, Equatable {
     public static let conflict = HTTPStatus(code: 409, reason: "Conflict")
     public static let payloadTooLarge = HTTPStatus(code: 413, reason: "Payload Too Large")
     public static let tooManyRequests = HTTPStatus(code: 429, reason: "Too Many Requests")
+    public static let rangeNotSatisfiable = HTTPStatus(code: 416, reason: "Range Not Satisfiable")
     public static let headersTooLarge = HTTPStatus(code: 431, reason: "Request Header Fields Too Large")
     public static let notImplemented = HTTPStatus(code: 501, reason: "Not Implemented")
     public static let unavailable = HTTPStatus(code: 503, reason: "Service Unavailable")
@@ -43,8 +44,6 @@ public struct HTTPResponse: Sendable, Equatable {
 
     /// `{"error": "…"}` with the status.
     public static func error(_ status: HTTPStatus) -> HTTPResponse { json(["error": status.reason], status: status) }
-
-    public static func redirect(to location: String) -> HTTPResponse { HTTPResponse(.seeOther, headers: [("Location", location)]) }
 
     /// Same-origin only; no framing, no sniffing, no referrer (the page URL may hold a pairing token).
     static let securityHeaders = [
@@ -78,6 +77,6 @@ public enum ServerSentEvent {
         return Data(("event: \(clean)\n" + lines.map { "data: \($0)\n" }.joined() + "\n").utf8)
     }
 
-    /// A comment line; keeps the connection open through idle periods.
-    public static let ping = Data(": ping\n\n".utf8)
+    /// Keeps the connection open through idle periods, and lets the page see a stream that died while the phone slept.
+    public static let ping = frame("ping", "")
 }

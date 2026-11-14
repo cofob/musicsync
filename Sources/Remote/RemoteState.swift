@@ -29,8 +29,12 @@ public struct RemoteState: Codable, Sendable, Equatable {
     public var starred: Bool
     /// The next songs, at most `queueLimit`.
     public var queue: [Item]
+    /// Where the sound plays: the Mac's output device (an AirPlay speaker too), or the server.
+    public var output = ""
+    /// Nil when the server has no jukebox; true while it plays.
+    public var jukebox: Bool?
 
-    public static let queueLimit = 20
+    public static let queueLimit = 100
 
     public init(song: Item?, elapsed: Double, duration: Double, playing: Bool, volume: Double, shuffle: Bool,
                 repeatMode: RepeatSetting, starred: Bool, queue: [Item]) {
@@ -46,7 +50,7 @@ public struct RemoteState: Codable, Sendable, Equatable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case song, elapsed, duration, playing, volume, shuffle, starred, queue
+        case song, elapsed, duration, playing, volume, shuffle, starred, queue, output, jukebox
         case repeatMode = "repeat"
     }
 
@@ -62,20 +66,67 @@ public struct RemoteState: Codable, Sendable, Equatable {
     }
 }
 
-/// One search hit: an album or a playlist to play.
-public struct RemoteSearchItem: Codable, Sendable, Equatable {
-    public var kind: String
+/// One row of a list or search: an artist, album, playlist, mix or song.
+public struct RemoteItem: Codable, Sendable, Equatable {
+    public var kind: RemoteKind
     public var id: String
     public var name: String
     public var detail: String?
     public var cover: String?
 
-    public init(kind: String, id: String, name: String, detail: String?, coverArt: String?) {
+    public init(kind: RemoteKind, id: String, name: String, detail: String?, coverArt: String?) {
         self.kind = kind
         self.id = id
         self.name = name
         self.detail = detail
         cover = coverArt.map(RemoteState.coverPath)
+    }
+}
+
+/// A list page or an opened artist, album, playlist or mix. `next` is the offset of the next page, if any.
+public struct RemoteList: Codable, Sendable, Equatable {
+    public var title: String
+    public var detail: String?
+    public var cover: String?
+    public var items: [RemoteItem]
+    public var next: Int?
+
+    public static let pageSize = 100
+
+    public init(title: String, detail: String? = nil, coverArt: String? = nil, items: [RemoteItem], next: Int? = nil) {
+        self.title = title
+        self.detail = detail
+        cover = coverArt.map(RemoteState.coverPath)
+        self.items = items
+        self.next = next
+    }
+
+    /// Page `offset` of `all`, with `next` set when more follow.
+    public static func page<T>(_ all: [T], offset: Int, title: String, item: (T) -> RemoteItem) -> RemoteList {
+        let end = min(all.count, offset + pageSize)
+        let items = offset < end ? all[offset..<end].map(item) : []
+        return RemoteList(title: title, items: items, next: end < all.count ? end : nil)
+    }
+}
+
+/// Lyrics of the song `id`; `start` (seconds) is nil for unsynced lines.
+public struct RemoteLyrics: Codable, Sendable, Equatable {
+    public struct Line: Codable, Sendable, Equatable {
+        public var start: Double?
+        public var text: String
+
+        public init(start: Double?, text: String) {
+            self.start = start
+            self.text = text
+        }
+    }
+
+    public var id: String?
+    public var lines: [Line]
+
+    public init(id: String?, lines: [Line]) {
+        self.id = id
+        self.lines = lines
     }
 }
 

@@ -4,7 +4,7 @@
 Run the app against it with MUSICSYNC_DEMO_SERVER=http://127.0.0.1:<port> (demo mode only).
 Sizes (env): BIG_ARTISTS (2000), BIG_ALBUMS (5000), BIG_SONGS_PER_ALBUM (10), BIG_PLAYLISTS (500).
 Playlist pl-0 holds 10000 songs, the others 50; artist ar-0 has every 40th album as well. BIG_MEDIA=1 draws album covers
-in the asked size (up to 1000 px) and streams 30 s of silence for every song. Otherwise covers, streams and lyrics are
+in the asked size (up to 1000 px), streams 30 s of silence and gives synced lyrics for every song. Otherwise covers, streams and lyrics are
 missing, except for the podcasts:
 three channels with drawn covers, bookmarks kept in memory, and silent episode streams (seekable).
 The user has the jukebox role; the jukebox keeps its playlist in memory and plays no sound."""
@@ -257,6 +257,10 @@ def reply(method, q):
         return {"openSubsonicExtensions": []}
     if method == "getPlayQueue":
         return {}
+    if method == "getLyricsBySongId" and MEDIA and q.get("id") in song_by_id:
+        title = song_by_id[q["id"]]["title"]
+        lines = [{"start": 500 + n * 3000, "value": f"{WORDS[n % len(WORDS)]} line {n + 1} of {title}"} for n in range(10)]
+        return {"lyricsList": {"structuredLyrics": [{"lang": "eng", "synced": True, "line": lines}]}}
     if method in ("getCoverArt", "stream", "download", "getLyricsBySongId"):
         return None
     return podcast(method, q)

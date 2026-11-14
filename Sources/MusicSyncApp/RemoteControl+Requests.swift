@@ -24,9 +24,12 @@ extension RemoteControl {
         case .command(let command):
             guard run(command) else { return .error(.conflict) }
             return .json(state())
+        case .silence: return RemoteAudio.ranged(RemoteAudio.silence, type: "audio/wav", range: request.headers["range"])
+        case .lyrics: return .json(await lyrics())
         case .search(let text): return await search(text)
-        case .playAlbum(let id): app.system.open(.play(.album, id: id)); return HTTPResponse(.noContent)
-        case .playPlaylist(let id): app.system.open(.play(.playlist, id: id)); return HTTPResponse(.noContent)
+        case .list(let kind, let offset): return await list(kind, offset: offset)
+        case .detail(let kind, let id, let offset): return await detail(kind, id: id, offset: offset)
+        case .play(let kind, let id, let mode, let start): return await play(kind, id: id, mode: mode, start: start)
         case .cover(let id): return await cover(id, small: request.query["size"] == "small")
         case .pair, .pairLink, .events: return .error(.notFound)
         }
@@ -51,35 +54,33 @@ extension RemoteControl {
             player.seek(to: player.duration > 0 ? min(time, player.duration) : time)
         case .volume(let value): player.volume = value
         case .playQueue(let offset, let id):
-            guard let index = player.index, player.queue.indices.contains(index + 1 + offset),
-                  id == nil || player.queue[index + 1 + offset].id == id else { return false }
+            guard upcoming(offset, id) else { return false }
             player.playUpcoming(at: offset)
+        case .removeQueue(let offset, let id):
+            guard upcoming(offset, id) else { return false }
+            player.removeUpcoming(at: [offset])
+        case .moveQueue(let from, let to, let id):
+            guard upcoming(from, id), upcoming(to, nil) else { return false }
+            player.moveUpcoming(from: [from], to: to > from ? to + 1 : to)
+        case .output(let server):
+            let jukebox = app.jukebox
+            guard jukebox.isAvailable else { return false }
+            Task { if server { await jukebox.activate() } else { await jukebox.deactivate() } }
         }
         return true
     }
 
-    /// Albums from the server search, then playlists by name.
-    private func search(_ text: String) async -> HTTPResponse {
-        let text = text.trimmingCharacters(in: .whitespaces)
-        guard !text.isEmpty, let client = app.client else { return .json(["items": [RemoteSearchItem]()]) }
-        let store = app.store
-        do {
-            let albums = try await client.search3(text, artistCount: 0, albumCount: 12, songCount: 0).album
-            guard store === app.store else { return .error(.conflict) }
-            let playlists = app.playlists.filter { $0.name.localizedStandardContains(text) }.prefix(6)
-            searchCovers = Set(albums.compactMap(\.coverArt) + playlists.compactMap(\.coverArt))
-            let items = albums.map { RemoteSearchItem(kind: "album", id: $0.id, name: $0.name, detail: $0.artist, coverArt: $0.coverArt) }
-                + playlists.map { RemoteSearchItem(kind: "playlist", id: $0.id, name: $0.name, detail: nil, coverArt: $0.coverArt) }
-            return .json(["items": items])
-        } catch {
-            return .error(.unavailable)
-        }
+    /// True when entry `offset` of the songs up next exists and, if given, has the song `id`.
+    private func upcoming(_ offset: Int, _ id: String?) -> Bool {
+        let player = app.player
+        guard let index = player.index, player.queue.indices.contains(index + 1 + offset) else { return false }
+        return id == nil || player.queue[index + 1 + offset].id == id
     }
 
     /// Only covers the page can show: the queue, the library lists and the last search. Never a free URL.
     private func cover(_ id: String, small: Bool) async -> HTTPResponse {
         let player = app.player
-        let known = player.queue.contains { $0.coverArt == id } || searchCovers.contains(id)
+        let known = player.queue.contains { $0.coverArt == id } || listedCovers.contains(id)
             || app.albums.contains { $0.coverArt == id } || app.playlists.contains { $0.coverArt == id }
         guard known, let client = app.client else { return .error(.notFound) }
         let size = small ? 120 : 600, key = "\(id)@\(size)"

@@ -23,18 +23,13 @@ public struct RemoteAccess: Sendable {
         case .success(let r): route = r
         }
         switch route {
-        case .pair(let code, let name):
-            let outcome = gate.attempt(code: code, now: now)
+        case .pair(let code, let name), .pairLink(let code, let name):
+            let isLink = if case .pairLink = route { true } else { false }
+            let outcome = isLink ? gate.attempt(link: code, now: now) : gate.attempt(code: code, now: now)
             guard outcome == .paired else { return .respond(.error(Self.status(outcome))) }
             let token = pair(name.isEmpty ? Self.deviceName(request) : name, now: now)
             var response = HTTPResponse.json(["token": token])
             response.headers.append(RemoteAuth.cookie(token))
-            return .respond(response)
-        case .pairLink(let link):
-            // A used or old link opens the page, which asks for the code.
-            guard gate.attempt(link: link, now: now) == .paired else { return .respond(.redirect(to: "/")) }
-            var response = HTTPResponse.redirect(to: "/")
-            response.headers.append(RemoteAuth.cookie(pair(Self.deviceName(request), now: now)))
             return .respond(response)
         case let r where !r.needsToken:
             return .serve(r, device: nil)

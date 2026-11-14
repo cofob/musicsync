@@ -36,8 +36,8 @@ final class RemoteControl {
     @ObservationIgnored private var pushed: (elapsed: Double, at: Date)?
     /// Recent covers by `<id>@<size>`; a few, as the page asks for the same ones again.
     @ObservationIgnored var covers: [String: Data] = [:]
-    /// Covers of the last search results, which may be outside the library lists.
-    @ObservationIgnored var searchCovers: Set<String> = []
+    /// Covers of the searches and lists sent to the page, which may be outside the library lists.
+    @ObservationIgnored var listedCovers: Set<String> = []
     @ObservationIgnored private var quitObserver: Any?
 
     var devices: [PairedDevice] { access.tokens.devices }
@@ -126,10 +126,12 @@ final class RemoteControl {
     func state(elapsed: Bool = true) -> RemoteState {
         let player = app.player
         let next = player.index.map { Array(player.queue.dropFirst($0 + 1).prefix(RemoteState.queueLimit)) } ?? []
-        return RemoteState(song: player.current.map(Self.item), elapsed: elapsed ? player.elapsed : 0, duration: player.duration,
-                           playing: player.isPlaying, volume: player.volume, shuffle: player.shuffle,
-                           repeatMode: player.repeatMode.setting,
-                           starred: currentSong.map(app.isStarred) ?? false, queue: next.map(Self.item))
+        var state = RemoteState(song: player.current.map(Self.item), elapsed: elapsed ? player.elapsed : 0, duration: player.duration,
+                                playing: player.isPlaying, volume: player.volume, shuffle: player.shuffle,
+                                repeatMode: player.repeatMode.setting,
+                                starred: currentSong.map(app.isStarred) ?? false, queue: next.map(Self.item))
+        output(&state)
+        return state
     }
 
     var currentSong: Song? {
