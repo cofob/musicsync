@@ -57,7 +57,7 @@ import Testing
         mixer.play(try cue(3))
         mixer.setNext(try cue(3), transition: Transition(at: 1, duration: 1, curve: .linear))
         let advanced = try #require(await time(of: .advanced(skipped: false)))
-        #expect(advanced > 0.9 && advanced < 1.6)
+        #expect(advanced > 0.9 - Mixer.lead && advanced < 1.6)
         #expect(mixer.isFading)
         await sleep(0.5)
         #expect(playingDecks == 2)

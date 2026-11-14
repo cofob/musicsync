@@ -44,8 +44,32 @@ import AVFoundation
         }
     }
 
-    func clear() {
+    /// Host time at which the playing item reaches `time`; nil when it does not run, or the time has passed or is a second away.
+    func hostTime(at time: TimeInterval) -> CMTime? {
+        guard let timebase = player.currentItem?.timebase, CMTimebaseGetRate(timebase) > 0 else { return nil }
+        let clock = CMClockGetHostTimeClock()
+        let host = CMSyncConvertTime(CMTime(seconds: time, preferredTimescale: 1_000_000), from: timebase, to: clock)
+        let wait = (host - CMClockGetTime(clock)).seconds
+        return host.isNumeric && wait > 0 && wait < 1 ? host : nil
+    }
+
+    /// Starts the paused item at `rate`: at `hostTime` when given, to line up with the other deck, else now.
+    /// A timed start needs the player not to wait for buffering; `clear()` and the end of the fade turn that back on.
+    func start(rate: Float, at hostTime: CMTime?) {
+        guard let hostTime else { player.rate = rate; return }
+        player.automaticallyWaitsToMinimizeStalling = false
+        player.setRate(rate, time: .invalid, atHostTime: hostTime)
+    }
+
+    /// Also cancels a timed start, which a plain pause does not always do.
+    func pause() {
+        if !player.automaticallyWaitsToMinimizeStalling { player.setRate(0, time: .invalid, atHostTime: .invalid) }
         player.pause()
+    }
+
+    func clear() {
+        pause()
+        player.automaticallyWaitsToMinimizeStalling = true
         player.removeAllItems()
         setBoundary(nil)
         fade = 1
