@@ -14,6 +14,8 @@ import SwiftUI
     static let output = env["MUSICSYNC_SHOT"]
     /// A window that is not part of the scene graph (Settings); kept alive until the capture.
     private static var extraWindow: NSWindow?
+    /// Titles of a menu bar menu and its submenus to open before the capture, e.g. ["Playback", "Sleep Timer"].
+    private static var menuPath: [String] = []
 
     static func start(_ model: AppModel) {
         guard let output else { return }
@@ -23,7 +25,8 @@ import SwiftUI
             NSApp.windows.first?.setContentSize(NSSize(width: 1280, height: 820))
             await show(env["MUSICSYNC_SCENE"] ?? "home", model)
             try? await Task.sleep(for: .seconds(delay))
-            exit(save(to: URL(fileURLWithPath: output)) ? 0 : 1)
+            let capture: @MainActor @Sendable () -> Void = { exit(save(to: URL(fileURLWithPath: output)) ? 0 : 1) }
+            if menuPath.isEmpty { capture() } else { openMenu(then: capture) }
         }
     }
 
@@ -78,6 +81,9 @@ import SwiftUI
             }
             await select(.downloaded, model)
         case "settings-downloads": open(DownloadSettingsView(), "Downloads", model)
+        case let s where s.hasPrefix("menu:"):
+            await playPaused(model)
+            menuPath = s.dropFirst(5).split(separator: "/").map(String.init)
         case "settings-playback":
             model.player.settings.crossfade = true
             model.player.settings.soundCheck = .album
@@ -250,12 +256,23 @@ import SwiftUI
         return nil
     }
 
+    /// Pops up the menu of `menuPath` inside the main window and runs `capture` a second later. The pop-up
+    /// tracks the mouse until the menu closes, so `capture` runs from a timer in the menu's run loop mode.
+    private static func openMenu(then capture: @escaping @MainActor @Sendable () -> Void) {
+        guard let first = menuPath.first, var menu = NSApp.mainMenu?.item(withTitle: first)?.submenu,
+              let view = NSApp.windows.first(where: \.isVisible)?.contentView else { return capture() }
+        for title in menuPath.dropFirst() { if let sub = menu.item(withTitle: title)?.submenu { menu = sub } }
+        let timer = Timer(timeInterval: 1, repeats: false) { _ in MainActor.assumeIsolated { capture() } }
+        RunLoop.main.add(timer, forMode: .eventTracking)
+        menu.popUp(positioning: nil, at: NSPoint(x: 380, y: view.bounds.height - 120), in: view)
+    }
+
     /// Captures the front app window through the window server (with materials), else through AppKit.
     /// `MUSICSYNC_SHOT_METHOD=cache` forces the AppKit path; a locked screen uses it too, as the window server gives a blank image then.
     private static func save(to url: URL) -> Bool {
         guard let window = NSApp.orderedWindows.first(where: \.isVisible) else { return false }
         let locked = (CGSessionCopyCurrentDictionary() as? [String: Any])?["CGSSessionScreenIsLocked"] as? Bool == true
-        let image = env["MUSICSYNC_SHOT_METHOD"] == "cache" || locked ? nil : windowServerImage(window)
+        let image = env["MUSICSYNC_SHOT_METHOD"] == "cache" || locked ? nil : menuPath.isEmpty ? windowServerImage(window) : appWindowsImage()
         guard let rep = image.map(NSBitmapImageRep.init(cgImage:)) ?? cachedImage(window),
               let png = rep.representation(using: .png, properties: [:]) else { return false }
         return (try? png.write(to: url)) != nil
@@ -268,6 +285,17 @@ import SwiftUI
         // Options: including window (1 << 3); bounds ignore framing (1 << 0) | best resolution (1 << 3).
         return unsafeBitCast(symbol, to: Create.self)(.null, 1 << 3, UInt32(window.windowNumber), 1 << 0 | 1 << 3)?
             .takeRetainedValue()
+    }
+
+    /// All on-screen windows of this app in one image: the main window with an open menu.
+    private static func appWindowsImage() -> CGImage? {
+        typealias Create = @convention(c) (CGRect, CFArray, UInt32) -> Unmanaged<CGImage>?
+        guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "CGWindowListCreateImageFromArray"),
+              let list = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] else { return nil }
+        var ids = list.filter { $0[kCGWindowOwnerPID as String] as? Int32 == getpid() }
+            .compactMap { ($0[kCGWindowNumber as String] as? UInt32).map { UnsafeRawPointer(bitPattern: UInt($0)) } }
+        guard let array = CFArrayCreate(nil, &ids, ids.count, nil) else { return nil }
+        return unsafeBitCast(symbol, to: Create.self)(.null, array, 1 << 0 | 1 << 3)?.takeRetainedValue()
     }
 
     private static func cachedImage(_ window: NSWindow) -> NSBitmapImageRep? {
