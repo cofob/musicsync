@@ -29,7 +29,7 @@ struct PlaylistDetailView: View {
                     // Moving needs the full list in playlist order.
                     let canMove = editable && rows.count == entries.count
                     SongList(songs: songs, leading: .cover, onPlay: { model.mixes.play(songs, from: .playlist, startAt: $0) },
-                             onRemove: editable ? { (i: Int) in remove(at: rows[i].offset) } : nil,
+                             onRemove: editable ? { (i: [Int]) in remove(at: i.map { rows[$0].offset }) } : nil,
                              onMove: canMove ? { (from: Int, to: Int) in move(from: from, to: to) } : nil)
                 }
                 .padding(.horizontal, 22).padding(.bottom, 20)
@@ -77,8 +77,8 @@ struct PlaylistDetailView: View {
         return rows.filter { row in [row.element.title, row.element.artistName, row.element.album].contains { $0?.localizedCaseInsensitiveContains(query) == true } }
     }
 
-    private func remove(at index: Int) {
-        edit({ $0.remove(at: index) }) { try await model.removeSongs(at: [index], from: playlist) }
+    private func remove(at indexes: [Int]) {
+        edit({ for i in indexes.sorted(by: >) { $0.remove(at: i) } }) { try await model.removeSongs(at: indexes, from: playlist) }
     }
 
     /// The dragged row takes the place of the row it is dropped on.

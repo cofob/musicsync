@@ -2,6 +2,7 @@ import Integration
 import Preferences
 import SwiftUI
 import Subsonic
+import Support
 
 /// Song actions shared by "•••" menus and context menus.
 struct SongMenuItems: View {
@@ -34,9 +35,12 @@ struct SongMenuItems: View {
 }
 
 /// Plain song list with thin separators. `numbering` shows track numbers; `covers` shows small covers
-/// and "artist — album". Double-click plays from the clicked row.
+/// and "artist — album". Double-click plays from the clicked row. Click, ⌘-click, ⇧-click and ⌘A select rows;
+/// the context menu, Return and Delete act on all of them.
 struct SongList: View {
     enum Leading { case track, cover }
+    /// A row: the song and how often it came before in the list, as a playlist may hold a song twice.
+    struct RowKey: Hashable { let id: String, n: Int }
 
     @Environment(AppModel.self) private var model
     let songs: [Song]
@@ -44,25 +48,28 @@ struct SongList: View {
     /// Hide the artist when it equals this (album pages).
     var albumArtist: String?
     let onPlay: (Int) -> Void
-    /// Playlist pages: "Remove from Playlist" for the row at this index.
-    var onRemove: ((Int) -> Void)?
+    /// Playlist pages: "Remove from Playlist" and Delete for the rows at these indexes.
+    var onRemove: (([Int]) -> Void)?
     /// Playlist pages in playlist order: a row dropped on another moves there (from, to).
     var onMove: ((Int, Int) -> Void)?
     /// Short label on a row (`TrackRow.tag`).
     var tag: ((Song) -> String?)?
-    /// Index and id: the id stops a stale index from marking another song after the list changes.
-    @State private var selected: (index: Int, id: String)?
+    /// Row keys, not indexes: the selection stays on its songs after the list changes.
+    @State private var selection = ListSelection<RowKey>()
     @State private var dropTarget: Int?
+    @FocusState private var focused: Bool
 
     var body: some View {
+        let keys = rowKeys
+        let picked = keys.indices.filter { selection.contains(keys[$0]) }
         LazyVStack(spacing: 0) {
             ForEach(Array(songs.enumerated()), id: \.offset) { index, song in
-                row(song, index)
+                row(song, index, keys: keys, picked: picked)
                     .overlay(alignment: .bottom) {
-                        if index < songs.count - 1 { Divider().padding(.leading, leading == .cover ? 64 : 50).padding(.trailing, 10) }
+                        if index < songs.count - 1, !picked.contains(index) { Divider().padding(.leading, leading == .cover ? 64 : 50).padding(.trailing, 10) }
                     }
                     .overlay { if dropTarget == index { RoundedRectangle(cornerRadius: 8).strokeBorder(Color.musicAccent, lineWidth: 2) } }
-                    .draggable(DragPayload.songs([song.id], index: index).text)
+                    .draggable(dragPayload(index, picked).text)
                     .dropDestination(for: String.self) { items, _ in
                         guard let onMove, case .songs(_, let from?)? = items.first.flatMap(DragPayload.init) else { return false }
                         onMove(from, index)
@@ -70,12 +77,18 @@ struct SongList: View {
                     } isTargeted: { dropTarget = $0 && onMove != nil ? index : (dropTarget == index ? nil : dropTarget) }
             }
         }
+        .focusable().focusEffectDisabled().focused($focused)
+        .onCommand(#selector(NSResponder.selectAll(_:))) { selection.selectAll(keys) }
+        .onKeyPress(.return) { play(picked) }
+        .onDeleteCommand { if let onRemove, !picked.isEmpty { onRemove(picked); selection.clear() } }
+        .onExitCommand { selection.clear() }
     }
 
-    private func row(_ song: Song, _ index: Int) -> some View {
+    private func row(_ song: Song, _ index: Int, keys: [RowKey], picked: [Int]) -> some View {
         let isCurrent = model.player.current?.id == song.id
+        let isSelected = selection.contains(keys[index])
         return TrackRow(title: song.title, subtitle: subtitle(song), time: song.duration.map(TimeInterval.init),
-                        isCurrent: isCurrent, isSelected: selected?.index == index && selected?.id == song.id,
+                        isCurrent: isCurrent, isSelected: isSelected,
                         isStarred: model.isStarred(song), badge: model.downloads.badge(song), detail: detail(song), tag: tag?(song)) {
             switch leading {
             case .track:
@@ -84,15 +97,45 @@ struct SongList: View {
                 CoverImage(id: song.coverArt, size: 100, cornerRadius: 4).frame(width: 40, height: 40)
             }
         } menu: {
-            SongMenuItems(song: song)
+            let rows = isSelected && picked.count > 1 ? picked : [index]
+            if rows.count > 1 { SongsMenuItems(songs: rows.map { songs[$0] }) } else { SongMenuItems(song: song) }
             if let onRemove {
                 Divider()
-                Button("Remove from Playlist", systemImage: "minus.circle") { onRemove(index) }
+                Button("Remove from Playlist", systemImage: "minus.circle") { onRemove(rows) }
             }
         }
         .opacity(model.downloads.isAvailable(song) ? 1 : 0.4)
         .onTapGesture(count: 2) { onPlay(index) }
-        .simultaneousGesture(TapGesture().onEnded { selected = (index, song.id) })
+        .simultaneousGesture(TapGesture().onEnded { select(keys[index], in: keys) })
+    }
+
+    private var rowKeys: [RowKey] {
+        var seen: [String: Int] = [:]
+        return songs.map { song in
+            let n = seen[song.id, default: 0]
+            seen[song.id] = n + 1
+            return RowKey(id: song.id, n: n)
+        }
+    }
+
+    private func select(_ key: RowKey, in keys: [RowKey]) {
+        let flags = NSApp.currentEvent?.modifierFlags ?? []
+        if flags.contains(.shift) { selection.extend(to: key, in: keys) }
+        else if flags.contains(.command) { selection.toggle(key) }
+        else { selection.click(key) }
+        focused = true
+    }
+
+    /// One row plays the list from there, as a double-click does; several play alone.
+    private func play(_ rows: [Int]) -> KeyPress.Result {
+        guard let first = rows.first else { return .ignored }
+        if rows.count == 1 { onPlay(first) } else { model.player.play(rows.map { songs[$0] }) }
+        return .handled
+    }
+
+    /// A selected row drags the whole selection (onto a sidebar playlist); a lone row keeps its index for reordering.
+    private func dragPayload(_ index: Int, _ picked: [Int]) -> DragPayload {
+        picked.count > 1 && picked.contains(index) ? .songs(picked.map { songs[$0].id }, index: nil) : .songs([songs[index].id], index: index)
     }
 
     private func detail(_ song: Song) -> String? {

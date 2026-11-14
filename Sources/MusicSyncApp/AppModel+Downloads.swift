@@ -26,6 +26,14 @@ extension AppModel {
         downloadAction { try await $0.remove(.song, songIDs: [song.id]) }
     }
 
+    func download(_ songs: [Song]) {
+        downloadAction { try await $0.download(songs) }
+    }
+
+    func removeDownload(_ songs: [Song]) {
+        downloadAction { try await $0.remove(.song, songIDs: songs.map(\.id)) }
+    }
+
     func removeDownload(_ reason: DownloadReason) {
         downloadAction { try await $0.remove(reason) }
     }

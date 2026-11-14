@@ -61,7 +61,7 @@ struct SongsView: View {
         }
         .contextMenu(forSelectionType: Row.ID.self) { ids in
             if ids.count == 1, let id = ids.first, let song = list?.item(at: id) { SongMenuItems(song: song) }
-            else if ids.count > 1 { AddToPlaylistMenu(songs: ids.sorted().compactMap { list?.item(at: $0) }) }
+            else if ids.count > 1 { SongsMenuItems(songs: ids.sorted().compactMap { list?.item(at: $0) }) }
         } primaryAction: { ids in
             if let id = ids.first { play(id) }
         }

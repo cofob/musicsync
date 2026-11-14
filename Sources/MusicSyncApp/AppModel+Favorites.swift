@@ -12,6 +12,8 @@ extension AppModel {
     func toggleStar(_ song: Song) { setStar(!isStarred(song), songs: [song.id]) }
     func toggleStar(_ album: Album) { setStar(!isStarred(album), albums: [album.id]) }
     func toggleStar(_ artist: Artist) { setStar(!isStarred(artist), artists: [artist.id]) }
+    /// Several songs: all become favorites, or none when all are already.
+    func toggleStar(_ songs: [Song]) { setStar(!songs.allSatisfy(isStarred), songs: songs.map(\.id)) }
 
     private func setStar(_ star: Bool, songs: [String] = [], albums: [String] = [], artists: [String] = []) {
         let ids = songs + albums + artists

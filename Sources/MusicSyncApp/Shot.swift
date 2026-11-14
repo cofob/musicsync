@@ -254,6 +254,20 @@ import SwiftUI
         case "resume":
             _ = await first({ model.serverQueue.offer })
             await select(.home, model)
+        case "multiselect", "multiselect-menu":
+            // Click, ⌘-click and ⇧-click on album rows: the first, third, fourth and fifth are selected.
+            await select(.albums, model)
+            guard let album = await first({ model.albums.first }) else { break }
+            model.show(.album(album))
+            if scene == "multiselect-menu", let songs = try? await model.album(album.id)?.song {
+                open(VStack(alignment: .leading) { SongsMenuItems(songs: Array(songs.prefix(3))) }.buttonStyle(.borderless).padding(20).frame(width: 280), "Songs Menu", model)
+                break
+            }
+            try? await Task.sleep(for: .seconds(3))
+            for (row, flags) in [(0, NSEvent.ModifierFlags()), (2, .command), (4, .shift)] {
+                click(CGPoint(x: 700, y: 393 + row * 42), flags)
+                try? await Task.sleep(for: .milliseconds(700))  // no double-click
+            }
         case "radio-editor":
             open(StationEditor(station: RadioStation(id: "1", name: "Groove Salad", streamUrl: "https://ice1.somafm.com/groovesalad-128-mp3")), "Station", model)
         default:
@@ -355,6 +369,16 @@ import SwiftUI
         window.title = title
         window.orderFront(nil)
         extraWindow = window
+    }
+
+    /// Clicks the front window at `point` (from the top left of its content) with `flags`, as the mouse does.
+    private static func click(_ point: CGPoint, _ flags: NSEvent.ModifierFlags) {
+        guard let window = NSApp.windows.first(where: \.isVisible), let height = window.contentView?.bounds.height else { return }
+        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+            NSEvent.mouseEvent(with: type, location: NSPoint(x: point.x, y: height - point.y), modifierFlags: flags,
+                               timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+                               eventNumber: 0, clickCount: 1, pressure: 1).map { NSApp.postEvent($0, atStart: false) }
+        }
     }
 
     /// A new selection clears the path and the search text a moment later, so wait for that first.
