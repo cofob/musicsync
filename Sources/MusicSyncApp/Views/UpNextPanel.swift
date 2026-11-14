@@ -5,10 +5,10 @@ import Support
 
 /// Now Playing queue panel, as Apple Music's Up Next: History above (scroll up), the current song, then Playing Next
 /// (added by the user), Continue Playing (the album or playlist) and AutoPlay. Drag to reorder within a section,
-/// swipe, ⌫ or the context menu to remove, double-click to play.
+/// swipe, ⌫ or the context menu to remove, double-click or Return to play; ↑ and ↓ move the selection.
 struct UpNextPanel: View {
     @Environment(AppModel.self) private var model
-    /// Key of the selected entry; ⌫ removes it.
+    /// Key of the selected entry; ⌫ removes it, Return plays it.
     @State private var selected: Int?
     /// `player.history` one run loop turn late: History rows that change in the same update as the rows
     /// below them make AppKit warn of a reentrant table operation.
@@ -58,6 +58,10 @@ struct UpNextPanel: View {
                 .listStyle(.plain)
                 .focusable().focusEffectDisabled()
                 .onDeleteCommand { removeSelected() }
+                .onKeyPress(.downArrow) { move(1, in: (user + source + auto).map(\.id)) }
+                .onKeyPress(.upArrow) { move(-1, in: (user + source + auto).map(\.id)) }
+                .onKeyPress(.return) { playSelected() }
+                .onChange(of: selected) { if let key = $1 { proxy.scrollTo(RowID(key: key)) } }  // only as far as needed
                 .task {
                     // History sits above: scroll up to see it, as in Apple Music. The list lays out first.
                     try? await Task.sleep(for: .milliseconds(500))
@@ -76,6 +80,7 @@ struct UpNextPanel: View {
         // instead makes the list resolve every row of a long queue to count its views, and Up Next opens late.
         ForEach(slots.filter { queue.indices.contains($0.index) }.map { ($0, queue[$0.index]) }, id: \.0.id) { slot, item in
             QueueRow(item: item, selected: selected == slot.id) { menu(slot, item) }
+                .id(RowID(key: slot.id))
                 .onTapGesture(count: 2) { player.play(at: slot.index) }
                 .onTapGesture { selected = slot.id }
                 .contextMenu { menu(slot, item) }
@@ -138,6 +143,23 @@ struct UpNextPanel: View {
         }
     }
 
+    /// The selection `offset` rows on among the upcoming entries `keys`, as in song lists.
+    private func move(_ offset: Int, in keys: [Int]) -> KeyPress.Result {
+        guard !keys.isEmpty else { return .ignored }
+        var selection = ListSelection<Int>()
+        if let selected { selection.click(selected) }
+        selection.move(offset, in: keys)
+        selected = selection.anchor
+        return .handled
+    }
+
+    private func playSelected() -> KeyPress.Result {
+        guard let selected, let i = model.player.line.keys.firstIndex(of: selected) else { return .ignored }
+        model.player.play(at: i)
+        self.selected = nil
+        return .handled
+    }
+
     private func removeSelected() {
         guard let selected, let i = model.player.line.keys.firstIndex(of: selected) else { return }
         model.player.remove(at: [i])
@@ -160,6 +182,9 @@ struct UpNextPanel: View {
         return first
     }
 }
+
+/// Scroll id of an upcoming row, apart from the History rows' offsets.
+private struct RowID: Hashable { let key: Int }
 
 /// Red capsule switch above the queue, as Apple Music's Shuffle and AutoPlay.
 private struct QueueToggle: View {

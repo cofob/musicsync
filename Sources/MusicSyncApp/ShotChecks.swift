@@ -25,6 +25,7 @@ import SwiftUI
         case "artists": await artists(model)
         case "nowplaying-lyrics": await nowPlayingLyrics(model)
         case "nowplaying-drag": await nowPlayingDrag(model)
+        case "upnext-keys": await upNextKeys(model)
         case "podcast-resume": await podcastResume(model)
         case "accessibility": await accessibility(model)
         case "intents": await intents(model)
@@ -331,6 +332,35 @@ import SwiftUI
         mouse(.leftMouseDown, volume.convert(NSPoint(x: volume.bounds.width * 0.2, y: y), to: nil), window).map(window.sendEvent)
         check(await wait { abs(model.player.volume - 0.8) < 0.02 }, "the drag sets the volume: \(model.player.volume)")
         check(window.frame == before, "the window stays: \(before) → \(window.frame)")
+    }
+
+    /// Up Next with three albums queued: ↓ to the last upcoming row scrolls it into view, ↑ goes back and Return
+    /// plays the selected row.
+    private static func upNextKeys(_ model: AppModel) async {
+        let player = model.player
+        guard let albums = await Shot.first({ model.albums.count >= 3 ? Array(model.albums.prefix(3)) : nil }) else { return check(false, "3 albums") }
+        var songs: [Song] = []
+        for album in albums { songs += (try? await model.album(album.id)?.song) ?? [] }
+        player.play(songs)
+        if player.isPlaying { player.toggle() }
+        model.nowPlayingPanel = .queue
+        model.showNowPlaying = true
+        try? await Task.sleep(for: .seconds(2))
+        guard let window = mainWindow, let content = window.contentView,
+              let table = views(content, of: NSTableView.self).first(where: { $0.numberOfRows >= songs.count }) else { return check(false, "Up Next list") }
+        let last = table.numberOfRows - 1
+        check(!table.rows(in: table.visibleRect).contains(last), "the last row starts out of view")
+        window.makeFirstResponder(table)
+        let line = player.line, slots = line.upcoming(.user) + line.upcoming(.source) + line.upcoming(.autoPlay)
+        for _ in slots { await send(key(125, arrowKey(NSDownArrowFunctionKey), window), window) }
+        try? await Task.sleep(for: .milliseconds(500))
+        let visible = table.rows(in: table.visibleRect)
+        check(visible.contains(last) && visible.upperBound - 1 == last, "↓ to the last upcoming row scrolls it into view: rows \(visible)")
+        for _ in 0..<3 { await send(key(126, arrowKey(NSUpArrowFunctionKey), window), window) }
+        await send(key(36, "\r", window), window)
+        let expected = player.queue[slots[slots.count - 4].index].id
+        check(await wait { player.current?.id == expected }, "↑ ↑ ↑, Return plays the 4th row from the end: \(player.current?.title ?? "none")")
+        if player.isPlaying { player.toggle() }
     }
 
     private static func views<T: NSView>(_ root: NSView, of type: T.Type) -> [T] {
