@@ -212,6 +212,8 @@ final class Player {
     }
 
     func seek(to time: TimeInterval) {
+        // Saved, remote and server positions may be junk; `Int(time)` traps on NaN and huge values.
+        let time = time.isFinite ? min(max(0, time), duration > 0 ? duration : 1e7) : 0
         elapsed = time
         seekTarget = (time, Date().addingTimeInterval(3))
         mixer.seek(to: time)

@@ -10,7 +10,7 @@ extension Color {
 
     /// A color picked from the genre name: the same genre has the same color on every page.
     static func genre(_ name: String) -> Color {
-        genrePalette[abs(name.unicodeScalars.reduce(0) { $0 &* 31 &+ Int($1.value) }) % genrePalette.count]
+        genrePalette[Int(name.unicodeScalars.reduce(0) { $0 &* 31 &+ Int($1.value) }.magnitude % UInt(genrePalette.count))]
     }
 }
 

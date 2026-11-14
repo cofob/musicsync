@@ -2,7 +2,7 @@ import Foundation
 
 /// "3:45" or "1:02:03".
 func formatTime(_ seconds: TimeInterval) -> String {
-    let total = Int(max(0, seconds.isFinite ? seconds : 0))
+    let total = Int(min(max(0, seconds.isFinite ? seconds : 0), 1e9))  // a server may send any number
     let (h, m, s) = (total / 3600, total / 60 % 60, total % 60)
     return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%d:%02d", m, s)
 }

@@ -51,4 +51,11 @@ import Testing
         #expect(server.albums == [.init(key: "al1", plays: 13, seconds: 2600)] && server.artists.map(\.key) == ["A"])
         #expect(server.seconds == 2600 && server.bars.isEmpty)
     }
+
+    @Test func junkServerCountsDoNotOverflow() {
+        let junk = [Track(id: "a", title: "A", artist: "A", albumId: "al", duration: .max, serverPlays: .max),
+                    Track(id: "b", title: "B", artist: "A", albumId: "al", duration: .max, serverPlays: .max)]
+        let server = ListeningStats(serverPlays: junk)
+        #expect(server.plays == 2_000_000_000 && server.albums.first?.plays == 2_000_000_000)
+    }
 }

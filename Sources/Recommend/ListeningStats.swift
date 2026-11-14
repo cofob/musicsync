@@ -71,8 +71,9 @@ public struct ListeningStats: Sendable, Equatable {
     public init(serverPlays tracks: [Track], limit: Int = 10) {
         var tally = Tally()
         for track in tracks where track.serverPlays > 0 {
-            tally.add(song: track.id, album: track.albumId, artist: track.artist, plays: track.serverPlays,
-                      seconds: Double(track.serverPlays * (track.duration ?? 0)))
+            let plays = min(track.serverPlays, 1_000_000_000)  // the sums must not overflow on junk counts
+            tally.add(song: track.id, album: track.albumId, artist: track.artist, plays: plays,
+                      seconds: Double(plays) * Double(track.duration ?? 0))
         }
         let all = tally.songs.values
         self.init(tally, limit, plays: all.reduce(0) { $0 + $1.plays }, seconds: all.reduce(0) { $0 + $1.seconds }, bars: [], fromServer: true)
