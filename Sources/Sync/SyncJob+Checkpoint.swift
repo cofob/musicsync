@@ -69,15 +69,16 @@ extension SyncJob {
         pendingDeletes = []
     }
 
-    /// Removes an album/artist folder that holds nothing but our `cover.jpg`.
+    /// Removes an album/artist folder that holds nothing but our `cover.jpg` and macOS litter.
     func pruneEmptyFolders(from folder: URL) {
         let fm = FileManager.default
         let root = device.mountURL.appendingPathComponent("Music").standardizedFileURL.path
         var dir = folder.standardizedFileURL
         while dir.path.hasPrefix(root + "/") {
             let names = (try? fm.contentsOfDirectory(atPath: dir.path)) ?? []
-            if names == ["cover.jpg"] { try? fm.removeItem(at: dir.appendingPathComponent("cover.jpg")) }
-            else if !names.isEmpty { return }
+            let litter = { (name: String) in name == "cover.jpg" || name == ".DS_Store" || name.hasPrefix("._") }
+            guard names.allSatisfy(litter) else { return }
+            for name in names { try? fm.removeItem(at: dir.appendingPathComponent(name)) }
             guard (try? fm.removeItem(at: dir)) != nil else { return }
             dir = dir.deletingLastPathComponent()
         }
