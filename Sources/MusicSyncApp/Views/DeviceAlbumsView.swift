@@ -91,7 +91,7 @@ struct DeviceAlbumDetailView: View {
                             title: album.name.nilIfEmpty ?? "Unknown Album", canPlay: !album.tracks.isEmpty,
                             onPlay: { model.play(album.tracks) }, onShuffle: { model.play(album.tracks, shuffled: true) }) {
                     Text(album.artist.nilIfEmpty ?? "Unknown Artist").font(.title3.weight(.semibold)).foregroundStyle(Color.musicAccent)
-                    Text([album.year.map(String.init), "\(album.tracks.count) songs", formatTotal(Int(album.duration))]
+                    Text([album.year.map(String.init), formatSongs(album.tracks.count), formatTotal(Int(album.duration))]
                         .compactMap { $0 }.joined(separator: " · ")).foregroundStyle(.secondary)
                 }
                 DeviceTrackList(tracks: album.tracks, leading: .number)
@@ -110,7 +110,8 @@ struct DeviceTrackList: View {
     @Environment(AppModel.self) private var model
     let tracks: [DeviceTrack]
     let leading: Leading
-    @State private var selected: Int?
+    /// Index and id: the id stops a stale index from marking another track after the list changes.
+    @State private var selected: (index: Int, id: UInt32)?
 
     var body: some View {
         LazyVStack(spacing: 0) {
@@ -135,10 +136,10 @@ struct DeviceTrackList: View {
             RowMenu { menu(track, index) }
         }
         .padding(.vertical, 6).padding(.horizontal, 8)
-        .background(selected == index ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 6))
+        .background(selected?.index == index && selected?.id == track.id ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 6))
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { play(index) }
-        .onTapGesture { selected = index }
+        .onTapGesture { selected = (index, track.id) }
         .contextMenu { menu(track, index) }
     }
 

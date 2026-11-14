@@ -42,7 +42,8 @@ struct SongList: View {
     /// Hide the artist when it equals this (album pages).
     var albumArtist: String?
     let onPlay: (Int) -> Void
-    @State private var selected: Int?
+    /// Index and id: the id stops a stale index from marking another song after the list changes.
+    @State private var selected: (index: Int, id: String)?
 
     var body: some View {
         LazyVStack(spacing: 0) {
@@ -58,7 +59,7 @@ struct SongList: View {
     private func row(_ song: Song, _ index: Int) -> some View {
         let isCurrent = model.player.current?.id == song.id
         return TrackRow(title: song.title, subtitle: subtitle(song), time: song.duration.map(TimeInterval.init),
-                        isCurrent: isCurrent, isSelected: selected == index) {
+                        isCurrent: isCurrent, isSelected: selected?.index == index && selected?.id == song.id) {
             switch leading {
             case .track:
                 TrackNumber(text: song.track.map(String.init) ?? "", isCurrent: isCurrent)
@@ -69,7 +70,7 @@ struct SongList: View {
             SongMenuItems(song: song)
         }
         .onTapGesture(count: 2) { onPlay(index) }
-        .simultaneousGesture(TapGesture().onEnded { selected = index })
+        .simultaneousGesture(TapGesture().onEnded { selected = (index, song.id) })
     }
 
     private func subtitle(_ song: Song) -> String? {
