@@ -72,6 +72,7 @@ final class AppModel {
     @ObservationIgnored private(set) lazy var mixes = MixModel(app: self)
     @ObservationIgnored private(set) lazy var browse = BrowseModel(app: self)
     @ObservationIgnored private(set) lazy var radio = RadioModel(app: self)
+    @ObservationIgnored private(set) lazy var smartDownloads = SmartDownloads(app: self)
     /// Sharing, deep links, Spotlight, global shortcuts, notifications.
     @ObservationIgnored private(set) lazy var system = SystemServices(app: self)
     /// The web remote for iPhone, iPad and Apple Watch (Settings > Remote).
@@ -131,6 +132,7 @@ final class AppModel {
         sync.attach(self)
         downloads.attach(to: player)
         _ = mixes  // starts the play history
+        _ = smartDownloads
         ipod.start()
         spaceMonitor = SpaceKeyMonitor.install { [weak self] in
             guard let player = self?.player, !player.queue.isEmpty else { return false }

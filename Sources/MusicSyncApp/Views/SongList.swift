@@ -48,6 +48,8 @@ struct SongList: View {
     var onRemove: ((Int) -> Void)?
     /// Playlist pages in playlist order: a row dropped on another moves there (from, to).
     var onMove: ((Int, Int) -> Void)?
+    /// Short label on a row (`TrackRow.tag`).
+    var tag: ((Song) -> String?)?
     /// Index and id: the id stops a stale index from marking another song after the list changes.
     @State private var selected: (index: Int, id: String)?
     @State private var dropTarget: Int?
@@ -74,7 +76,7 @@ struct SongList: View {
         let isCurrent = model.player.current?.id == song.id
         return TrackRow(title: song.title, subtitle: subtitle(song), time: song.duration.map(TimeInterval.init),
                         isCurrent: isCurrent, isSelected: selected?.index == index && selected?.id == song.id,
-                        isStarred: model.isStarred(song), badge: model.downloads.badge(song), detail: detail(song)) {
+                        isStarred: model.isStarred(song), badge: model.downloads.badge(song), detail: detail(song), tag: tag?(song)) {
             switch leading {
             case .track:
                 TrackNumber(text: song.track.map(String.init) ?? "", isCurrent: isCurrent)

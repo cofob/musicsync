@@ -3,13 +3,21 @@ import Subsonic
 import SwiftUI
 
 /// "Downloaded": music kept on this Mac. Running downloads, albums, playlists and every downloaded song.
+/// A filter splits the user's own downloads from smart ones; smart songs show the rule that keeps them.
 struct DownloadedView: View {
+    enum Filter: String, CaseIterable, Identifiable {
+        case all = "All", user = "Downloaded by You", smart = "Smart"
+        var id: Self { self }
+    }
+
+    static let filterKey = "downloadedFilter"
     @Environment(AppModel.self) private var model
+    @AppStorage(DownloadedView.filterKey, store: .app) private var filter = Filter.all
     @State private var confirmRemoveAll = false
 
     var body: some View {
         let downloads = model.downloads
-        let all = downloads.entries.values
+        let all = downloads.entries.values.filter(shows)
         let songs = filter(all.filter { $0.state == .done }.map(\.song)).sorted(by: Self.libraryOrder)
         let pending = all.filter { $0.state != .done }.sorted { $0.song.title < $1.song.title }
         ScrollView {
@@ -17,14 +25,14 @@ struct DownloadedView: View {
                 header(songs: all.count { $0.state == .done })
                 if let block = downloads.status.blocked, !pending.isEmpty { BlockedNotice(block: block) }
                 if !pending.isEmpty { ActiveDownloads(entries: pending) }
-                if !albums.isEmpty {
+                if !albums.isEmpty, filter != .smart {
                     section("Albums") {
                         LazyVGrid(columns: albumGridColumns, spacing: 28) {
                             ForEach(albums) { AlbumCard(album: $0) }
                         }
                     }
                 }
-                if !playlists.isEmpty {
+                if !playlists.isEmpty, filter != .smart {
                     section("Playlists") {
                         LazyVGrid(columns: albumGridColumns, spacing: 28) {
                             ForEach(playlists) { PlaylistCard(playlist: $0) }
@@ -33,7 +41,7 @@ struct DownloadedView: View {
                 }
                 if !songs.isEmpty {
                     section("Songs") {
-                        SongList(songs: songs, leading: .cover) { model.player.play(songs, startAt: $0) }
+                        SongList(songs: songs, leading: .cover, onPlay: { model.player.play(songs, startAt: $0) }, tag: tag)
                     }
                 }
             }
@@ -41,7 +49,10 @@ struct DownloadedView: View {
             .padding(.horizontal, 32).padding(.top, 20).padding(.bottom, 32)
         }
         .overlay {
-            if all.isEmpty {
+            if all.isEmpty && filter == .smart {
+                ContentUnavailableView("No Smart Downloads", systemImage: "wand.and.sparkles",
+                                       description: Text("Turn on smart downloads in Settings > Downloads to keep favorites and mixes offline."))
+            } else if all.isEmpty {
                 ContentUnavailableView("No Downloads", systemImage: "arrow.down.circle",
                                        description: Text("Download albums, playlists and songs to play them without a connection."))
             }
@@ -62,6 +73,10 @@ struct DownloadedView: View {
             }
             Spacer()
             if !model.downloads.entries.isEmpty {
+                Picker("Show", selection: $filter) {
+                    ForEach(Filter.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented).labelsHidden().fixedSize()
                 Button("Remove All…") { confirmRemoveAll = true }.buttonStyle(FilledCapsuleStyle())
             }
         }
@@ -80,6 +95,20 @@ struct DownloadedView: View {
 
     private var playlists: [Playlist] {
         model.downloads.pins.compactMap { if case .playlist(let p) = $0 { p } else { nil } }.filter { matches($0.name) }
+    }
+
+    private func shows(_ entry: DownloadEntry) -> Bool {
+        switch filter {
+        case .all: true
+        case .user: entry.isUserKept
+        case .smart: !entry.smartRules.isEmpty
+        }
+    }
+
+    /// The rule that keeps a smart song; under "All" only for songs the user does not keep too.
+    private func tag(_ song: Song) -> String? {
+        guard let entry = model.downloads.entries[song.id], filter == .smart || !entry.isUserKept else { return nil }
+        return entry.smartRules.first?.badge
     }
 
     /// "Find in Downloaded".

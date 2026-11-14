@@ -88,7 +88,7 @@ struct Sidebar: View {
             } header: { PlaylistsHeader() }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if model.client != nil { VStack(spacing: 6) { OfflineBanner(); LibraryStatusView() }.padding(.horizontal, 10).padding(.bottom, 8) }
+            if model.client != nil { VStack(spacing: 6) { OfflineBanner(); SmartDownloadStatus(); LibraryStatusView() }.padding(.horizontal, 10).padding(.bottom, 8) }
         }
         .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 300)
         .task(id: model.client?.baseURL) { await model.radio.load() }

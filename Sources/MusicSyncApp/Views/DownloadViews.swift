@@ -15,7 +15,7 @@ struct SongDownloadMenuItem: View {
             let entry = model.downloads.entries[song.id]
             if entry?.reasons.contains(.song) == true {
                 Button("Remove Download", systemImage: "trash") { model.removeDownload(song) }
-            } else if entry == nil {
+            } else if entry?.isUserKept != true {
                 Button("Download", systemImage: "arrow.down.circle") { model.download(song) }
             }
         }

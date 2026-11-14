@@ -38,13 +38,14 @@ struct DownloadSettingsView: View {
                         .disabled(downloads.entries.isEmpty)
                 }
             } footer: {
-                Text("When the limit is reached, new downloads wait. Downloaded music is never deleted on its own.")
+                Text("When the limit is reached, new downloads wait. Your downloads are never deleted on their own; smart downloads have their own sizes.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+            SmartDownloadSettings()
+            PlaybackCacheSettings()
         }
         .formStyle(.grouped)
-        .frame(width: 480)
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(width: 520, height: 680)
         .confirmationDialog("Remove all downloads?", isPresented: $confirmClear) {
             Button("Remove All", role: .destructive) { model.removeAllDownloads() }
         } message: {

@@ -156,6 +156,8 @@ struct TrackRow<Leading: View, MenuItems: View>: View {
     var badge: String?
     /// Gray text before the time: the song columns of Settings > Appearance.
     var detail: String?
+    /// Short gray label before the star, e.g. why a song is downloaded.
+    var tag: String?
     @ViewBuilder var leading: Leading
     @ViewBuilder var menu: MenuItems
 
@@ -170,6 +172,10 @@ struct TrackRow<Leading: View, MenuItems: View>: View {
             }
             Spacer(minLength: 8)
             if let detail { Text(detail).font(.callout).monospacedDigit().foregroundStyle(.secondary).lineLimit(1) }
+            if let tag {
+                Text(tag).font(.caption.weight(.medium)).foregroundStyle(.secondary).lineLimit(1)
+                    .padding(.horizontal, 7).padding(.vertical, 2).background(.quaternary, in: Capsule())
+            }
             if isStarred { Image(systemName: "star.fill").font(.caption2).foregroundStyle(Color.musicAccent) }
             if let badge { Image(systemName: badge).font(.caption).foregroundStyle(.secondary) }
             Text(time.map(formatTime) ?? "").monospacedDigit().foregroundStyle(.secondary)

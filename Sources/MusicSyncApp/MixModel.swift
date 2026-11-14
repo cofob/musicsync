@@ -79,7 +79,7 @@ final class MixModel {
     /// Opens the New Playlist sheet with the songs of the mix.
     func save(_ mix: Mix) { app.playlistPrompt = .create(songIds: songs(of: mix).map(\.id)) }
 
-    private static var today: String {
+    static var today: String {
         let c = Calendar.current.dateComponents([.year, .month, .day], from: Date())
         return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
     }

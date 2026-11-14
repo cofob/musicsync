@@ -101,6 +101,29 @@ import SwiftUI
             }
             await select(.downloaded, model)
         case "settings-downloads": open(DownloadSettingsView(), "Downloads", model)
+        case "smart-downloading", "downloaded-smart", "downloaded-smart-all":
+            await smartFavorites(model)
+            let smart = model.smartDownloads
+            if scene == "smart-downloading" {
+                model.downloads.settings.smart.favorites.budgetGB = 0.5  // more to download than the earlier scenes kept
+                DownloadSettings().save()
+                _ = await first({ smart.pending > 0 && model.downloads.entries.values.contains { $0.state == .done } ? true : nil })
+            } else {
+                for _ in 0..<3000 where smart.lastPlan?.songs.values.allSatisfy(\.isEmpty) ?? true || smart.pending > 0 { try? await Task.sleep(for: .milliseconds(100)) }
+            }
+            UserDefaults.app.set((scene == "downloaded-smart" ? DownloadedView.Filter.smart : .all).rawValue, forKey: DownloadedView.filterKey)
+            await select(.downloaded, model)
+        case "settings-smart":
+            await smartFavorites(model)
+            _ = await first({ model.smartDownloads.lastPlan?.songs.values.contains { !$0.isEmpty } == true ? true : nil })
+            open(Form { SmartDownloadSettings(); PlaybackCacheSettings() }.formStyle(.grouped).frame(width: 520, height: 900), "Smart Downloads", model)
+        case "cache":
+            // Plays (muted) until the song is in the cache, then pauses.
+            guard let album = await first({ model.albums.first }) else { break }
+            model.play(album)
+            for _ in 0..<1200 where model.downloads.cache.files.isEmpty { try? await Task.sleep(for: .milliseconds(100)) }
+            model.player.pause()
+            open(Form { PlaybackCacheSettings() }.formStyle(.grouped).frame(width: 520, height: 230), "Cache", model)
         case let s where s.hasPrefix("menu:"):
             await playPaused(model)
             menuPath = s.dropFirst(5).split(separator: "/").map(String.init)
@@ -250,6 +273,23 @@ import SwiftUI
             }
         }
         await model.mixes.load(refresh: true)
+    }
+
+    /// Demo only: smart downloads of favorites and the most played songs as small mp3 files. Only the running app
+    /// gets these settings; the saved ones stay unchanged. Waits for the local mirror.
+    private static func smartFavorites(_ model: AppModel) async {
+        var settings = model.downloads.settings
+        settings.quality = .mp3
+        settings.maxBitRate = 128
+        settings.smart.favorites.isOn = true
+        settings.smart.favorites.budgetGB = 0.1
+        settings.smart.mostPlayed.isOn = true
+        settings.smart.mostPlayed.budgetGB = 0.1
+        settings.smart.mostPlayedCount = 25
+        model.downloads.settings = settings
+        DownloadSettings().save()
+        await mirrored(model)
+        model.smartDownloads.run()
     }
 
     /// Demo only: the remote on (port from `MUSICSYNC_REMOTE_PORT`), two paired devices and an open pairing code.

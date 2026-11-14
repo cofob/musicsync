@@ -34,7 +34,8 @@ extension AppModel {
         downloadAction { try await $0.removeAll() }
     }
 
-    /// Follows changes of pinned albums and playlists after a library sync. Only the local library is read.
+    /// Follows changes of pinned albums and playlists after a library sync, then the smart download rules.
+    /// Only the local library is read.
     func refreshDownloadPins() {
         guard let manager = downloads.manager, let db = library?.database else { return }
         Task {
@@ -44,6 +45,7 @@ extension AppModel {
                 case .playlist(let playlist): await db.playlist(id: playlist.id)?.entry
                 }
             }
+            smartDownloads.run()
         }
     }
 

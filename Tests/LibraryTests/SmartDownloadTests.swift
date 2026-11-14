@@ -270,6 +270,24 @@ private struct SmartFixture {
         #expect(plan.added == ["s-1-1", "s-3-2"])
     }
 
+    /// The app calls `refreshPins` after each mirror pass, reading the mirrored playlist.
+    @Test func pinnedPlaylistFollowsServerEdits() async throws {
+        let f = await SmartFixture(SmartSettings())
+        f.server.playlists = [StubPlaylist(id: "pl-1", name: "Mix", changed: "t1", songIDs: ["s-1-1", "s-2-1"])]
+        await f.mirror()
+        await f.downloads.start(client: f.server.client)
+        let playlist = try #require(await f.library.database.playlist(id: "pl-1"))
+        try await f.downloads.pin(.playlist(playlist), songs: playlist.entry ?? [])
+        #expect(await eventually { await f.states() == ["s-1-1": .done, "s-2-1": .done] })
+
+        f.server.playlists = [StubPlaylist(id: "pl-1", name: "Mix", changed: "t2", songIDs: ["s-2-1", "s-3-1"])]
+        f.server.lastScan = "scan-2"
+        await f.library.mirror.syncNow()
+        let db = f.library.database
+        await f.downloads.refreshPins { await db.playlist(id: $0.reason == .playlist("pl-1") ? "pl-1" : "")?.entry }
+        #expect(await eventually { await f.states() == ["s-2-1": .done, "s-3-1": .done] })
+    }
+
     @Test func storageLimitDoesNotBlockSmartSongs() async throws {
         var smart = SmartSettings()
         smart.favorites.isOn = true
