@@ -112,7 +112,7 @@ struct SyncSettingsView: View {
                 Label("A GUID has exactly 16 hex digits.", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
             }
             LabeledContent("In use", value: model.ipod.snapshot?.guid ?? "Not found")
-                .onChange(of: manual.wrappedValue.isEmpty ? nil : FirewireGuid.parse(manual.wrappedValue) != nil) { model.ipod.reload() }
+                .onChange(of: FirewireGuid.parse(manual.wrappedValue)) { model.ipod.reload() }
         } else {
             Text("Connect an iPod to set its GUID.").foregroundStyle(.secondary)
         }
