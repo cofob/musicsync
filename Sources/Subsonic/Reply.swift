@@ -39,7 +39,7 @@ struct Reply<Body: Decodable>: Decodable {
         let inner = try decoder.container(keyedBy: AnyKey.self).superDecoder(forKey: AnyKey("subsonic-response"))
         head = try Head(from: inner)
         if head.status == "ok", let key = decoder.userInfo[Self.bodyKey] as? String {
-            body = try inner.container(keyedBy: AnyKey.self).decode(Body.self, forKey: AnyKey(key))
+            body = try inner.container(keyedBy: AnyKey.self).decodeIfPresent(Body.self, forKey: AnyKey(key))
         } else {
             body = nil
         }

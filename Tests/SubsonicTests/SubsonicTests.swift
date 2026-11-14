@@ -56,6 +56,7 @@ private func decode<T: Decodable>(_ json: String, key: String?, as: T.Type = T.s
         let list = try #require(decode(Fixtures.playlists, key: "playlists", as: PlaylistsBody.self).1?.playlist)
         #expect(list.first?.isPublic == true)
         #expect(list.first?.songCount == 12)
+        #expect(list.first?.readonly == nil && list.last?.readonly == true && list.last?.validUntil != nil)
     }
 
     @Test func searchMissingSectionsAreEmpty() throws {
@@ -130,11 +131,14 @@ private func decode<T: Decodable>(_ json: String, key: String?, as: T.Type = T.s
 /// Serves canned replies per request path.
 final class StubProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var replies: [String: String] = [:]
+    /// Every requested URL, oldest first.
+    nonisolated(unsafe) static var log: [URL] = []
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
         let name = request.url!.lastPathComponent.replacingOccurrences(of: ".view", with: "")
+        Self.log.append(request.url!)
         let body = Self.replies[name] ?? "{}"
         let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
                                        headerFields: body.hasPrefix("<") ? ["Content-Type": "text/xml"] : nil)!
@@ -203,6 +207,35 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
         await #expect(throws: SubsonicError.api(code: 40, message: "Wrong username or password")) { try await c.star(ids: ["s-1"]) }
     }
 
+    @Test func playlistEditsAndRating() async throws {
+        let ok = #"{"subsonic-response":{"status":"ok","version":"1.16.1"}}"#
+        StubProtocol.replies = [
+            "createPlaylist": #"{"subsonic-response":{"status":"ok","version":"1.16.1","playlist":{"id":"pl-9","name":"New","owner":"demo","readonly":false,"entry":[{"id":"s-1","title":"Xtal"}]}}}"#,
+            "deletePlaylist": ok, "setRating": ok, "updatePlaylist": ok,
+        ]
+        StubProtocol.log = []
+        let c = stubbed()
+        let created = try await c.createPlaylist(name: "New", songIds: ["s-1", "s-2"])
+        #expect(created?.id == "pl-9" && created?.readonly == false && created?.entry?.count == 1)
+        try await c.replacePlaylistSongs(id: "pl-9", songIds: ["s-2", "s-1"])
+        try await c.updatePlaylist(id: "pl-9", name: "Renamed", comment: "Notes", isPublic: false, songIndexesToRemove: [1])
+        try await c.setRating(id: "s-1", rating: 7)
+        try await c.deletePlaylist(id: "pl-9")
+        let calls = StubProtocol.log.map { url in
+            (url.lastPathComponent, URLComponents(url: url, resolvingAgainstBaseURL: false)!.queryItems!
+                .filter { !["u", "s", "t", "v", "c", "f"].contains($0.name) }.map { "\($0.name)=\($0.value ?? "")" })
+        }
+        #expect(calls.map(\.0) == ["createPlaylist.view", "createPlaylist.view", "updatePlaylist.view", "setRating.view", "deletePlaylist.view"])
+        #expect(calls[0].1 == ["name=New", "songId=s-1", "songId=s-2"])
+        #expect(calls[1].1 == ["playlistId=pl-9", "songId=s-2", "songId=s-1"])
+        #expect(calls[2].1 == ["playlistId=pl-9", "name=Renamed", "comment=Notes", "public=false", "songIndexToRemove=1"])
+        #expect(calls[3].1 == ["id=s-1", "rating=5"])
+        #expect(calls[4].1 == ["id=pl-9"])
+        // Old servers answer createPlaylist without the playlist.
+        StubProtocol.replies["createPlaylist"] = ok
+        #expect(try await c.createPlaylist(name: "Old") == nil)
+    }
+
     @Test func publicURLCarriesParameters() {
         let q = query(client().url("star", [("id", "s-1"), ("albumId", "al-1")]))
         #expect(q["id"] == "s-1" && q["albumId"] == "al-1" && q["f"] == "json" && q["t"] != nil)
@@ -235,7 +268,7 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
         let first = try await store.refresh()
         #expect(first.artists.count == 2)
         #expect(first.albums.count == 1)
-        #expect(first.playlists.count == 1)
+        #expect(first.playlists.count == 2)
 
         // Same lastScan: albums come from the cache even if the server now returns none.
         StubProtocol.replies["getAlbumList2"] = Fixtures.emptyAlbumList

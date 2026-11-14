@@ -96,11 +96,15 @@ public struct Playlist: Codable, Hashable, Sendable, Identifiable {
     public let created: String?
     public let changed: String?
     public let coverArt: String?
+    /// Navidrome: true for smart playlists and playlists of other users.
+    public let readonly: Bool?
+    /// Smart playlists: the time their song list is rebuilt.
+    public let validUntil: String?
     /// Present in `getPlaylist` replies.
     public let entry: [Song]?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, comment, owner, songCount, duration, created, changed, coverArt, entry
+        case id, name, comment, owner, songCount, duration, created, changed, coverArt, readonly, validUntil, entry
         case isPublic = "public"
     }
 }
@@ -181,6 +185,14 @@ public extension Playlist {
     /// Copy of the playlist with its entries replaced.
     func withEntries(_ entries: [Song]?) -> Playlist {
         Playlist(id: id, name: name, comment: comment, owner: owner, isPublic: isPublic, songCount: songCount,
-                 duration: duration, created: created, changed: changed, coverArt: coverArt, entry: entries)
+                 duration: duration, created: created, changed: changed, coverArt: coverArt, readonly: readonly,
+                 validUntil: validUntil, entry: entries)
+    }
+
+    /// Copy with a new name and description, e.g. while a rename is sent.
+    func renamed(_ name: String, comment: String?) -> Playlist {
+        Playlist(id: id, name: name, comment: comment, owner: owner, isPublic: isPublic, songCount: songCount,
+                 duration: duration, created: created, changed: changed, coverArt: coverArt, readonly: readonly,
+                 validUntil: validUntil, entry: entry)
     }
 }

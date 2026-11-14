@@ -36,7 +36,8 @@ enum Fixtures {
     static let playlists = """
     {"subsonic-response":{"status":"ok","version":"1.16.1","playlists":{"playlist":[
       {"id":"pl-1","name":"Road trip","comment":"","owner":"demo","public":true,"songCount":12,"duration":3000,
-       "created":"2024-01-01T00:00:00Z","changed":"2024-01-02T00:00:00Z","coverArt":"pl-pl-1"}]}}}
+       "created":"2024-01-01T00:00:00Z","changed":"2024-01-02T00:00:00Z","coverArt":"pl-pl-1"},
+      {"id":"pl-2","name":"Recent","owner":"demo","songCount":3,"readonly":true,"validUntil":"2024-01-03T00:00:00Z"}]}}}
     """
 
     static let search = """
