@@ -37,6 +37,7 @@ import SwiftUI
         case "quality": await quality(model)
         case "downloads": await downloads(model)
         case "smart": await smart(model)
+        case "flaky": await flaky(model)
         default: check(false, "known check \(name)")
         }
     }
