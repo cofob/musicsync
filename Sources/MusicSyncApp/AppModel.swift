@@ -14,6 +14,7 @@ enum Route: Hashable {
     case devicePlaylist(Int)
     case genre(String)
     case mix(String)
+    case podcast(PodcastChannel)
     case stats
 }
 
@@ -76,6 +77,7 @@ final class AppModel {
     @ObservationIgnored private(set) lazy var mixes = MixModel(app: self)
     @ObservationIgnored private(set) lazy var browse = BrowseModel(app: self)
     @ObservationIgnored private(set) lazy var radio = RadioModel(app: self)
+    @ObservationIgnored private(set) lazy var podcasts = PodcastsModel(app: self)
     @ObservationIgnored private(set) lazy var bookmarks = BookmarkKeeper(app: self)
     @ObservationIgnored private(set) lazy var smartDownloads = SmartDownloads(app: self)
     /// Sharing, deep links, Spotlight, global shortcuts, notifications.

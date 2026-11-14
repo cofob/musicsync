@@ -24,6 +24,7 @@ import SwiftUI
         case "artists": await artists(model)
         case "nowplaying-lyrics": await nowPlayingLyrics(model)
         case "nowplaying-drag": await nowPlayingDrag(model)
+        case "podcast-resume": await podcastResume(model)
         default: check(false, "known check \(name)")
         }
     }
@@ -402,6 +403,34 @@ import SwiftUI
     }
 
     private static var mainWindow: NSWindow? { NSApp.windows.first { $0.identifier?.rawValue.hasPrefix(MainWindow.id) == true } }
+
+    /// Needs `scripts/big-server.py`, fresh: its episode st-0-1 (21 min) has a bookmark at 7:00.
+    private static func podcastResume(_ model: AppModel) async {
+        guard model.config?.baseURL.host == "127.0.0.1" else { return check(false, "podcast-resume needs MUSICSYNC_DEMO_SERVER on 127.0.0.1") }
+        let podcasts = model.podcasts, player = model.player
+        check(await wait { podcasts.isVisible && model.bookmarks.supported }, "podcasts and bookmarks load")
+        guard let channel = podcasts.channels.first(where: { $0.id == "ch-0" }), let full = try? await podcasts.channel(channel.id),
+              let episode = full.episodes.first(where: { $0.song?.id == "st-0-1" }) else { return check(false, "stub episode st-0-1") }
+        await Shot.select(.podcasts, model)
+        model.show(.podcast(channel))
+        let shown = podcasts.progress(episode) ?? 0
+        check(abs(shown - 420.0 / 1260) < 0.01, "the row shows the bookmark: \(shown)")
+        podcasts.play(episode, in: full.episodes)
+        try? await Task.sleep(for: .seconds(4))
+        check(await wait { player.isPlaying && player.elapsed > 419 && player.elapsed < 440 }, "plays on from the bookmark at 7:00: \(player.elapsed)")
+        player.seek(to: 600)
+        try? await Task.sleep(for: .seconds(2))
+        player.toggle()
+        let kept = { model.bookmarks.positions["st-0-1"].map { abs($0 - 600_000) < 5000 } == true }
+        check(await wait(kept), "pause keeps the position: \(String(describing: model.bookmarks.positions["st-0-1"]))")
+        try? await Task.sleep(for: .seconds(1))
+        let saved = try? await model.client?.getBookmarks().first { $0.entry.id == "st-0-1" }?.position
+        check(saved.map { abs($0 - 600_000) < 5000 } == true, "the server has it: \(String(describing: saved))")
+        podcasts.markPlayed(episode)
+        try? await Task.sleep(for: .seconds(1))
+        let left = try? await model.client?.getBookmarks().contains { $0.entry.id == "st-0-1" }
+        check(left == false && podcasts.progress(episode) == nil, "Mark as Played drops the bookmark")
+    }
 
     private static func wait(_ condition: () -> Bool) async -> Bool { await Shot.first { condition() ? true : nil } ?? false }
 

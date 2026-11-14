@@ -131,6 +131,7 @@ struct RootView: View {
         case .songs: SongsView()
         case .genres: GenresView()
         case .radio: RadioView()
+        case .podcasts: PodcastsView()
         case .favorites: FavoritesView()
         case .downloaded: DownloadedView()
         case .playlists: PlaylistsView()
@@ -158,6 +159,7 @@ struct RootView: View {
         case .devicePlaylist(let id): DevicePlaylistDetailView(id: id)
         case .genre(let name): GenreDetailView(genre: name)
         case .mix(let id): MixDetailView(id: id)
+        case .podcast(let channel): PodcastChannelView(channel: channel)
         case .stats: StatsView()
         }
     }

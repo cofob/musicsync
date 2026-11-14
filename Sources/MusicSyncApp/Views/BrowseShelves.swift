@@ -2,7 +2,7 @@ import SwiftUI
 import Subsonic
 
 /// Row of cards that scrolls sideways; it reaches into the page margins so the card shadows are not cut.
-private struct SideShelf<Content: View>: View {
+struct SideShelf<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {

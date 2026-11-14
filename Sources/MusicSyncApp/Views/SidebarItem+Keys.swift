@@ -2,7 +2,7 @@ import Foundation
 
 extension SidebarItem {
     /// Rows Settings > Appearance can hide, in sidebar order.
-    static let editable: [SidebarItem] = [.home, .recentlyAdded, .artists, .albums, .songs, .genres, .favorites, .downloaded, .radio, .playlists]
+    static let editable: [SidebarItem] = [.home, .recentlyAdded, .artists, .albums, .songs, .genres, .favorites, .downloaded, .radio, .podcasts, .playlists]
 
     /// Saved name of a page (start page, hidden rows); nil for pages that may be gone at the next launch.
     var key: String? {
@@ -16,6 +16,7 @@ extension SidebarItem {
         case .favorites: "favorites"
         case .downloaded: "downloaded"
         case .radio: "radio"
+        case .podcasts: "podcasts"
         case .playlists: "playlists"
         case .search, .playlist, .deviceOverview, .deviceAlbums, .deviceSongs, .devicePlaylists: nil
         }

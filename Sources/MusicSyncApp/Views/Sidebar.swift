@@ -4,7 +4,7 @@ import SwiftUI
 /// and a branch in `RootView.content(for:)`.
 enum SidebarItem: Hashable {
     case search, home
-    case recentlyAdded, artists, albums, songs, genres, favorites, downloaded, radio
+    case recentlyAdded, artists, albums, songs, genres, favorites, downloaded, radio, podcasts
     case playlists, playlist(String)
     case deviceOverview, deviceAlbums, deviceSongs, devicePlaylists
 
@@ -23,6 +23,7 @@ enum SidebarItem: Hashable {
         case .songs, .deviceSongs: "Songs"
         case .genres: "Genres"
         case .radio: "Radio"
+        case .podcasts: "Podcasts"
         case .favorites: "Favorites"
         case .downloaded: "Downloaded"
         case .playlists: "All Playlists"
@@ -41,6 +42,7 @@ enum SidebarItem: Hashable {
         case .songs, .deviceSongs: "music.note"
         case .genres: "guitars"
         case .radio: "dot.radiowaves.left.and.right"
+        case .podcasts: "mic"
         case .favorites: "star"
         case .downloaded: "arrow.down.circle"
         case .playlists: "square.grid.3x3"
@@ -72,6 +74,7 @@ struct Sidebar: View {
             Section("Library") {
                 ForEach(SidebarItem.libraryItems.filter(\.isShown), id: \.self, content: row)
                 if model.radio.isVisible, SidebarItem.radio.isShown { row(.radio) }
+                if model.podcasts.isVisible, SidebarItem.podcasts.isShown { row(.podcasts) }
             }
             if model.ipod.current != nil || model.ipod.isOffline {
                 Section {
@@ -91,7 +94,7 @@ struct Sidebar: View {
             if model.client != nil { VStack(spacing: 6) { OfflineBanner(); SmartDownloadStatus(); LibraryStatusView() }.padding(.horizontal, 10).padding(.bottom, 8) }
         }
         .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 300)
-        .task(id: model.client?.baseURL) { await model.radio.load() }
+        .task(id: model.client?.baseURL) { async let radio: Void = model.radio.load(); await model.podcasts.load(); await radio }
     }
 
     private func row(_ item: SidebarItem) -> some View {
