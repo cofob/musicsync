@@ -32,6 +32,12 @@ import Testing
         }
     }
 
+    /// Waits until the mixers have played to the end, at most `timeout` seconds: a busy machine can start a deck late.
+    private func ended(_ mixers: [Mixer], timeout: Double = 30) async throws {
+        let deadline = Date().addingTimeInterval(timeout)
+        while mixers.contains(where: \.hasCurrent), Date() < deadline { try await Task.sleep(for: .milliseconds(50)) }
+    }
+
     private func start(_ url: URL, _ gains: EqualizerGains) -> Run {
         let recorder = TapRecorder()
         let mixer = Mixer(equalizer: Equalizer(recorder: recorder))
@@ -104,9 +110,8 @@ import Testing
     @Test(arguments: ["noise", "sweep"]) func equalizerBandGains(signal: String) async throws {
         let source = signal == "noise" ? noise(seconds: 5) : sweep(seconds: 5)
         let url = try await file(source)
-        let seconds = Double(source.count) / 44100 + 0.8
         let runs = Self.presets.map { start(url, $0.1) }
-        try await Task.sleep(for: .seconds(seconds))
+        try await ended(runs.map(\.mixer))
         for (preset, run) in zip(Self.presets, runs) {
             let track = try run.stop()
             let measured = Self.bandGains(of: source, in: track, blocks: signal == "noise" ? 10 : 1)
@@ -133,7 +138,7 @@ import Testing
             run.mixer.equalizer.set(gains)
             elapsed = at
         }
-        try await Task.sleep(for: .seconds(1.3))
+        try await ended([run.mixer])
         let track = try run.stop()
         let output = track.mono(Self.delay + 4410..<Self.delay + source.count - 4410)
         let click = Measure.clickRatio(output, sampleRate: 44100)
@@ -163,7 +168,7 @@ import Testing
         capture.start()
         mixer.play(Mixer.Cue(item: ia))
         mixer.setNext(Mixer.Cue(item: ib))
-        try await Task.sleep(for: .seconds(5))
+        try await ended([mixer])
         capture.stop()
         mixer.stop()
         // On the clock: where a reaches its end and b its start.
