@@ -95,6 +95,7 @@ struct SyncSettingsView: View {
             } footer: {
                 SettingsFooter("Size of the cover.jpg in each album folder; it applies to folders that have no cover yet.")
             }
+            DeviceContentSection()
             Section {
                 guidFields
             } header: {

@@ -170,6 +170,12 @@ import SwiftUI
             model.player.isMetered = true
             PlaybackSettings().save()
             open(PlaybackSettingsView(), "Playback", model)
+        case "settings-sync-device", "sync-fill":
+            // Needs a fake iPod folder in MUSICSYNC_VOLUMES; turns on favorites and filling for it.
+            guard await first({ model.sync.isAvailable ? true : nil }) != nil else { break }
+            model.sync.update { $0.favorites = true; $0.fillMostPlayed = true }
+            _ = await first({ model.sync.preview.map { _ in true } })
+            if scene == "sync-fill" { open(SyncSheet(), "Sync", model) } else { open(SyncSettingsView(), "Sync", model) }
         case "info-playing":
             await playPaused(model)
             model.player.settings.quality = .mp3

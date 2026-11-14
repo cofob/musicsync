@@ -8,6 +8,8 @@ public struct Expansion: Sendable {
     public var playlists: [DesiredPlaylist] = []
     /// Selected ids the server no longer knows. Their songs are not desired.
     public var missing: [String] = []
+    /// Songs of the most played albums, best first, for the space left (`Selection.fillMostPlayed`).
+    public var fillers: [DesiredSong] = []
 }
 
 public enum ExpansionError: Error, LocalizedError, Equatable {
@@ -45,6 +47,8 @@ public actor SelectionExpander {
     private var albums: [String: Album] = [:]
     private var artistAlbums: [String: [String]] = [:]
     private var playlists: [String: Playlist] = [:]
+    /// Id of the playlist of favorite songs.
+    public static let favoritesID = "musicsync-favorites"
 
     public init(client: SubsonicClient, concurrency: Int = 8, local: LocalLibrary? = nil) {
         self.client = client
@@ -67,7 +71,9 @@ public actor SelectionExpander {
         var albumIDs = selection.albums.sorted()
         async let fetchedArtists = fetchAll(selection.artists.sorted()) { try await self.albumIDs(ofArtist: $0) }
         async let fetchedLists = fetchAll(selection.playlists.sorted()) { try await self.playlist($0) }
-        let (artists, lists) = try await (fetchedArtists, fetchedLists)
+        async let fetchedFavorites = selection.favorites ? client.getStarred2().song : []
+        async let fetchedFrequent = selection.fillMostPlayed ? client.getAlbumList2(type: "frequent", size: 50).map(\.id) : []
+        let (artists, lists, favorites, frequent) = try await (fetchedArtists, fetchedLists, fetchedFavorites, fetchedFrequent)
         for (id, owned) in artists {
             if let owned { albumIDs += owned.filter { !selection.excludedAlbums.contains($0) } } else { result.missing.append(id) }
         }
@@ -77,7 +83,7 @@ public actor SelectionExpander {
         }
 
         // Playlist songs need their album for track/disc totals.
-        let extra = listed.flatMap { $0.1.compactMap(\.albumId) }
+        let extra = (listed.flatMap(\.1) + favorites).compactMap(\.albumId) + frequent
         let ids = Array(Set(albumIDs + extra)).sorted()
         let details = try await fetchAll(ids, progress: progress) { try await self.album($0) }
         var known: [String: Album] = [:]
@@ -87,11 +93,13 @@ public actor SelectionExpander {
 
         let presetsByID = Dictionary(presets.map { ($0.id, $0) }) { a, _ in a }
         var seen = Set<String>()
-        func add(_ song: Song, in album: Album?) throws {
-            guard seen.insert(song.id).inserted else { return }
+        func desired(_ song: Song, in album: Album?) throws -> DesiredSong {
             let presetID = selection.presetID(forAlbum: song.albumId, default: defaultPresetID)
             guard let preset = presetsByID[presetID] else { throw ExpansionError.unknownPreset(presetID) }
-            result.songs.append(Self.desired(song, album: album, preset: preset, soundCheck: soundCheck))
+            return Self.desired(song, album: album, preset: preset, soundCheck: soundCheck)
+        }
+        func add(_ song: Song, in album: Album?) throws {
+            if seen.insert(song.id).inserted { result.songs.append(try desired(song, in: album)) }
         }
         for id in Set(albumIDs).sorted() {
             guard let album = known[id] else { continue }
@@ -105,6 +113,14 @@ public actor SelectionExpander {
                 }
             }
             result.playlists.append(DesiredPlaylist(id: list.id, name: list.name, songIDs: songs.map(\.id)))
+        }
+        if selection.favorites {
+            for song in favorites { try add(song, in: song.albumId.flatMap { known[$0] }) }
+            result.playlists.append(DesiredPlaylist(id: Self.favoritesID, name: "Favorites", songIDs: favorites.map(\.id)))
+        }
+        for id in frequent {
+            guard let album = known[id] else { continue }
+            result.fillers += try (album.song ?? []).map { try desired($0, in: album) }
         }
         return result
     }

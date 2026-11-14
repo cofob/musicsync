@@ -14,6 +14,10 @@ public struct Selection: Codable, Sendable, Equatable {
     public var presetID: String?
     /// albumID -> presetID (e.g. a Rockbox preset for one album).
     public var albumPresets: [String: String] = [:]
+    /// The user's favorite songs, also as a "Favorites" playlist.
+    public var favorites = false
+    /// Fills the space left with the most played albums, as many as fit.
+    public var fillMostPlayed = false
 
     public init() {}
 
@@ -25,9 +29,11 @@ public struct Selection: Codable, Sendable, Equatable {
         playlists = try c.decodeIfPresent(Set<String>.self, forKey: .playlists) ?? []
         presetID = try c.decodeIfPresent(String.self, forKey: .presetID)
         albumPresets = try c.decodeIfPresent([String: String].self, forKey: .albumPresets) ?? [:]
+        favorites = try c.decodeIfPresent(Bool.self, forKey: .favorites) ?? false
+        fillMostPlayed = try c.decodeIfPresent(Bool.self, forKey: .fillMostPlayed) ?? false
     }
 
-    public var isEmpty: Bool { albums.isEmpty && artists.isEmpty && playlists.isEmpty }
+    public var isEmpty: Bool { albums.isEmpty && artists.isEmpty && playlists.isEmpty && !favorites && !fillMostPlayed }
 
     public func selects(_ album: Album) -> Bool {
         !excludedAlbums.contains(album.id) && (albums.contains(album.id) || album.artistId.map(artists.contains) == true)

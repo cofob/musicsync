@@ -9,10 +9,14 @@ public struct PlannerInput: Sendable {
     public var freeBytes: Int64
     /// Space the sync must leave free.
     public var reserveBytes: Int64
+    /// Songs for the space left, best album first; whole albums are added while they fit.
+    public var fillers: [DesiredSong]
 
     public init(desired: [DesiredSong], playlists: [DesiredPlaylist] = [], manifest: Manifest,
-                library: DeviceLibrary, freeBytes: Int64, reserveBytes: Int64 = SyncPlanner.reserveBytes) {
+                library: DeviceLibrary, freeBytes: Int64, reserveBytes: Int64 = SyncPlanner.reserveBytes,
+                fillers: [DesiredSong] = []) {
         self.reserveBytes = reserveBytes
+        self.fillers = fillers
         self.desired = desired
         self.playlists = playlists
         self.manifest = manifest
@@ -29,6 +33,38 @@ public enum SyncPlanner {
     public static let reserveBytes: Int64 = 500_000_000
 
     public static func plan(_ input: PlannerInput) -> SyncPlan {
+        guard !input.fillers.isEmpty else { return planDesired(input) }
+        var filled = input
+        let picked = Set(fill(input.fillers, input: input, space: planDesired(input).spaceLeft).map(\.id))
+        filled.desired += input.fillers.filter { picked.contains($0.id) }
+        var plan = planDesired(filled)
+        plan.filledSongs = plan.add.count { picked.contains($0.id) }
+        return plan
+    }
+
+    /// Albums of `fillers`, in order, that fit into `space`. Albums already on the device always stay and cost nothing;
+    /// songs that are desired anyway are left out.
+    static func fill(_ fillers: [DesiredSong], input: PlannerInput, space: Int64) -> [DesiredSong] {
+        let desired = Set(input.desired.map(\.id))
+        let present = Set(input.manifest.entries.filter { input.library.dbids.contains($0.value.dbid) }.keys)
+            .union(input.manifest.rockboxEntries.filter { input.library.rockboxPaths.contains($0.value.relativePath) }.keys)
+        var order: [String] = [], albums: [String: [DesiredSong]] = [:]
+        for song in fillers where !desired.contains(song.id) {
+            if albums[song.albumID] == nil { order.append(song.albumID) }
+            albums[song.albumID, default: []].append(song)
+        }
+        var left = space, picked: [DesiredSong] = []
+        for id in order {
+            let songs = albums[id] ?? []
+            let cost = songs.filter { !present.contains($0.id) }.reduce(0) { $0 + SizeEstimate.bytes($1) }
+            guard cost == 0 || cost <= left else { continue }
+            left -= cost
+            picked += songs
+        }
+        return picked
+    }
+
+    private static func planDesired(_ input: PlannerInput) -> SyncPlan {
         var plan = SyncPlan()
         plan.freeBytes = input.freeBytes
         plan.reserveBytes = input.reserveBytes

@@ -178,7 +178,7 @@ final class SyncModel {
         update { if $0.playlists.remove(id) == nil { $0.playlists.insert(id) } }
     }
 
-    private func update(_ change: (inout Selection) -> Void) {
+    func update(_ change: (inout Selection) -> Void) {
         guard let key = deviceKey, !isRunning else { return }
         change(&selection)
         updateMatcher()
@@ -223,12 +223,12 @@ final class SyncModel {
                         self.checked = (done, total)
                     }
                 }
-                let songs = expansion.songs, playlists = expansion.playlists
+                let songs = expansion.songs, playlists = expansion.playlists, fillers = expansion.fillers
                 // The iPod disk can be slow or busy: read it off the main thread.
                 let (plan, hasPlayCounts) = await Task.detached(priority: .userInitiated) {
                     let input = PlannerInput(desired: songs, playlists: playlists, manifest: context.manifest,
                                              library: context.library, freeBytes: (try? device.capacity().available) ?? 0,
-                                             reserveBytes: settings.reserveBytes)
+                                             reserveBytes: settings.reserveBytes, fillers: fillers)
                     var plan = SyncPlanner.plan(input)
                     plan.rename = rename
                     return (plan, FileManager.default.fileExists(atPath: device.playCountsURL.path))

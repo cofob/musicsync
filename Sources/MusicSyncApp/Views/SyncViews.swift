@@ -177,6 +177,7 @@ struct SyncSheet: View {
             let plan = preview.plan
             Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 8) {
                 row("Add", count: plan.add.count, bytes: plan.addBytes)
+                if plan.filledSongs > 0 { row("From Most Played", count: plan.filledSongs) }
                 row("Update", count: plan.reencode.count + plan.retag.count)
                 row("Remove", count: plan.remove.count, bytes: plan.freedBytes)
                 row("Playlists", count: plan.playlistsToCreate.count + plan.playlistsToUpdate.count,

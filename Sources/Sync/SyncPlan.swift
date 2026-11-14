@@ -42,7 +42,13 @@ public struct SyncPlan: Sendable, Equatable {
     public var freeBytes: Int64 = 0
     public var reserveBytes: Int64 = SyncPlanner.reserveBytes
 
+    /// Songs added to fill the space left (`Selection.fillMostPlayed`); also counted in `add`.
+    public var filledSongs = 0
+
     public var fits: Bool { freeBytes + freedBytes - addBytes >= reserveBytes }
+
+    /// Space the sync could still fill, beyond the reserve.
+    public var spaceLeft: Int64 { freeBytes + freedBytes - addBytes - reserveBytes }
 
     public var transferCount: Int { add.count + reencode.count }
 
