@@ -72,9 +72,9 @@ struct DownloadPlan: Equatable {
     var suffix: String
     var bitRate: Int?
 
-    /// Expected file size, for the storage checks.
+    /// Expected file size, for the storage checks. Clamped, so that junk numbers from a server cannot overflow the sums.
     func estimate(_ song: Song) -> Int64 {
-        if format == nil, let size = song.size { return Int64(size) }
-        return Int64(song.duration ?? 300) * Int64(bitRate ?? 320) * 125
+        if format == nil, let size = song.size { return Int64(min(max(size, 0), 1 << 40)) }
+        return Int64(min(max(song.duration ?? 300, 0), 1_000_000)) * Int64(min(max(bitRate ?? 320, 0), 100_000)) * 125
     }
 }

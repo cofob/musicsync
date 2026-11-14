@@ -61,4 +61,12 @@ import Testing
         let huge: Song = decode(["id": "s-2", "title": "T", "duration": Int.max])
         _ = try await cache.store(huge, format: "mp3", maxBitRate: nil, client: server.client)
     }
+
+    @Test func junkServerNumbersGiveBoundedEstimates() {
+        let song: Song = decode(["id": "s", "title": "T", "suffix": "flac", "duration": Int.max, "bitRate": Int.max, "size": Int.max])
+        let unsized: Song = decode(["id": "s", "title": "T", "suffix": "flac", "duration": Int.max, "bitRate": Int.max])
+        let plans = [DownloadPlan(format: nil, maxBitRate: nil, suffix: "flac", bitRate: .max), DownloadPlan(format: "mp3", maxBitRate: 320, suffix: "mp3", bitRate: .max)]
+        let sizes = plans.flatMap { plan in [song, unsized].map(plan.estimate) }
+        #expect(sizes.allSatisfy { (0..<1 << 50).contains($0) })
+    }
 }
