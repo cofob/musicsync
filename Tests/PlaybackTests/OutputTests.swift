@@ -4,7 +4,7 @@ import AVFoundation
 import Testing
 
 /// The real playback pipeline, measured on muted decks from what the equalizer tap records: local generated files only.
-@MainActor @Suite(.serialized) final class OutputTests {
+@MainActor @Suite(.slow, .serialized) final class OutputTests {
     private var files: [URL] = []
 
     deinit { files.forEach { try? FileManager.default.removeItem(at: $0) } }
