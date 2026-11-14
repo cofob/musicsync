@@ -279,13 +279,12 @@ import SwiftUI
                 try? await Task.sleep(for: .milliseconds(700))  // no double-click
             }
         case "songs-select":
-            // Songs table: click, ⌘-click and ⇧-click, for the gray selection.
+            // Songs table with several rows selected, for the gray selection. Posted ⌘- and ⇧-clicks do not
+            // select in a background window, so the rows are selected directly.
             model.selection = .songs
             try? await Task.sleep(for: .seconds(3))
-            for (row, flags) in [(1, NSEvent.ModifierFlags()), (3, .command), (6, .shift)] {
-                click(CGPoint(x: 700, y: 97 + row * 24), flags)
-                try? await Task.sleep(for: .milliseconds(700))
-            }
+            func table(in view: NSView?) -> NSTableView? { (view as? NSTableView) ?? view?.subviews.lazy.compactMap(table).first }
+            table(in: NSApp.windows.first(where: \.isVisible)?.contentView)?.selectRowIndexes([1, 3, 4, 5, 6], byExtendingSelection: false)
         case "miniplayer", "miniplayer-queue":
             // Through the Window menu, as the user does; the main window hides.
             await playPaused(model)

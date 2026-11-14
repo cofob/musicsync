@@ -53,7 +53,7 @@ struct SongsTable: NSViewRepresentable {
         coordinator.list = list
         coordinator.observed = []
         table.deselectAll(nil)
-        table.noteNumberOfRowsChanged()
+        if table.numberOfRows == 0 { table.reloadData() } else { table.noteNumberOfRowsChanged() }
         table.scrollRowToVisible(0)
         coordinator.fillLiveRows()
     }
@@ -215,17 +215,13 @@ struct SongsTable: NSViewRepresentable {
             let accent = NSColor(Color.musicAccent)
             switch column {
             case .title:
-                let cell = reused as? TitleCell ?? TitleCell(column.cellID)
-                cell.textField?.stringValue = song?.title ?? ""
-                cell.textField?.textColor = song.map { model.player.current?.id == $0.id } == true ? accent : .labelColor
-                let badge = song.flatMap { model.downloads.badge($0) }
-                cell.badge.image = badge.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: nil) }
-                cell.badge.isHidden = badge == nil
-                cell.needsLayout = true
-                cell.more.contentTintColor = accent
-                cell.more.isHidden = song == nil
+                let cell = reused as? TextCell ?? TextCell(column.cellID, menu: true)
+                cell.text = song?.title ?? ""
+                cell.color = song.map { model.player.current?.id == $0.id } == true ? accent : .labelColor
+                cell.badge = song.flatMap { model.downloads.badge($0) }
+                cell.tint = accent
                 cell.alphaValue = song.map(model.downloads.isAvailable) == false ? 0.4 : 1
-                cell.menuItems = { song.map { NSHostingMenu(rootView: SongMenuItems(song: $0).environment(model)) } }
+                cell.menuItems = song.map { song in { NSHostingMenu(rootView: SongMenuItems(song: song).environment(model)) } }
                 return cell
             case .rating:
                 let cell = reused as? RatingCell ?? RatingCell(column.cellID)
@@ -235,13 +231,13 @@ struct SongsTable: NSViewRepresentable {
                 cell.onSet = { rating in song.map { model.setRating(rating, for: $0) } }
                 return cell
             case .star:
-                let cell = reused as? NSImageView ?? starView(column)
-                cell.contentTintColor = accent
-                cell.isHidden = !(song.map(model.isStarred) ?? false)
+                let cell = reused as? StarCell ?? StarCell(column.cellID)
+                cell.tint = accent
+                cell.isOn = song.map(model.isStarred) ?? false
                 return cell
             default:
                 let cell = reused as? TextCell ?? TextCell(column.cellID, digits: column == .time || column == .plays)
-                cell.textField?.stringValue = song.map { text(column, $0) } ?? ""
+                cell.text = song.map { text(column, $0) } ?? ""
                 return cell
             }
         }
@@ -255,13 +251,6 @@ struct SongsTable: NSViewRepresentable {
             case .plays: (song.playCount ?? 0) > 0 ? String(song.playCount ?? 0) : ""
             default: ""
             }
-        }
-
-        private func starView(_ column: Column) -> NSImageView {
-            let view = NSImageView(image: NSImage(systemSymbolName: "star.fill", accessibilityDescription: "Favorite") ?? NSImage())
-            view.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
-            view.identifier = column.cellID
-            return view
         }
     }
 }

@@ -1,64 +1,88 @@
 import AppKit
-import SwiftUI
 
-/// AppKit cells of `SongsTable`. They are plain views placed by frame, as SwiftUI cells and Auto Layout
-/// take too long when the table reloads on each typed letter.
+/// Cells of `SongsTable`. Each one is a single view that draws itself: SwiftUI cells, Auto Layout and even text
+/// fields take too long to make and lay out when a big window shows the table or it reloads on each typed letter.
 extension SongsTable {
-    /// One line of text, truncated; times and counts use even-width digits.
-    final class TextCell: NSTableCellView {
-        init(_ id: NSUserInterfaceItemIdentifier, digits: Bool = false) {
+    /// One line of text, truncated. The title cell adds a gray download badge and the "•••" button,
+    /// which opens `menuItems` under itself.
+    final class TextCell: NSView {
+        var text = "" { didSet { if text != oldValue { changed() } } }
+        var color = NSColor.labelColor { didSet { if color != oldValue { needsDisplay = true } } }
+        var badge: String? { didSet { if badge != oldValue { needsDisplay = true } } }
+        var tint = NSColor.controlAccentColor { didSet { if tint != oldValue { needsDisplay = true } } }
+        var menuItems: (() -> NSMenu?)? { didSet { if (menuItems == nil) != (oldValue == nil) { needsDisplay = true } } }
+        private let font: NSFont
+        private let hasMenu: Bool
+        private static let menuWidth: CGFloat = 26
+
+        init(_ id: NSUserInterfaceItemIdentifier, digits: Bool = false, menu: Bool = false) {
+            font = digits ? .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular) : .systemFont(ofSize: NSFont.systemFontSize)
+            hasMenu = menu
             super.init(frame: .zero)
             identifier = id
-            let field = NSTextField.cellLabel(digits: digits)  // `textField` is weak
-            addSubview(field)
-            textField = field
+            setAccessibilityElement(true)
+            setAccessibilityRole(.staticText)
         }
 
         required init?(coder: NSCoder) { nil }
 
-        override func layout() {
-            super.layout()
-            textField?.frame = bounds.centeredLine(of: textField, from: 0, to: bounds.maxX - 2)
+        private func changed() {
+            setAccessibilityLabel(text)
+            needsDisplay = true
+        }
+
+        override func draw(_ dirtyRect: NSRect) {
+            var right = bounds.maxX - 2
+            if hasMenu {
+                right = bounds.maxX - Self.menuWidth - 4
+                if menuItems != nil, let more = symbol("ellipsis", size: NSFont.systemFontSize, weight: .bold, color: tint) {
+                    more.draw(in: centered(more.size, x: bounds.maxX - Self.menuWidth / 2 - 4 - more.size.width / 2))
+                }
+            }
+            if let badge, let image = symbol(badge, size: 10, color: .secondaryLabelColor) {
+                right -= image.size.width
+                image.draw(in: centered(image.size, x: right))
+                right -= 6
+            }
+            let style = NSMutableParagraphStyle()
+            style.lineBreakMode = .byTruncatingTail
+            let line = (font.ascender - font.descender + font.leading).rounded(.up)
+            (text as NSString).draw(with: NSRect(x: 0, y: ((bounds.height - line) / 2).rounded(.down), width: max(0, right), height: line),
+                                    options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
+                                    attributes: [.font: font, .foregroundColor: color, .paragraphStyle: style])
+        }
+
+        /// Clicks go to the table, which selects rows, except on the "•••" button.
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            hasMenu && menuItems != nil && convert(point, from: superview).x > bounds.maxX - Self.menuWidth - 4 ? self : nil
+        }
+
+        override func mouseDown(with event: NSEvent) {
+            guard let menu = menuItems?() else { return }
+            menu.popUp(positioning: nil, at: NSPoint(x: bounds.maxX - Self.menuWidth - 4, y: bounds.minY - 4), in: self)
+        }
+
+        private func centered(_ size: NSSize, x: CGFloat) -> NSRect {
+            NSRect(origin: NSPoint(x: x, y: ((bounds.height - size.height) / 2).rounded()), size: size)
         }
     }
 
-    /// Title, download badge and the "•••" button, which opens `menu` under itself.
-    final class TitleCell: NSTableCellView {
-        let badge = NSImageView()
-        let more = NSButton()
-        var menuItems: (() -> NSMenu?)?
+    /// The red favorite star.
+    final class StarCell: NSView {
+        var isOn = false { didSet { if isOn != oldValue { needsDisplay = true } } }
+        var tint = NSColor.controlAccentColor { didSet { if tint != oldValue { needsDisplay = true } } }
 
         init(_ id: NSUserInterfaceItemIdentifier) {
             super.init(frame: .zero)
             identifier = id
-            let field = NSTextField.cellLabel()
-            textField = field
-            badge.symbolConfiguration = NSImage.SymbolConfiguration(textStyle: .caption1)
-            badge.contentTintColor = .secondaryLabelColor
-            more.image = NSImage(systemSymbolName: "ellipsis", accessibilityDescription: "More")
-            more.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: NSFont.systemFontSize, weight: .bold)
-            more.isBordered = false
-            more.target = self
-            more.action = #selector(showMenu)
-            for view in [field, badge, more] { addSubview(view) }
         }
 
         required init?(coder: NSCoder) { nil }
 
-        override func layout() {
-            super.layout()
-            var right = bounds.maxX - 4
-            more.frame = NSRect(x: right - 20, y: 0, width: 20, height: bounds.height)
-            right -= 26
-            if !badge.isHidden {
-                badge.frame = NSRect(x: right - 16, y: 0, width: 16, height: bounds.height)
-                right -= 22
-            }
-            textField?.frame = bounds.centeredLine(of: textField, from: 0, to: right)
-        }
-
-        @objc private func showMenu() {
-            menuItems?()?.popUp(positioning: nil, at: NSPoint(x: 0, y: more.bounds.maxY + 4), in: more)
+        override func draw(_ dirtyRect: NSRect) {
+            guard isOn, let star = symbol("star.fill", size: 12, color: tint) else { return }
+            star.draw(in: NSRect(origin: NSPoint(x: ((bounds.width - star.size.width) / 2).rounded(), y: ((bounds.height - star.size.height) / 2).rounded()),
+                                 size: star.size))
         }
     }
 
@@ -70,7 +94,6 @@ extension SongsTable {
         private var hovering = false { didSet { needsDisplay = true } }
         private static let size: CGFloat = 10
         private static let step = size * 1.4
-        private static var images: [String: NSImage] = [:]
 
         init(_ id: NSUserInterfaceItemIdentifier) {
             super.init(frame: .zero)
@@ -97,38 +120,23 @@ extension SongsTable {
 
         override func draw(_ dirtyRect: NSRect) {
             for n in 1...5 where n <= rating || hovering {
-                guard let image = star(filled: n <= rating) else { continue }
-                let origin = NSPoint(x: 2 + CGFloat(n - 1) * Self.step, y: (bounds.height - image.size.height) / 2)
+                let filled = n <= rating
+                guard let image = symbol(filled ? "star.fill" : "star", size: Self.size, color: filled ? tint : .tertiaryLabelColor) else { continue }
+                let origin = NSPoint(x: 2 + CGFloat(n - 1) * Self.step, y: ((bounds.height - image.size.height) / 2).rounded())
                 image.draw(in: NSRect(origin: origin, size: image.size))
             }
         }
-
-        /// Symbol images are made once per look; making them on each draw slows scrolling.
-        private func star(filled: Bool) -> NSImage? {
-            let color = filled ? tint : .tertiaryLabelColor
-            let key = "\(filled) \(color)"
-            if let image = Self.images[key] { return image }
-            let config = NSImage.SymbolConfiguration(pointSize: Self.size, weight: .regular).applying(.init(paletteColors: [color]))
-            let image = NSImage(systemSymbolName: filled ? "star.fill" : "star", accessibilityDescription: nil)?.withSymbolConfiguration(config)
-            Self.images[key] = image
-            return image
-        }
     }
 }
 
-private extension NSTextField {
-    static func cellLabel(digits: Bool = false) -> NSTextField {
-        let field = NSTextField(labelWithString: "")
-        field.lineBreakMode = .byTruncatingTail
-        if digits { field.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular) }
-        return field
-    }
-}
+/// Symbol images are made once per look; making them on each draw slows scrolling.
+@MainActor private var symbols: [String: NSImage] = [:]
 
-private extension NSRect {
-    /// One text line from `minX` to `maxX`, centered vertically.
-    @MainActor func centeredLine(of field: NSTextField?, from minX: CGFloat, to maxX: CGFloat) -> NSRect {
-        let height = (field?.font).map { ($0.ascender - $0.descender + $0.leading).rounded(.up) + 1 } ?? 17
-        return NSRect(x: minX, y: ((self.height - height) / 2).rounded(.down), width: max(0, maxX - minX), height: height)
-    }
+@MainActor private func symbol(_ name: String, size: CGFloat, weight: NSFont.Weight = .regular, color: NSColor) -> NSImage? {
+    let key = "\(name) \(size) \(weight.rawValue) \(color)"
+    if let image = symbols[key] { return image }
+    let config = NSImage.SymbolConfiguration(pointSize: size, weight: weight).applying(.init(paletteColors: [color]))
+    let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(config)
+    symbols[key] = image
+    return image
 }
