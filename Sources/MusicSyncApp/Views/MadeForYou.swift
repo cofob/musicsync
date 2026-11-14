@@ -138,7 +138,10 @@ private struct BecauseShelf: View {
     var body: some View {
         let songs = model.mixes.songs(of: mix)
         VStack(alignment: .leading, spacing: 14) {
-            ShelfHeader(title: "Because You Listened to \(mix.title)") { model.show(.mix(mix.id)) }.lineLimit(1)
+            VStack(alignment: .leading, spacing: 2) {
+                ShelfHeader(title: "Because You Listened to \(mix.title)") { model.show(.mix(mix.id)) }.lineLimit(1)
+                Text(mix.reason).foregroundStyle(.secondary).lineLimit(1)
+            }
             HorizontalShelf {
                 ForEach(Array(songs.enumerated()), id: \.element.id) { index, song in
                     SongCard(song: song) { model.mixes.play(mix, startAt: index) }.frame(width: 150)
@@ -191,6 +194,25 @@ struct StationButton: View {
     var body: some View {
         if model.mixes.isAvailable {
             Button("Create Station", systemImage: "dot.radiowaves.left.and.right") { model.mixes.startStation(seed) }
+        }
+    }
+}
+
+/// "Not for Me" on songs that mixes, stations and AutoPlay suggested: they leave the song out from now on.
+struct NotForMeButton: View {
+    @Environment(AppModel.self) private var model
+    let song: Song
+    /// Runs after the song is marked, e.g. to take it out of the queue.
+    var then: () -> Void = {}
+
+    var body: some View {
+        let mixes = model.mixes
+        if mixes.isAvailable, mixes.isSuggested(song.id) {
+            let disliked = mixes.dislikes.contains(song.id)
+            Button(disliked ? "Undo Not for Me" : "Not for Me", systemImage: disliked ? "hand.thumbsup" : "hand.thumbsdown") {
+                mixes.toggleDislike(song)
+                if !disliked { then() }
+            }
         }
     }
 }

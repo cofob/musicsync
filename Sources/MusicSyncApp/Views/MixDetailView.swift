@@ -17,6 +17,7 @@ struct MixDetailView: View {
                     Text(mix.subtitle).font(.system(size: 22, weight: .medium)).foregroundStyle(Color.musicAccent).lineLimit(2)
                     Text("\(formatSongs(songs.count)), \(formatTotal(songs.reduce(0) { $0 + ($1.duration ?? 0) }))")
                         .font(.callout).foregroundStyle(.secondary)
+                    if !mix.reason.isEmpty { Text(mix.reason).font(.callout).foregroundStyle(.secondary) }
                 } accessory: {
                     Button("Save as Playlist", systemImage: "text.badge.plus") { mixes.save(mix) }
                         .buttonStyle(CircleIconStyle()).help("Save as Playlist")

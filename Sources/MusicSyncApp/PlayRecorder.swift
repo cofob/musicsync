@@ -19,7 +19,7 @@ final class PlayRecorder {
     private var source = PlaySource.other
     /// Queue started by a mix or station, and songs AutoPlay added; anything else is guessed from the queue.
     private var tagged: (ids: Set<String>, source: PlaySource)?
-    private var autoPlayed: Set<String> = []
+    private(set) var autoPlayed: Set<String> = []
     /// Called after each track start, once its event is recorded.
     var onTrackStart: () -> Void = {}
 

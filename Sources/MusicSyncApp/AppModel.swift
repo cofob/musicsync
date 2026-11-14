@@ -281,13 +281,15 @@ final class AppModel {
             let newest = await db.albums(sort: .newest, limit: 20)
             let frequent = await db.albums(sort: .mostPlayed, limit: 20).filter { ($0.playCount ?? 0) > 0 }
             let recent = albums.filter { $0.played != nil }.sorted { $0.played! > $1.played! }.prefix(20)
-            shelves = [Shelf(id: "newest", title: "Recently Added", albums: newest),
-                       Shelf(id: "recent", title: "Recently Played", albums: Array(recent)),
-                       Shelf(id: "frequent", title: "Most Played", albums: frequent),
-                       Shelf(id: "random", title: "Discover", albums: Array(albums.shuffled().prefix(20)))]
+            let base = [Shelf(id: "newest", title: "Recently Added", albums: newest),
+                        Shelf(id: "recent", title: "Recently Played", albums: Array(recent)),
+                        Shelf(id: "frequent", title: "Most Played", albums: frequent),
+                        Shelf(id: "random", title: "Discover", albums: Array(albums.shuffled().prefix(20)))]
                 .filter { !$0.albums.isEmpty }
+            shelves = mixes.personalized(base, albums: albums)
             libraryError = nil
             await mixes.load()
+            shelves = mixes.personalized(base, albums: albums)
             return
         }
         guard let client else { return }

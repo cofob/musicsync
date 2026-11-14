@@ -44,8 +44,10 @@ struct UpNextPanel: View {
                         QueueRow(item: current, playing: true) { EmptyView() }
                     }
                     if !user.isEmpty { section("Playing Next", user, clear: true) }
-                    if !source.isEmpty { section("Continue Playing", source, from: album(of: source), clear: user.isEmpty) }
-                    if !auto.isEmpty { section("AutoPlay", auto, clear: false) }
+                    if !source.isEmpty {
+                        section("Continue Playing", source, note: album(of: source).map { "From \($0)" } ?? station(of: source), clear: user.isEmpty)
+                    }
+                    if !auto.isEmpty { section("AutoPlay", auto, note: model.mixes.autoPlayNote, clear: false) }
                     if user.isEmpty && source.isEmpty && auto.isEmpty {
                         Text("Nothing up next").foregroundStyle(.secondary).listRowBackground(Color.clear)
                     }
@@ -66,9 +68,9 @@ struct UpNextPanel: View {
     }
 
     @ViewBuilder
-    private func section(_ title: String, _ slots: [PlayQueue<PlayItem>.Slot], from: String? = nil, clear: Bool) -> some View {
+    private func section(_ title: String, _ slots: [PlayQueue<PlayItem>.Slot], note: String? = nil, clear: Bool) -> some View {
         let player = model.player, queue = player.queue  // read once: each read of `player.queue` is tracked
-        header(title, from: from, clear: clear)
+        header(title, note: note, clear: clear)
         // The item goes with its slot: a row may draw once more after the queue got shorter. An `if` in the row
         // instead makes the list resolve every row of a long queue to count its views, and Up Next opens late.
         ForEach(slots.filter { queue.indices.contains($0.index) }.map { ($0, queue[$0.index]) }, id: \.0.id) { slot, item in
@@ -86,11 +88,11 @@ struct UpNextPanel: View {
     }
 
     /// Section title as a plain row: pinned headers would cover the rows under them on the clear background.
-    private func header(_ title: String, from: String? = nil, clear: Bool = false) -> some View {
+    private func header(_ title: String, note: String? = nil, clear: Bool = false) -> some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.title3.weight(.semibold)).foregroundStyle(.primary)
-                if let from { Text("From \(from)").foregroundStyle(.secondary).lineLimit(1) }
+                if let note { Text(note).foregroundStyle(.secondary).lineLimit(1) }
             }
             Spacer()
             if clear {
@@ -113,6 +115,7 @@ struct UpNextPanel: View {
             player.playNext([item])
         }
         Button("Remove from Queue", systemImage: "minus.circle") { player.remove(at: [slot.index]) }
+        if case .server(let song) = item { NotForMeButton(song: song) { player.remove(at: [slot.index]) } }
         goTo(item)
     }
 
@@ -138,6 +141,13 @@ struct UpNextPanel: View {
         guard let selected, let i = model.player.line.keys.firstIndex(of: selected) else { return }
         model.player.remove(at: [i])
         self.selected = nil
+    }
+
+    /// Why a station holds the songs of `slots`, when they all come from the one playing.
+    private func station(of slots: [PlayQueue<PlayItem>.Slot]) -> String? {
+        guard let station = model.mixes.station else { return nil }
+        let queue = model.player.queue
+        return slots.allSatisfy { queue.indices.contains($0.index) && station.ids.contains(queue[$0.index].id) } ? station.note : nil
     }
 
     /// The album every song of `slots` comes from, for "From <album>"; nil when they mix albums.

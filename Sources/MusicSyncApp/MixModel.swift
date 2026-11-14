@@ -21,6 +21,15 @@ final class MixModel {
     private(set) var because: [Mix] = []
     /// Songs of `mixes` and `because` by id.
     private(set) var songs: [String: Song] = [:]
+    /// Home "Top Picks" for this part of the day and "Discover": album ids, empty without enough history.
+    private(set) var topPicks: [String] = []
+    private(set) var discover: [String] = []
+    private(set) var dayPart = DayPart.morning
+    /// Songs marked "Not for Me".
+    var dislikes: Set<String> = []
+    /// The station playing, and why AutoPlay added its songs, for Up Next.
+    var station: (ids: Set<String>, note: String)?
+    var autoPlayNote: String?
     /// When the queue ends, go on with similar songs.
     var autoPlay = UserDefaults.app.object(forKey: autoPlayKey) as? Bool ?? true {
         didSet { UserDefaults.app.set(autoPlay, forKey: Self.autoPlayKey); extendQueue() }
@@ -28,12 +37,12 @@ final class MixModel {
 
     var isAvailable: Bool { app.usesLocalLibrary }
 
-    @ObservationIgnored private unowned let app: AppModel
+    @ObservationIgnored unowned let app: AppModel
     @ObservationIgnored let recorder: PlayRecorder
     /// Library songs and playlists; read again only when the library changes.
     @ObservationIgnored private var input: (database: LibraryDatabase, version: Int, tracks: [Track], playlists: [[String]])?
     /// Day, library and refresh the shown mixes were made for.
-    @ObservationIgnored private var loadedKey: String?
+    @ObservationIgnored var loadedKey: String?
     /// Set by Refresh: other mixes for the rest of the day.
     @ObservationIgnored private var salt = ""
     @ObservationIgnored private var extending = false
@@ -47,6 +56,8 @@ final class MixModel {
     /// Plays songs and notes where they came from, for the play history.
     func play(_ list: [Song], from source: PlaySource, startAt: Int = 0, shuffled: Bool? = nil) {
         recorder.tag(list, as: source)
+        station = nil
+        autoPlayNote = nil
         app.player.play(list, startAt: startAt, shuffled: shuffled)
     }
 
@@ -60,17 +71,20 @@ final class MixModel {
     func load(refresh: Bool = false) async {
         guard app.usesLocalLibrary, let db = app.library?.database else { mixes = []; because = []; return }
         if refresh { salt = UUID().uuidString }
-        let day = Self.today + salt
-        let key = "\(ObjectIdentifier(db).hashValue)|\(app.libraryVersion)|\(day)"
+        let day = Self.today + salt, part = DayPart(hour: Calendar.current.component(.hour, from: Date()))
+        let key = "\(ObjectIdentifier(db).hashValue)|\(app.libraryVersion)|\(day)|\(part)"
         guard key != loadedKey, let catalog = await catalog() else { return }
-        let (made, shelves) = await Task.detached(priority: .userInitiated) {
-            (catalog.madeForYou(day: day), catalog.becauseYouListened(day: day))
+        let (made, shelves, picks, unplayed) = await Task.detached(priority: .userInitiated) {
+            (catalog.madeForYou(day: day), catalog.becauseYouListened(day: day), catalog.topPicks(day: day), catalog.discover(day: day))
         }.value
         let found = await db.songs(ids: Array(Set((made + shelves).flatMap(\.trackIds))))
         guard app.library?.database === db else { return }
         songs = Dictionary(found.map { ($0.id, $0) }) { a, _ in a }
         mixes = made
         because = shelves
+        topPicks = picks
+        discover = unplayed
+        dayPart = catalog.dayPart
         loadedKey = key
     }
 
@@ -105,10 +119,14 @@ final class MixModel {
                 return
             }
             let catalog = base.adding(similar: [first: await similarSongs(first)])
-            let ids = await Task.detached { catalog.radio(seeds: seeds, count: 50, seed: .random(in: 0 ... .max)) }.value
+            let (ids, note) = await Task.detached {
+                let ids = catalog.radio(seeds: seeds, count: 50, seed: .random(in: 0 ... .max))
+                return (ids, catalog.reason(seeds: seeds, picks: ids))
+            }.value
             let list = await db.songs(ids: ids)
             guard !list.isEmpty, app.library?.database === db else { return }
             play(list, from: .radio, shuffled: false)
+            station = (Set(ids), "Station · \(note)")
         }
     }
 
@@ -124,10 +142,14 @@ final class MixModel {
             defer { extending = false }
             guard let db = app.library?.database, let base = await catalog() else { return }
             let catalog = base.adding(similar: [last: await similarSongs(last)])
-            let ids = await Task.detached { catalog.continuation(of: queue, seed: .random(in: 0 ... .max)) }.value
+            let (ids, note) = await Task.detached {
+                let ids = catalog.continuation(of: queue, seed: .random(in: 0 ... .max))
+                return (ids, catalog.reason(seeds: Array(queue.suffix(5)), picks: ids, timeOfDay: true))
+            }.value
             let list = await db.songs(ids: ids)
             // Extend only the queue this was made for.
             guard !list.isEmpty, player.queue.last?.id == last, app.library?.database === db else { return }
+            autoPlayNote = note
             recorder.tagAutoPlay(list)
             player.addAutoPlay(list.map(PlayItem.server))
         }
@@ -160,8 +182,10 @@ final class MixModel {
         // Settings > Library can leave the local history out: the server's play counts are always in `tracks`.
         let usesHistory = AppPreferences.shared.listening.usesHistory
         let events = usesHistory ? await library.history.events() : [], stats = usesHistory ? await library.history.stats() : [:]
+        let dislikes = await library.history.dislikes()
+        if app.library?.database === db, self.dislikes != dislikes { self.dislikes = dislikes }
         return await Task.detached(priority: .userInitiated) {
-            Catalog(tracks: input.tracks, playlists: input.playlists, history: events, stats: stats)
+            Catalog(tracks: input.tracks, playlists: input.playlists, history: events, stats: stats, dislikes: dislikes)
         }.value
     }
 }

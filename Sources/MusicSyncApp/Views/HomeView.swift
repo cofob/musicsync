@@ -20,7 +20,9 @@ struct HomeView: View {
                     ForEach(AppPreferences.shared.home.visible, id: \.self) { kind in
                         switch kind {
                         case .madeForYou, .because: MadeForYouSection(part: kind)
-                        default: if let shelf = model.shelves.first(where: { $0.id == kind.listType }) { albumShelf(shelf, featured: kind == .topPicks) }
+                        // Top Picks for this time of day when the history has them, else the newest albums.
+                        default: if let shelf = model.shelves.first(where: { kind == .topPicks && $0.id == "picks" })
+                            ?? model.shelves.first(where: { $0.id == kind.listType }) { albumShelf(shelf, featured: kind == .topPicks) }
                         }
                     }
                 }

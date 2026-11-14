@@ -18,6 +18,7 @@ struct SongMenuItems: View {
         }
         AddToPlaylistMenu(songs: [song])
         StationButton(seed: .song(song))
+        NotForMeButton(song: song)
         Divider()
         Button("Get Info", systemImage: "info.circle") { model.infoSong = song }
         Button(model.isStarred(song) ? "Undo Favorite" : "Favorite", systemImage: model.isStarred(song) ? "star.slash" : "star") {
