@@ -11,6 +11,7 @@ import SwiftUI
         NSApp.setActivationPolicy(.regular)
         if Shot.output == nil { NSApp.activate(ignoringOtherApps: true) }
         Shot.start(model)
+        model.system.start()
         // SIGTERM (`kill`, `pkill`) quits like ⌘Q instead of killing the process mid-sync.
         signal(SIGTERM, SIG_IGN)
         sigterm = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
@@ -40,7 +41,7 @@ struct MusicSyncApp: App {
 
     var body: some Scene {
         WindowGroup("MusicSync", id: MainWindow.id) {
-            RootView().environment(model)
+            RootView().modifier(SystemEvents()).environment(model)
         }
         .commands {
             SidebarCommands()
@@ -72,6 +73,8 @@ struct MusicSyncApp: App {
                 }
                 Toggle("AutoPlay", isOn: Binding(get: { model.mixes.autoPlay }, set: { model.mixes.autoPlay = $0 }))
                     .disabled(!model.mixes.isAvailable)
+                Divider()
+                Toggle("Private Session", isOn: Binding(get: { model.player.privateSession }, set: { model.player.privateSession = $0 }))
                 Divider()
                 Button(model.showNowPlaying ? "Hide Now Playing" : "Show Now Playing") { model.showNowPlaying.toggle() }
                     .keyboardShortcut("n", modifiers: [.command, .shift])

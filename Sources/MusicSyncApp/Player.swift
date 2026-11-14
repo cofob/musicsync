@@ -66,6 +66,8 @@ final class Player {
     var volume: Double = 1 { didSet { player.volume = Float(volume) } }
     private(set) var shuffle = false
     var repeatMode = RepeatMode.off { didSet { resetUpcoming() } }
+    /// Playback > Private Session: no scrobbles, so plays stay out of the server's history and counts.
+    var privateSession = false
 
     @ObservationIgnored var client: SubsonicClient?
     @ObservationIgnored var covers: CoverArtCache?
@@ -373,7 +375,7 @@ final class Player {
         startedAt = Date()
         updateNowPlaying()
         onTrackStart?()
-        if case .server(let song)? = current, let client {
+        if case .server(let song)? = current, let client, !privateSession {
             Task { try? await client.scrobble(ids: [song.id], submission: false) }
         }
         let cover = current?.coverArt
@@ -403,7 +405,7 @@ final class Player {
         }
         elapsed = max(0, time)
         // Submit after 50% of the track or 4 minutes, whichever comes first.
-        guard !scrobbled, case .server(let song)? = current, let client, duration > 0,
+        guard !scrobbled, !privateSession, case .server(let song)? = current, let client, duration > 0,
               elapsed >= min(duration / 2, 240) else { return }
         scrobbled = true
         let start = startedAt

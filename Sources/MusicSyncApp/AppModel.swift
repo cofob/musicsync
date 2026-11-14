@@ -69,6 +69,8 @@ final class AppModel {
     var searchFieldFocused = false
     @ObservationIgnored private(set) lazy var search = SearchModel(app: self)
     @ObservationIgnored private(set) lazy var mixes = MixModel(app: self)
+    /// Sharing, deep links, Spotlight, global shortcuts, notifications.
+    @ObservationIgnored private(set) lazy var system = SystemServices(app: self)
     var showNowPlaying = false
     var nowPlayingPanel = NowPlayingPanel.lyrics
     /// Song shown in the "Get Info" sheet.
