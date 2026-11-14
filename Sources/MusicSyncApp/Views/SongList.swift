@@ -61,7 +61,7 @@ struct SongList: View {
 
     var body: some View {
         let keys = rowKeys
-        let picked = keys.indices.filter { selection.contains(keys[$0]) }
+        let picked = selectedRows(keys)
         LazyVStack(spacing: 0) {
             ForEach(Array(songs.enumerated()), id: \.offset) { index, song in
                 row(song, index, keys: keys, picked: picked)
@@ -79,9 +79,19 @@ struct SongList: View {
         }
         .focusable().focusEffectDisabled().focused($focused)
         .onCommand(#selector(NSResponder.selectAll(_:))) { selection.selectAll(keys) }
-        .onKeyPress(.return) { play(picked) }
-        .onDeleteCommand { if let onRemove, !picked.isEmpty { onRemove(picked); selection.clear() } }
-        .onExitCommand { selection.clear() }
+        // Key and command handlers read the selection now: at the root of the detail stack they can outlive a render.
+        .onKeyPress(.return) { play(selectedRows(keys)) }
+        .onDeleteCommand { remove(selectedRows(keys)) }
+        .onKeyPress(.escape) { if selection.isEmpty { return .ignored }; selection.clear(); return .handled }
+        .focusedSceneValue(\.songListCommands, SongListCommands(selectAll: { selection.selectAll(keys); focused = true }, delete: { remove(selectedRows(keys)) }))
+    }
+
+    private func selectedRows(_ keys: [RowKey]) -> [Int] { keys.indices.filter { selection.contains(keys[$0]) } }
+
+    private func remove(_ rows: [Int]) {
+        guard let onRemove, !rows.isEmpty else { return }
+        onRemove(rows)
+        selection.clear()
     }
 
     private func row(_ song: Song, _ index: Int, keys: [RowKey], picked: [Int]) -> some View {
@@ -156,6 +166,17 @@ struct SongList: View {
         case .track: song.artistName == albumArtist ? nil : song.artistName
         }
     }
+}
+
+/// Select All and Delete of the page's `SongList`, for `RootView`: on the root page of the detail stack the
+/// menu commands go to the window's hosting view, which does not see the list's own command handlers.
+struct SongListCommands {
+    let selectAll: () -> Void
+    let delete: () -> Void
+}
+
+extension FocusedValues {
+    @Entry var songListCommands: SongListCommands?
 }
 
 /// "Get Info" sheet for a song.

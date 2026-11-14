@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    @FocusedValue(\.songListCommands) private var songList
 
     var body: some View {
         @Bindable var model = model
@@ -57,6 +58,8 @@ struct RootView: View {
         .animation(.smooth(duration: 0.35), value: model.showNowPlaying)
         .toolbar(model.showNowPlaying ? .hidden : .automatic, for: .windowToolbar)
         .tint(Color.musicAccent)
+        .onCommand(#selector(NSResponder.selectAll(_:))) { songList?.selectAll() }
+        .onDeleteCommand { songList?.delete() }
         .task(id: model.searchText) {
             guard selection == .search else { return }
             let search = model.search
