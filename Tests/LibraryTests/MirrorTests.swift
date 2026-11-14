@@ -208,6 +208,7 @@ private struct Fixture {
         #expect(f.mirror.currentStatus.lastSuccess == nil)  // a cancelled pass is not a success
         let partial = await f.db.songCount()
         #expect(partial >= 12 && partial < 36)
+        let finished = Set(await f.db.songs(limit: 100).compactMap(\.albumId))
 
         server.delayMs = 0
         server.clearLog()
@@ -216,7 +217,9 @@ private struct Fixture {
         #expect(await f.db.songCount() == 36)
         #expect(await f.db.songs(limit: 100).count == 36)
         #expect(Set(await f.db.songs(limit: 100).map(\.id)).count == 36)
-        #expect(server.requests("getAlbum").count == 12 - partial / 3)  // finished albums are not fetched again
+        // Finished albums are not fetched again. A request of the cancelled pass can still reach the stub late, so compare ids, not counts.
+        #expect(Set(server.requests("getAlbum").map { String($0.dropFirst(9)) }).isDisjoint(with: finished))
+        #expect(Set(server.requests("getAlbum")).count >= 12 - finished.count)
         #expect(f.mirror.currentStatus.lastSuccess != nil)
     }
 
