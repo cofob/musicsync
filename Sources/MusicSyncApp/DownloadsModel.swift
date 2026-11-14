@@ -112,12 +112,13 @@ final class DownloadsModel {
         usedBytes = list.reduce(0) { $0 + ($1.state == .done ? $1.size : 0) }
     }
 
-    /// Pings the server: every 10 s while it is unreachable, every minute otherwise.
+    /// Pings the server: every 10 s while it is unreachable, every minute otherwise. A server that answers with an
+    /// error (a refused password) is reachable: offline mode would hide the songs and the real problem.
     private func watchServer(_ client: SubsonicClient, _ manager: DownloadManager) -> Task<Void, Never> {
         Task { [weak self] in
             while !Task.isCancelled {
                 let reachable: Bool
-                do { _ = try await client.ping(); reachable = true } catch { reachable = error.isCancellation }
+                do { _ = try await client.ping(); reachable = true } catch SubsonicError.api { reachable = true } catch { reachable = error.isCancellation }
                 guard !Task.isCancelled, let model = self, model.manager === manager else { return }
                 if model.isOffline == reachable {
                     model.isOffline = !reachable
