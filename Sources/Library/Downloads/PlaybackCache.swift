@@ -87,12 +87,13 @@ public actor PlaybackCache {
     public func store(_ song: Song, format: String, maxBitRate: Int?, client: SubsonicClient) async throws -> URL? {
         load()
         if let item = index.items[song.id] { return directory.appendingPathComponent(item.fileName) }
-        let estimate = Int64(song.size ?? (song.duration ?? 300) * 40_000)
+        let estimate = Int64(song.size ?? min(song.duration ?? 300, 1_000_000) * 40_000)
         guard limit > 0, estimate <= limit, let free = freeDisk(), free > estimate + SmartPlanner.reserveBytes else { return nil }
         let tmp = try await client.download(id: song.id, format: format, maxBitRate: maxBitRate)
         defer { try? FileManager.default.removeItem(at: tmp) }
         try Task.checkCancellation()
-        let suffix = format == "raw" ? (song.suffix ?? "audio") : format
+        // The suffix comes from the server: only letters and digits, so the name stays in the folder.
+        let suffix = String((format == "raw" ? (song.suffix ?? "audio") : format).filter { $0.isASCII && ($0.isLetter || $0.isNumber) }.prefix(8))
         let name = "\(LibraryDatabase.hash(song.id)).\(suffix)"
         let dest = directory.appendingPathComponent(name)
         try? FileManager.default.removeItem(at: dest)
@@ -114,7 +115,9 @@ public actor PlaybackCache {
         loaded = true
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         guard let data = try? Data(contentsOf: indexURL), var saved = try? JSONDecoder().decode(CacheIndex.self, from: data) else { return }
-        saved.items = saved.items.filter { FileManager.default.fileExists(atPath: directory.appendingPathComponent($0.value.fileName).path) }
+        // A damaged index may name files outside the folder or hold sizes that overflow the sums.
+        saved.items = saved.items.filter { !$0.value.fileName.contains("/") && (0..<1 << 40).contains($0.value.size)
+            && FileManager.default.fileExists(atPath: directory.appendingPathComponent($0.value.fileName).path) }
         index = saved
     }
 
