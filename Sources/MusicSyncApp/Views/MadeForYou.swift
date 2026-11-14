@@ -194,25 +194,3 @@ struct StationButton: View {
         }
     }
 }
-
-/// AutoPlay switch (∞) for the queue panel.
-struct AutoPlayButton: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        let mixes = model.mixes
-        if mixes.isAvailable {
-            Button { mixes.autoPlay.toggle() } label: {
-                Image(systemName: "infinity").font(.body.weight(.bold))
-                    .foregroundStyle(.primary.opacity(mixes.autoPlay ? 1 : 0.6))
-                    .frame(width: 34, height: 24)
-                    .background(.primary.opacity(mixes.autoPlay ? 0.2 : 0), in: Capsule())
-                    .contentShape(Capsule())
-            }
-            .buttonStyle(HitAreaButtonStyle())
-            .help(mixes.autoPlay ? "AutoPlay: similar songs play when the queue ends" : "Turn On AutoPlay")
-            .accessibilityLabel("AutoPlay")
-            .accessibilityValue(mixes.autoPlay ? "On" : "Off")
-        }
-    }
-}
