@@ -78,12 +78,14 @@ extension AppModel {
     /// Lyrics from memory, then the library database, then the server; server replies (also "none") are kept.
     func lyrics(for song: Song) async -> Lyrics? {
         if let hit = lyricsCache[song.id] { return hit }
-        let found = await fetchLyrics(song)
-        lyricsCache[song.id] = .some(found)
-        return found
+        do {
+            let found = try await fetchLyrics(song)
+            lyricsCache[song.id] = .some(found)
+            return found
+        } catch { return nil }  // a failed request is not kept as "none"
     }
 
-    private func fetchLyrics(_ song: Song) async -> Lyrics? {
+    private func fetchLyrics(_ song: Song) async throws -> Lyrics? {
         func best(_ list: [StructuredLyrics]) -> Lyrics? { (list.first(where: \.synced) ?? list.first).flatMap(Lyrics.init) }
         let database = library?.database
         if let stored = await database?.storedLyrics(songId: song.id) { return best(stored) }
@@ -92,8 +94,8 @@ extension AppModel {
             try? await database?.storeLyrics(songId: song.id, lyrics: list)
             if let lyrics = best(list) { return lyrics }
         }
-        guard let artist = song.artist, let legacy = try? await client.getLyrics(artist: artist, title: song.title) else { return nil }
-        return Lyrics(plain: legacy.value ?? "")
+        guard let artist = song.artist else { return nil }
+        return try await Lyrics(plain: client.getLyrics(artist: artist, title: song.title).value ?? "")
     }
 
     /// The 96 px local thumbnail of a cover, if the mirror has it.
