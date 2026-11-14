@@ -44,8 +44,9 @@ public actor LibraryStore {
             var albums: [Album] = []
             while true {
                 let page = try await client.getAlbumList2(type: "alphabeticalByName", size: 500, offset: albums.count)
+                // Only an empty page (or one seen before: the offset is ignored) ends it; servers may cap the size below 500.
+                guard let first = page.first, !albums.contains(where: { $0.id == first.id }) else { break }
                 albums += page
-                if page.count < 500 { break }
             }
             cache.artists = artists
             cache.albums = albums
