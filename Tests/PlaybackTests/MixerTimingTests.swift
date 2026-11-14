@@ -15,8 +15,8 @@ import Testing
 
     deinit { files.forEach { try? FileManager.default.removeItem(at: $0) } }
 
-    private func cue(_ seconds: Double) throws -> Mixer.Cue {
-        let url = try ClickTrack(bpm: 120, body: seconds, firstBeat: 0.1).file()
+    private func cue(_ seconds: Double) async throws -> Mixer.Cue {
+        let url = try await ClickTrack(bpm: 120, body: seconds, firstBeat: 0.1).file()
         files.append(url)
         let item = AVPlayerItem(url: url)
         item.audioTimePitchAlgorithm = .spectral  // as the app plays
@@ -40,7 +40,7 @@ import Testing
 
     @Test(arguments: [Float(1), 1.04, 0.95])
     func incomingStartsOnTime(rate: Float) async throws {
-        let a = try cue(4), b = try cue(4)
+        let a = try await cue(4), b = try await cue(4)
         let t = Transition(at: 1.5, offset: 0.5, duration: 1.5, rate: rate)
         mixer.play(a)
         mixer.setNext(b, transition: t)
@@ -52,7 +52,7 @@ import Testing
     }
 
     @Test func pauseBeforeTheTimedStartHolds() async throws {
-        let a = try cue(3), b = try cue(3)
+        let a = try await cue(3), b = try await cue(3)
         mixer.play(a)
         mixer.setNext(b, transition: Transition(at: 1, duration: 1))
         try await waitForAdvance()
@@ -64,7 +64,7 @@ import Testing
 
     @Test func rateEasesBackAfterTheFade() async throws {
         mixer.rampDuration = 1
-        let a = try cue(3), b = try cue(4)
+        let a = try await cue(3), b = try await cue(4)
         mixer.play(a)
         mixer.setNext(b, transition: Transition(at: 0.6, duration: 0.5, rate: 1.05))
         try await waitForAdvance()
@@ -79,10 +79,11 @@ import Testing
     }
 
     @Test func retimeMovesTheTransition() async throws {
-        let a = try cue(4), b = try cue(4)
+        let a = try await cue(4), b = try await cue(4)
         mixer.play(a)
         mixer.setNext(b, transition: Transition(at: 3, duration: 0.5))
         try await Task.sleep(for: .seconds(0.3))
+        mixer.retime(Transition(at: 0.2, duration: 1))  // due already: ignored
         let t = Transition(at: 1.2, offset: 1, duration: 1)
         mixer.retime(t)
         try await waitForAdvance()

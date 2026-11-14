@@ -53,12 +53,14 @@ import AVFoundation
         return host.isNumeric && wait > 0 && wait < 1 ? host : nil
     }
 
-    /// Starts the paused item at `rate`: at `hostTime` when given, to line up with the other deck, else now.
+    /// Starts the paused item at `rate`: from `time` at `hostTime` when given, to line up with the other deck, else now.
     /// A timed start needs the player not to wait for buffering; `clear()` and the end of the fade turn that back on.
-    func start(rate: Float, at hostTime: CMTime?) {
+    func start(rate: Float, at hostTime: CMTime?, from time: TimeInterval) {
         guard let hostTime else { player.rate = rate; return }
         player.automaticallyWaitsToMinimizeStalling = false
-        player.setRate(rate, time: .invalid, atHostTime: hostTime)
+        // An earlier seek to `time` may still run; a new one only when the item is not there.
+        let itemTime = abs(self.time - time) < 0.001 ? CMTime.invalid : CMTime(seconds: time, preferredTimescale: 1_000_000)
+        player.setRate(rate, time: itemTime, atHostTime: hostTime)
     }
 
     /// Also cancels a timed start, which a plain pause does not always do.

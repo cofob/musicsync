@@ -20,6 +20,11 @@ import Testing
         check(track, SongAnalysis(samples: track.samples()))
     }
 
+    @Test func longSongKeepsTime() {
+        let track = ClickTrack(bpm: 122, lead: 2, intro: 20, body: 260, outro: 15, trail: 3, firstBeat: 0.4, pickup: 2)
+        check(track, SongAnalysis(samples: track.samples()))
+    }
+
     @Test func noIntroNoSilence() {
         let track = ClickTrack(bpm: 100, body: 40, firstBeat: 0.05)
         let a = SongAnalysis(samples: track.samples())
@@ -29,7 +34,7 @@ import Testing
 
     @Test func decodesAFile() async throws {
         let track = ClickTrack(bpm: 128, lead: 0.5, intro: 6, body: 30, outro: 6, trail: 1, firstBeat: 0.1, pickup: 3)
-        let url = try track.file()
+        let url = try await track.file()
         defer { try? FileManager.default.removeItem(at: url) }
         let samples = try await PCMReader.samples(of: url)
         check(track, SongAnalysis(samples: samples))

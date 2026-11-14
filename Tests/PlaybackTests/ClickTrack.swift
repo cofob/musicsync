@@ -35,8 +35,13 @@ struct ClickTrack {
         }
     }
 
-    /// A 44.1 kHz stereo WAV in a temp folder.
-    func file() throws -> URL {
+    /// A 44.1 kHz stereo WAV in a temp folder, made off the main actor, which the mixer tests need free.
+    func file() async throws -> URL {
+        let track = self
+        return try await Task.detached { try track.write() }.value
+    }
+
+    private func write() throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("clicks-\(UUID().uuidString).wav")
         let mono = samples(rate: 44100)
         let format = try #require(AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 2))

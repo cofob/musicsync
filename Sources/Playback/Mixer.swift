@@ -106,9 +106,9 @@ import AVFoundation
     }
 
     /// Changes how the next song starts, e.g. when its analysis came in after it was loaded.
-    /// A gapless next song stays gapless, and a running transition is kept.
+    /// A gapless next song stays gapless, and a running transition is kept, as is the old one when the new one is due already.
     public func retime(_ transition: Transition) {
-        guard let next, fade == nil, let old = self.transition, old != transition else { return }
+        guard let next, fade == nil, let old = self.transition, old != transition, transition.at - Self.lead > time + 0.2 else { return }
         self.transition = transition
         if idle.player.currentItem === next.item, old.offset != transition.offset {
             seekPending = true
@@ -211,7 +211,8 @@ import AVFoundation
         guard fade == nil, isPlaying, let next, let transition, next.item.status == .readyToPlay else { return }
         var at = transition.at
         if let duration { at = min(at, duration - transition.duration) }
-        if time >= at - Self.lead { startTransition(next, at: at) }
+        // The boundary call can come a little before its time.
+        if time >= at - Self.lead - 0.05 { startTransition(next, at: at) }
     }
 
     private func itemStatusChanged(_ item: AVPlayerItem) {
@@ -252,7 +253,7 @@ import AVFoundation
         fade = (outgoing, transition)
         stopRamp()
         nudge = transition.rate
-        if isPlaying { incoming.start(rate: rate * nudge, at: start) }
+        if isPlaying { incoming.start(rate: rate * nudge, at: start, from: max(0, transition.offset - next.offset)) }
         fadeTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.stepFade() }
         }
