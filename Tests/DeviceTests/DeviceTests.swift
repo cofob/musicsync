@@ -75,6 +75,7 @@ private func write(_ text: String, to url: URL) throws {
         #expect(FirewireGuid.parse("") == nil)
         #expect(FirewireGuid.parse("000A2700AABBCC") == nil)
         #expect(FirewireGuid.parse("000A2700AABBCCDG") == nil)
+        #expect(FirewireGuid.parse("000A2700AABBCCD\u{FF11}") == nil)  // fullwidth digit
     }
 
     @Test func chain() throws {

@@ -26,7 +26,7 @@ public enum FirewireGuid {
     public static func parse(_ string: String) -> [UInt8]? {
         var hex = string.trimmingCharacters(in: .whitespacesAndNewlines)
         if hex.lowercased().hasPrefix("0x") { hex.removeFirst(2) }
-        guard hex.count == 16, hex.allSatisfy(\.isHexDigit) else { return nil }
+        guard hex.count == 16, hex.allSatisfy({ $0.isASCII && $0.isHexDigit }) else { return nil }
         var bytes: [UInt8] = []
         var index = hex.startIndex
         while index < hex.endIndex {
