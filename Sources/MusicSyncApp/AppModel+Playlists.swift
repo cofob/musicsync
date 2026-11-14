@@ -97,6 +97,7 @@ extension AppModel {
             do {
                 try await client?.deletePlaylist(id: playlist.id)
                 try? await database?.deletePlaylist(id: playlist.id)
+                sync.libraryChanged()  // a check that ran meanwhile may have cached the playlist
             } catch { undo(before, error, store) }
         }
     }
