@@ -63,8 +63,11 @@ extension MirrorPass {
                 if data.isEmpty { throw SubsonicError.badResponse("empty cover") }
                 try await database.storeCover(id: id, data: data)
             } catch let error as SubsonicError {
-                // The server answered but has no usable image: remember it. Network errors just retry later.
-                try await database.recordMissingCover(id: id)
+                // Remember only a server that has no usable image; other failures retry next pass.
+                switch error {
+                case .api, .badResponse, .badStatus(404): try await database.recordMissingCover(id: id)
+                default: break
+                }
                 throw error
             }
         }

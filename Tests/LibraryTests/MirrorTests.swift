@@ -185,6 +185,16 @@ private struct Fixture {
         #expect(await f.db.smallCoverURL(coverArtId: "cov-al-1") != nil)
     }
 
+    @Test func onlyMissingCoversAreRemembered() async {
+        let f = await Fixture(server: makeServer(albums: 1))
+        f.server.coverStatus = 503
+        await f.sync()
+        #expect(await f.db.coversToFetch() == ["cov-al-1"])  // transient: retried next pass
+        f.server.coverStatus = 404
+        await f.sync()
+        #expect(await f.db.coversToFetch().isEmpty)
+    }
+
     @Test func cancelledSyncResumesWithoutDuplicates() async {
         let server = makeServer(albums: 12, songsPerAlbum: 3)
         let f = await Fixture(server: server)

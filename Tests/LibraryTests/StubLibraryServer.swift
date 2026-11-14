@@ -37,6 +37,7 @@ final class StubLibraryServer: @unchecked Sendable {
     private var _emptyAlbumList = false
     private var _emptyAlbumReply = false
     private var _delayMs = 0
+    private var _coverStatus = 200
     private var _lastScan = "scan-1"
     private var _lyrics: [String: [String: Any]] = [:]
     private var _extensions = ["songLyrics"]
@@ -47,6 +48,8 @@ final class StubLibraryServer: @unchecked Sendable {
     var playlists: [StubPlaylist] { get { locked { _playlists } } set { locked { _playlists = newValue } } }
     var lastScan: String { get { locked { _lastScan } } set { locked { _lastScan = newValue } } }
     var extensions: [String] { get { locked { _extensions } } set { locked { _extensions = newValue } } }
+    /// HTTP status of getCoverArt replies.
+    var coverStatus: Int { get { locked { _coverStatus } } set { locked { _coverStatus = newValue } } }
     var delayMs: Int { get { locked { _delayMs } } set { locked { _delayMs = newValue } } }
     /// getAlbumList2 answers this many calls, then fails with HTTP 500.
     var failAlbumListAfter: Int? { get { locked { _failAlbumListAfter } } set { locked { _failAlbumListAfter = newValue; _albumListCalls = 0 } } }
@@ -115,7 +118,7 @@ final class StubLibraryServer: @unchecked Sendable {
             case "getLyricsBySongId":
                 let lyrics = param("id").flatMap { _lyrics[$0] }
                 return ok(["lyricsList": lyrics.map { ["structuredLyrics": [$0]] } ?? [:]])
-            case "getCoverArt": return (200, cover, _delayMs)
+            case "getCoverArt": return (_coverStatus, cover, _delayMs)
             default: return (404, Data(), 0)
             }
         }
