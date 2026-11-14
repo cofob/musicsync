@@ -118,4 +118,28 @@ import Testing
         #expect(step.ratio > 1.5)
         #expect(click.ratio < 1.5)
     }
+
+    private func song(_ track: ClickTrack) async throws -> MixRun.Song {
+        let url = try await track.file()
+        files.append(url)
+        return MixRun.Song(cue: Mixer.Cue(item: item(url)), source: track.samples(rate: 44100))
+    }
+
+    /// AutoMix of two click tracks on the real mixer, as heard: beat-matched (120 into 123 bpm) and faded (into 95 bpm).
+    @Test(arguments: [123.0, 95]) func autoMixOutput(bpm: Double) async throws {
+        let ta = ClickTrack(bpm: 120, lead: 0.5, body: 40, trail: 0.5, firstBeat: 0.1)
+        let tb = ClickTrack(bpm: bpm, lead: 0.7, body: 40, trail: 0.5, firstBeat: 0.23, pickup: 1, tone: 330)
+        let aa = SongAnalysis(samples: ta.samples()), ab = SongAnalysis(samples: tb.samples())
+        let t = try #require(AutoMix.plan(from: aa, to: ab))
+        let matched = AutoMix.tempoMatch(aa, ab) != nil
+        #expect(matched == (bpm == 123))
+        let run = MixRun(a: try await song(ta), b: try await song(tb), transition: t, bpm: matched ? aa.bpm : nil)
+        let r = try await run.run(wav: "automix-clicks-\(Int(bpm))")
+        print("MIX clicks 120 → \(Int(bpm)) bpm, \(String(format: "%.1f", t.duration)) s, rate \(t.rate): \(r.summary)")
+        #expect(r.beatOffsets.allSatisfy { abs($0) < 10 })
+        #expect(r.dip < 3 && r.jump < 3)
+        #expect(r.silence < 0.05)
+        #expect(r.peak <= 1)
+        #expect(r.rateStep < 0.001)
+    }
 }

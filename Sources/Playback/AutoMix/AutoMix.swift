@@ -21,10 +21,13 @@ public enum AutoMix {
     static let maxCut: TimeInterval = 30
 
     /// Transition from `a` into `b`; nil for songs too short to mix. `canSeek` false starts `b` at 0 (a converted stream).
-    public static func plan(from a: SongAnalysis, to b: SongAnalysis, canSeek: Bool = true) -> Transition? {
-        guard a.duration >= minimumLength, b.duration >= minimumLength else { return nil }
-        guard let rate = tempoMatch(a, b) else { return fade(a, b, canSeek: canSeek) }
-        return beatMix(a, b, rate: rate, canSeek: canSeek)
+    /// `a` plays at `outgoingRate` (the rate of its own mix in): the incoming rate matches the tempo heard.
+    public static func plan(from a: SongAnalysis, to b: SongAnalysis, canSeek: Bool = true, outgoingRate: Double = 1) -> Transition? {
+        let heard = a.played(at: outgoingRate)
+        guard heard.duration >= minimumLength, b.duration >= minimumLength else { return nil }
+        var t = tempoMatch(heard, b).map { beatMix(heard, b, rate: $0, canSeek: canSeek) } ?? fade(heard, b, canSeek: canSeek)
+        t.at *= outgoingRate
+        return t
     }
 
     /// Rate of `b` that plays it at the tempo of `a`, also at half or double time; nil when that is more than `maxNudge` away.
@@ -70,13 +73,21 @@ public enum AutoMix {
     }
 }
 
+private extension SongAnalysis {
+    /// The song as heard at `rate`: shorter times, a faster tempo.
+    func played(at rate: Double) -> SongAnalysis {
+        SongAnalysis(duration: duration / rate, soundStart: soundStart / rate, soundEnd: soundEnd / rate, introEnd: introEnd / rate,
+                     outroStart: outroStart / rate, bpm: bpm * rate, downbeat: downbeat / rate, beatStrength: beatStrength)
+    }
+}
+
 public extension PlaybackSettings {
     /// AutoMix from `song` into `next` when both are analyzed, else the crossfade of `transition(from:to:duration:)`,
-    /// which also keeps albums in order gapless. `canSeek` false starts `next` at its beginning.
+    /// which also keeps albums in order gapless. `canSeek` false starts `next` at its beginning; `song` plays at `outgoingRate`.
     func transition(from song: Song?, to next: Song?, duration: TimeInterval?, analyses: (SongAnalysis, SongAnalysis)?,
-                    canSeek: Bool) -> Transition? {
+                    canSeek: Bool, outgoingRate: Double = 1) -> Transition? {
         guard let crossfade = transition(from: song, to: next, duration: duration) else { return nil }
         guard transitions == .autoMix, let analyses else { return crossfade }
-        return AutoMix.plan(from: analyses.0, to: analyses.1, canSeek: canSeek) ?? crossfade
+        return AutoMix.plan(from: analyses.0, to: analyses.1, canSeek: canSeek, outgoingRate: outgoingRate) ?? crossfade
     }
 }

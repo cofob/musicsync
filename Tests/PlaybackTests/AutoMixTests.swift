@@ -82,6 +82,18 @@ import Testing
         }
     }
 
+    @Test func outgoingRateIsTheTempoHeard() throws {
+        let a = analysis(bpm: 128), b = analysis(bpm: 132, downbeat: 0.9), n = 1.03
+        let t = try #require(AutoMix.plan(from: a, to: b, outgoingRate: n))
+        #expect(abs(Double(t.rate) * 132 - 128 * n) < 1e-4)
+        // The same plan as for `a` heard at its own tempo, back in the item time of `a`.
+        let heard = SongAnalysis(duration: a.duration / n, soundStart: a.soundStart / n, soundEnd: a.soundEnd / n, introEnd: a.introEnd / n,
+                                 outroStart: a.outroStart / n, bpm: a.bpm * n, downbeat: a.downbeat / n, beatStrength: a.beatStrength)
+        let plain = try #require(AutoMix.plan(from: heard, to: b))
+        #expect(abs(t.at - plain.at * n) < 1e-9 && t.rate == plain.rate && t.duration == plain.duration)
+        #expect(barsMeet(plain, heard, b))
+    }
+
     @Test func shortSongsAreNotMixed() {
         #expect(AutoMix.plan(from: analysis(bpm: 120, duration: 25, introEnd: 2, outroStart: 20), to: analysis(bpm: 120)) == nil)
         #expect(AutoMix.plan(from: analysis(bpm: 120), to: analysis(bpm: 120, duration: 20, introEnd: 2, outroStart: 15)) == nil)

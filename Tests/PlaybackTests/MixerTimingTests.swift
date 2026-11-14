@@ -62,8 +62,7 @@ import Testing
         #expect(mixer.time < 0.05)
     }
 
-    @Test func rateEasesBackAfterTheFade() async throws {
-        mixer.rampDuration = 1
+    @Test func rateStaysAfterTheFade() async throws {
         let a = try await cue(3), b = try await cue(4)
         mixer.play(a)
         mixer.setNext(b, transition: Transition(at: 0.6, duration: 0.5, rate: 1.05))
@@ -71,11 +70,12 @@ import Testing
         try await Task.sleep(for: .seconds(Mixer.lead + 0.2))
         let deck = try #require(mixer.decks.first { $0.player.currentItem === b.item })
         #expect(deck.player.rate == 1.05)
-        try await Task.sleep(for: .seconds(0.8))
-        #expect(!mixer.isFading)
-        #expect(deck.player.rate > 1 && deck.player.rate < 1.05)
         try await Task.sleep(for: .seconds(1))
-        #expect(deck.player.rate == 1)
+        #expect(!mixer.isFading)
+        #expect(deck.player.rate == 1.05 && mixer.nudge == 1.05)
+        mixer.pause()
+        mixer.resume()
+        #expect(deck.player.rate == 1.05)
     }
 
     @Test func retimeMovesTheTransition() async throws {

@@ -72,18 +72,17 @@ import AVFoundation
     private var next: Cue?
     /// How `next` starts; nil plays it gapless after `current`.
     private var transition: Transition?
-    /// The running transition and the deck that fades out.
-    private var fade: (outgoing: Deck, transition: Transition)?
+    /// The running transition, the deck that fades out and its `nudge`.
+    private var fade: (outgoing: Deck, transition: Transition, nudge: Float)?
     private var fadeTimer: Timer?
     private var statusObservations: [ObjectIdentifier: NSKeyValueObservation] = [:]
     /// The next item still has to seek to the transition offset once it is ready.
     private var seekPending = false
     /// The incoming deck is started this early, paused, to begin at the exact host time of the transition.
     static let lead: TimeInterval = 0.3
-    /// Rate factor of the current deck from a beat-matched transition; it eases back to 1 after the transition.
-    private var nudge: Float = 1
-    private var rampTimer: Timer?
-    var rampDuration: TimeInterval = 8
+    /// Rate factor of the current song from a beat-matched transition. It stays until the song ends: each rate
+    /// change of a playing item silences it for 0.1–0.2 s (measured), so easing it back in steps cut out the sound.
+    public private(set) var nudge: Float = 1
 
     public init(equalizer: Equalizer = Equalizer()) {
         self.equalizer = equalizer
@@ -137,10 +136,10 @@ import AVFoundation
         finishFade()
         loadNext()
         guard let next else { return false }
-        stopRamp()
         if transition != nil {
             decks[active].clear()
             active = 1 - active
+            nudge = 1
             if isPlaying { decks[active].player.rate = rate }
         } else {
             decks[active].player.advanceToNextItem()
@@ -264,8 +263,7 @@ import AVFoundation
         let volumes = transition.curve.volumes(at: 0)
         outgoing.fade = Float(volumes.out)
         incoming.fade = Float(volumes.in)
-        fade = (outgoing, transition)
-        stopRamp()
+        fade = (outgoing, transition, nudge)
         nudge = transition.rate
         if isPlaying { incoming.start(rate: rate * nudge, at: start, from: max(0, transition.offset - next.offset)) }
         fadeTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
@@ -294,29 +292,7 @@ import AVFoundation
         fade.outgoing.clear()
         decks[active].fade = 1
         decks[active].player.automaticallyWaitsToMinimizeStalling = true
-        rampNudge()
         loadNext()
-    }
-
-    /// Moves the rate of the current deck back to `rate` in small steps, so the tempo change is not heard.
-    private func rampNudge() {
-        guard nudge != 1 else { return }
-        let from = nudge, started = Date()
-        rampTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.stepRamp(from: from, started: started) }
-        }
-    }
-
-    private func stepRamp(from: Float, started: Date) {
-        let progress = rampDuration > 0 ? min(Date().timeIntervalSince(started) / rampDuration, 1) : 1
-        if progress < 1 { nudge = from + (1 - from) * Float(progress) } else { stopRamp() }
-        applyRate()
-    }
-
-    private func stopRamp() {
-        rampTimer?.invalidate()
-        rampTimer = nil
-        nudge = 1
     }
 
     // MARK: State
@@ -375,14 +351,14 @@ import AVFoundation
     private func applyRate() {
         guard isPlaying else { return }
         decks[active].player.rate = rate * nudge
-        fade?.outgoing.player.rate = rate
+        if let fade { fade.outgoing.player.rate = rate * fade.nudge }
     }
 
     private func reset() {
         fadeTimer?.invalidate()
         fadeTimer = nil
         fade = nil
-        stopRamp()
+        nudge = 1
         decks.forEach { $0.clear() }
         current = nil
         next = nil

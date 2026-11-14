@@ -45,7 +45,7 @@ extension Player {
     func transition(to i: Int) -> Transition? {
         guard let index, queue.indices.contains(index) else { return nil }
         return settings.transition(from: song(at: index), to: song(at: i), duration: queue[index].duration,
-                                   analyses: analyses(into: i), canSeek: canSeek(i))
+                                   analyses: analyses(into: i), canSeek: canSeek(i), outgoingRate: Double(mixer.nudge))
     }
 
     private func song(at i: Int) -> Song? {

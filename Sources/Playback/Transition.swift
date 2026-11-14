@@ -26,7 +26,7 @@ public struct Transition: Equatable, Sendable {
     public var offset: TimeInterval
     public var duration: TimeInterval
     public var curve: FadeCurve
-    /// Rate factor of the incoming song during the overlap, e.g. for beat matching; 1 keeps it.
+    /// Rate of the incoming song, e.g. for beat matching; it keeps it to its end. 1 keeps the tempo.
     public var rate: Float
 
     public init(at: TimeInterval, offset: TimeInterval = 0, duration: TimeInterval, curve: FadeCurve = .equalPower, rate: Float = 1) {
