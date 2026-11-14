@@ -38,7 +38,7 @@ swift test
 Install or update to the latest release from the terminal. The app is not notarized; a file downloaded with `curl` gets no quarantine flag, so Gatekeeper does not block it. A running copy quits first:
 
 ```sh
-curl -fLo /tmp/MusicSync.zip https://github.com/cofob/musicsync/releases/latest/download/MusicSync.zip && osascript -e 'quit app id "dev.cofob.musicsync"' && while pgrep -xq MusicSyncApp; do sleep 1; done && rm -rf /Applications/MusicSync.app && ditto -xk /tmp/MusicSync.zip /Applications && open /Applications/MusicSync.app
+curl -fLo /tmp/MusicSync.zip https://github.com/cofob/musicsync/releases/latest/download/MusicSync.zip && { pkill -x MusicSyncApp; while pgrep -xq MusicSyncApp; do sleep 1; done; } && rm -rf /Applications/MusicSync.app && ditto -xk /tmp/MusicSync.zip /Applications && open /Applications/MusicSync.app
 ```
 
 Or install your own build:
