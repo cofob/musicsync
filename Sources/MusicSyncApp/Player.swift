@@ -73,6 +73,8 @@ final class Player {
     var sleepTimer: SleepTimer? { didSet { sleepTimerChanged() } }
     /// The server has the OpenSubsonic `transcodeOffset` extension.
     var supportsTranscodeOffset = false
+    /// An AutoMix transition is running: two songs play. Not set for a plain crossfade.
+    var isMixing = false
 
     @ObservationIgnored var client: SubsonicClient?
     @ObservationIgnored var covers: CoverArtCache?
@@ -185,6 +187,7 @@ final class Player {
     /// Stops and clears the queue.
     func stop() {
         mixer.stop()
+        isMixing = false
         nextIndex = nil
         line = PlayQueue()
         elapsed = 0
@@ -348,6 +351,8 @@ final class Player {
 
     private func tick(_ time: TimeInterval) {
         guard time.isFinite else { return }
+        let mixing = settings.transitions == .autoMix && mixer.isFading
+        if mixing != isMixing { isMixing = mixing }
         if let target = seekTarget {
             guard abs(time - target.time) < 1.5 || Date() > target.deadline else { return }
             seekTarget = nil

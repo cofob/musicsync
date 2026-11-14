@@ -98,6 +98,7 @@ private struct PlayerColumn: View {
                         .foregroundStyle(.white.opacity(0.65)).lineLimit(1)
                 }
                 Spacer(minLength: 0)
+                if player.isMixing { AutoMixBadge() }
                 if case .server(let song)? = player.current {
                     let starred = model.isStarred(song)
                     Button(starred ? "Undo Favorite" : "Favorite", systemImage: starred ? "star.fill" : "star") { model.toggleStar(song) }

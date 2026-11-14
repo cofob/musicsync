@@ -18,6 +18,7 @@ struct UpNextPanel: View {
             HStack {
                 Text("Up Next").font(.title2.bold())
                 Spacer()
+                if player.isMixing { AutoMixBadge() }
                 Text(player.shuffle ? "Shuffle On" : "").font(.callout).foregroundStyle(.white.opacity(0.6))
                 AutoPlayButton()
             }

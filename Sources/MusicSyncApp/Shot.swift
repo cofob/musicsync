@@ -234,6 +234,13 @@ import SwiftUI
             }
             model.nowPlayingPanel = .queue
             model.showNowPlaying = true
+        case "automix-label":
+            // The queue during a mix; a real mix needs sound, so the flag is set.
+            await queueScene(model)
+            try? await Task.sleep(for: .seconds(2))  // the time update after the seek has come
+            model.player.isMixing = true
+            model.nowPlayingPanel = .queue
+            model.showNowPlaying = true
         case "queue-restored":
             _ = await first({ model.player.current })
             model.nowPlayingPanel = .queue
