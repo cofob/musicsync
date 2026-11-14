@@ -158,12 +158,14 @@ public struct SubsonicClient: Sendable {
     }
 
     /// Binary endpoints send a Subsonic error body (XML/JSON) with HTTP 200.
-    private static func check(_ response: URLResponse?, body: @autoclosure () -> Data?) throws {
+    static func check(_ response: URLResponse?, body: @autoclosure () -> Data?) throws {
         if let status = (response as? HTTPURLResponse)?.statusCode, status != 200 { throw SubsonicError.badStatus(status) }
-        if let type = response?.mimeType, ["text/xml", "application/xml", "application/json"].contains(type) {
+        if let type = response?.mimeType, errorTypes.contains(type) {
             throw SubsonicError.badResponse(String(decoding: (body() ?? Data()).prefix(500), as: UTF8.self))
         }
     }
+
+    static let errorTypes: Set = ["text/xml", "application/xml", "application/json"]
 
     /// Downloads the original file to a temp file. The caller moves or deletes it.
     /// `progress` gets bytes received and expected (-1 when unknown), at most 5 times a second.
@@ -200,7 +202,7 @@ public struct SubsonicClient: Sendable {
 }
 
 /// Holds a running download task and its progress observation. A cancel before `start` is kept.
-private final class TaskBox: @unchecked Sendable {
+final class TaskBox: @unchecked Sendable {
     private let lock = NSLock()
     private var task: URLSessionDownloadTask?
     private var cancelled = false

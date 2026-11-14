@@ -44,9 +44,11 @@ final class StubLibraryServer: @unchecked Sendable {
     private var _extensions = ["songLyrics"]
     private var _starred: [String: String] = [:]
     private var _failDownloads = 0
+    private var _dropDownloads = 0
+    private var _ranges: [String] = []
     private let cover = Data("COVER-BYTES".utf8)
-    /// Body of download and stream replies.
-    let audio = Data(repeating: 7, count: 1000)
+    /// Body of download and stream replies: 1000 bytes of a WAV whose header claims 200 s, the stub songs' length.
+    let audio = StubLibraryServer.wav(claiming: 200, bytes: 1000)
     let artists: [(id: String, name: String)] = [("ar-1", "Space Echo"), ("ar-2", "Björk")]
 
     var albums: [StubAlbum] { get { locked { _albums } } set { locked { _albums = newValue } } }
@@ -68,6 +70,30 @@ final class StubLibraryServer: @unchecked Sendable {
     var emptyAlbumReply: Bool { get { locked { _emptyAlbumReply } } set { locked { _emptyAlbumReply = newValue } } }
     /// The next this many download and stream calls fail with HTTP 500.
     var failDownloads: Int { get { locked { _failDownloads } } set { locked { _failDownloads = newValue } } }
+    /// The next this many download and stream calls lose the connection.
+    var dropDownloads: Int { get { locked { _dropDownloads } } set { locked { _dropDownloads = newValue } } }
+    /// Range headers of the download and stream calls.
+    var ranges: [String] { locked { _ranges } }
+
+    fileprivate func takeDrop(range: String?) -> Bool {
+        locked {
+            if let range { _ranges.append(range) }
+            guard _dropDownloads > 0 else { return false }
+            _dropDownloads -= 1
+            return true
+        }
+    }
+
+    /// 8-bit mono WAV at 1 kHz: a header that claims `seconds`, cut at `bytes`.
+    static func wav(claiming seconds: Int, bytes: Int) -> Data {
+        var d = Data()
+        func u32(_ v: Int) { withUnsafeBytes(of: UInt32(v).littleEndian) { d.append(contentsOf: $0) } }
+        func u16(_ v: Int) { withUnsafeBytes(of: UInt16(v).littleEndian) { d.append(contentsOf: $0) } }
+        let n = seconds * 1000
+        d.append(contentsOf: Array("RIFF".utf8)); u32(36 + n); d.append(contentsOf: Array("WAVEfmt ".utf8))
+        u32(16); u16(1); u16(1); u32(1000); u32(1000); u16(1); u16(8); d.append(contentsOf: Array("data".utf8)); u32(n)
+        return d + Data(repeating: 0x80, count: max(0, bytes - d.count))
+    }
     var log: [String] { locked { _log } }
     func clearLog() { locked { _log = [] } }
     func requests(_ method: String) -> [String] { log.filter { $0 == method || $0.hasPrefix(method + ":") } }
@@ -183,10 +209,24 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
 
     override func startLoading() {
         let url = request.url!
-        let (status, body, delay) = Registry.shared.server(for: url.host)?.respond(to: url) ?? (503, Data(), 0)
-        nonisolated(unsafe) let deliver = { [self] in
-            let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil)!
+        let server = Registry.shared.server(for: url.host)
+        var (status, body, delay) = server?.respond(to: url) ?? (503, Data(), 0)
+        var headers: [String: String] = [:]
+        // Download and stream bodies: byte ranges, and dropped connections.
+        let media = ["download.view", "stream.view"].contains(url.lastPathComponent) && status == 200
+        let range = media ? request.value(forHTTPHeaderField: "Range") : nil
+        if let start = range.flatMap({ Int($0.dropFirst(6).prefix { $0 != "-" }) }), start < body.count {
+            headers["Content-Range"] = "bytes \(start)-\(body.count - 1)/\(body.count)"
+            status = 206
+            body = body.dropFirst(start)
+        }
+        headers["Content-Length"] = String(body.count)
+        let drop = media && server?.takeDrop(range: range) == true
+        nonisolated(unsafe) let deliver = { [self, status, body, headers] in
+            let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: headers)!
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            // URLSession hands on no data of a protocol load that fails, so a drop sends none.
+            if drop { return client?.urlProtocol(self, didFailWithError: URLError(.networkConnectionLost)) ?? () }
             client?.urlProtocol(self, didLoad: body)
             client?.urlProtocolDidFinishLoading(self)
         }

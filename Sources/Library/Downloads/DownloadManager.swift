@@ -54,6 +54,7 @@ public actor DownloadManager {
     public func start(client: SubsonicClient) async {
         self.client = client
         try? await store.resetInterrupted()
+        await sweepParts()
         changed()
         await pump()
     }
@@ -152,6 +153,7 @@ public actor DownloadManager {
         running[id]?.cancel()
         waiting.remove(id)
         try? await store.markFailed(id, error: DownloadEntry.cancelledMessage)
+        if let entry = await store.entry(id) { removePart(entry.song) }
         changed()
     }
 
@@ -170,6 +172,7 @@ public actor DownloadManager {
             waiting.remove(song.id)
             if let name = song.fileName { try? FileManager.default.removeItem(at: filesDirectory.appendingPathComponent(name)) }
         }
+        await sweepParts()
         await pruneCovers()
         changed()
         await pump()
@@ -228,14 +231,21 @@ public actor DownloadManager {
         guard (try? await store.markDownloading(id)) == true, !Task.isCancelled else { return await finished(id) }
         changed()
         let hub = hub, estimate = plan.estimate(entry.song)
+        let name = Self.fileName(id, suffix: plan.suffix), part = partURL(entry.song, plan: plan)
+        // Only originals resume: a conversion may differ from one request to the next.
+        if plan.format != nil { try? FileManager.default.removeItem(at: part) }
         do {
-            let tmp = try await client.download(id: id, format: plan.format, maxBitRate: plan.maxBitRate) { got, expected in
+            try await client.download(id: id, format: plan.format, maxBitRate: plan.maxBitRate, resuming: part) { got, expected in
                 let total = expected > 0 ? expected : estimate
                 hub.update { $0.progress[id] = min(0.99, Double(got) / Double(max(1, total))) }
             }
             try Task.checkCancellation()
-            let name = Self.fileName(id, suffix: plan.suffix)
-            let size = try place(tmp, as: name)
+            do { try await DownloadCheck.verify(part, song: entry.song, original: plan.format == nil) } catch {
+                // The server sent all it had: a new try starts over.
+                try? FileManager.default.removeItem(at: part)
+                throw error
+            }
+            let size = try place(part, as: name)
             await extras(entry.song, client: client)
             if !Task.isCancelled, try await store.markDone(id, fileName: name, size: size, format: plan.suffix, bitRate: plan.bitRate) {
                 hub.update { $0.batchDone += 1 }
@@ -244,7 +254,10 @@ public actor DownloadManager {
             }
         } catch where !Task.isCancelled {
             await failed(id, error)
-        } catch {}
+        } catch {
+            // Kept for a resume when the queue only stopped; gone when the user cancelled or removed the song.
+            if await store.entry(id)?.state != .downloading { try? FileManager.default.removeItem(at: part) }
+        }
         await finished(id)
     }
 
@@ -261,7 +274,7 @@ public actor DownloadManager {
         attempts[id] = count
         libraryLog.warning("download \(id) failed (\(count)): \(error.localizedDescription)")
         let retry = count < Self.maxAttempts
-        try? await store.markFailure(id, error: error.localizedDescription, retry: retry)
+        try? await store.markFailure(id, error: error.friendlyMessage, retry: retry)
         guard retry else { return }
         waiting.insert(id)
         let delay = backoff(count)
@@ -276,17 +289,31 @@ public actor DownloadManager {
         await pump()
     }
 
-    /// Moves the downloaded temp file into the files folder: copied next to it first, then renamed, so a
-    /// half-written file never has the final name.
-    private func place(_ tmp: URL, as name: String) throws -> Int64 {
+    /// Renames the checked part file to its final name, so a half-written file never has it.
+    private func place(_ part: URL, as name: String) throws -> Int64 {
         let fm = FileManager.default
-        defer { try? fm.removeItem(at: tmp) }
+        defer { try? fm.removeItem(at: part) }
         let dest = filesDirectory.appendingPathComponent(name)
-        let part = filesDirectory.appendingPathComponent(name + ".part")
-        try? fm.removeItem(at: part)
-        try fm.moveItem(at: tmp, to: part)
         if fm.fileExists(atPath: dest.path) { _ = try fm.replaceItemAt(dest, withItemAt: part) } else { try fm.moveItem(at: part, to: dest) }
         return Int64((try? dest.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
+    }
+
+    /// The unfinished download of `song`, kept between tries. It has the song's suffix, so AVFoundation can read it.
+    private func partURL(_ song: Song, plan: DownloadPlan) -> URL {
+        filesDirectory.appendingPathComponent(Self.partPrefix + Self.fileName(song.id, suffix: plan.suffix))
+    }
+
+    private func removePart(_ song: Song) {
+        try? FileManager.default.removeItem(at: partURL(song, plan: settings.plan(for: song)))
+    }
+
+    /// Deletes part files of songs that are no longer in the store (removed, or left from a crash).
+    private func sweepParts() async {
+        let kept = Set(await store.entries().map { LibraryDatabase.hash($0.id) })
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: filesDirectory.path)) ?? [] where name.hasPrefix(Self.partPrefix) {
+            let hash = name.dropFirst(Self.partPrefix.count).prefix { $0 != "." }
+            if !kept.contains(String(hash)) { try? FileManager.default.removeItem(at: filesDirectory.appendingPathComponent(name)) }
+        }
     }
 
     /// Cover and lyrics, so the song shows fully offline. Failures are ignored.
@@ -316,6 +343,8 @@ public actor DownloadManager {
             }
         }
     }
+
+    static let partPrefix = "part-"
 
     static func fileName(_ id: String, suffix: String) -> String {
         "\(LibraryDatabase.hash(id)).\(suffix.isEmpty ? "audio" : suffix)"
