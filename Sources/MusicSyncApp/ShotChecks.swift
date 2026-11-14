@@ -238,6 +238,21 @@ import SwiftUI
         let edit = menuAction(#selector(NSText.delete(_:)), window)
         let removed = await wait { count() == before - 2 }
         check(edit && removed, "Edit > Delete removes the clicked row")
+        guard !pushed, let artist = (try? await model.playlist(playlist.id))?.entry?.compactMap(\.artistId).first else { return }
+        // A page without a song list pushed over the playlist: the commands must not reach the hidden rows.
+        await tap(window, row: 1, top: 414, height: 54)
+        model.show(.artist(artist))
+        try? await Task.sleep(for: .seconds(2))
+        await send(key(51, "\u{7f}", window), window)
+        _ = menuAction(#selector(NSText.delete(_:)), window)
+        await commandA(window)
+        try? await Task.sleep(for: .seconds(2))
+        let entries = { (try? await model.playlist(playlist.id))?.entry?.count }
+        check(await entries() == before - 2, "Delete, Edit > Delete and ⌘A on a pushed artist page leave the playlist")
+        model.path = []
+        try? await Task.sleep(for: .seconds(2))
+        await send(key(51, "\u{7f}", window), window)
+        check(await wait { count() == before - 3 }, "back on the playlist, Delete removes only the clicked row")
     }
 
     // MARK: Windows

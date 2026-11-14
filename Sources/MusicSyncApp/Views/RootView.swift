@@ -58,8 +58,9 @@ struct RootView: View {
         .animation(.smooth(duration: 0.35), value: model.showNowPlaying)
         .toolbar(model.showNowPlaying ? .hidden : .automatic, for: .windowToolbar)
         .tint(Color.musicAccent)
-        .onCommand(#selector(NSResponder.selectAll(_:))) { songList?.selectAll() }
-        .onDeleteCommand { songList?.delete() }
+        // Only for a list on the visible root page: a pushed page or Now Playing hides it.
+        .onCommand(#selector(NSResponder.selectAll(_:))) { if rootShown { songList?.selectAll() } }
+        .onDeleteCommand { if rootShown { songList?.delete() } }
         .task(id: model.searchText) {
             guard selection == .search else { return }
             let search = model.search
@@ -159,6 +160,8 @@ struct RootView: View {
         case .stats: StatsView()
         }
     }
+
+    private var rootShown: Bool { model.path.isEmpty && !model.showNowPlaying }
 
     private func prompt(_ selection: SidebarItem) -> String {
         guard selection == .search else { return selection.searchPrompt }
