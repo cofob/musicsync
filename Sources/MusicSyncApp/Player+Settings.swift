@@ -8,6 +8,7 @@ extension Player {
         guard settings != old else { return }
         settings.save()
         applySpeed()
+        if let index, let item = player.currentItem { Task { await item.setGain(gain(at: index)) } }
         // Quality, crossfade or gain changed: the preloaded next song is built again.
         if settings.speed == old.speed { resetUpcoming() }
     }
