@@ -5,6 +5,7 @@ import Subsonic
 /// Mixer cues for queue entries: the downloaded file, else a stream in the chosen quality.
 extension Player {
     func cue(at i: Int) -> Mixer.Cue? {
+        guard remote == nil else { return nil }
         let gain = gain(at: i)
         switch queue[i] {
         case .file(let url, _, _, _):

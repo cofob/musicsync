@@ -57,12 +57,12 @@ final class Player {
     /// Entries, their sections and the history (`Player+Queue`).
     var line = PlayQueue<PlayItem>()
     var queue: [PlayItem] { line.items }
-    private(set) var index: Int? { get { line.index } set { line.index = newValue } }
-    private(set) var isPlaying = false
-    private(set) var elapsed: TimeInterval = 0
+    var index: Int? { get { line.index } set { line.index = newValue } }
+    var isPlaying = false
+    var elapsed: TimeInterval = 0
     private(set) var artwork: NSImage?
     private(set) var errorMessage: String?
-    var volume: Double = 1 { didSet { mixer.volume = Float(volume) } }
+    var volume: Double = 1 { didSet { if let remote { remote.setGain(volume) } else { mixer.volume = Float(volume) } } }
     private(set) var shuffle = false
     var repeatMode = RepeatMode.off { didSet { resetUpcoming() } }
     /// Playback > Private Session: no scrobbles, so plays stay out of the server's history and counts.
@@ -77,6 +77,8 @@ final class Player {
     var supportsTranscodeOffset = false
     /// An AutoMix transition is running: two songs play. Not set for a plain crossfade.
     var isMixing = false
+    /// Plays the queue somewhere else (the server's jukebox); the mixer stays silent meanwhile.
+    var remote: PlayerRemote?
 
     @ObservationIgnored var client: SubsonicClient?
     @ObservationIgnored var covers: CoverArtCache?
@@ -173,7 +175,9 @@ final class Player {
     func playUpcoming(at offset: Int) { start(at: (index ?? -1) + 1 + offset) }
 
     func toggle() {
-        if isPlaying {
+        if let remote {
+            if current != nil { isPlaying.toggle(); remote.sync(restart: false) }
+        } else if isPlaying {
             mixer.pause()
         } else if mixer.hasCurrent {
             mixer.resume()
@@ -217,6 +221,7 @@ final class Player {
         elapsed = time
         seekTarget = (time, Date().addingTimeInterval(3))
         mixer.seek(to: time)
+        remote?.sync(restart: true)
         updateNowPlaying()
     }
 
@@ -227,6 +232,7 @@ final class Player {
         index = i
         elapsed = 0
         if let cue = cue(at: i) { mixer.play(cue, paused: paused) } else { mixer.stop() }
+        if let remote { isPlaying = !paused; remote.sync(restart: true) }
         preload(following(i))
         trackStarted()
     }
@@ -250,6 +256,7 @@ final class Player {
 
     /// Re-syncs the preloaded next song with `queue` after it changed.
     func resetUpcoming() {
+        remote?.sync(restart: false)
         transcoded = []
         guard let index else { return }
         preload(following(index))
@@ -271,7 +278,7 @@ final class Player {
         case .ready: failures = 0
         case .failed(let current, let message): failed(current: current, message: message)
         case .ended: ended()
-        case .playing(let playing): isPlaying = playing; updateNowPlaying()
+        case .playing(let playing): if remote == nil { isPlaying = playing; updateNowPlaying() }
         }
     }
 
@@ -324,7 +331,7 @@ final class Player {
 
     // MARK: Tracking
 
-    private func trackStarted() {
+    func trackStarted() {
         errorMessage = nil
         seekTarget = nil
         scrobbled = false
@@ -374,7 +381,7 @@ final class Player {
 
     // MARK: System integration
 
-    private func updateNowPlaying() {
+    func updateNowPlaying() {
         let center = MPNowPlayingInfoCenter.default()
         let commands = MPRemoteCommandCenter.shared()
         commands.nextTrackCommand.isEnabled = hasNext

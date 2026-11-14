@@ -86,6 +86,8 @@ final class AppModel {
     @ObservationIgnored private(set) lazy var remote = RemoteControl(app: self)
     @ObservationIgnored private(set) lazy var queueKeeper = QueueKeeper(app: self)
     @ObservationIgnored private(set) lazy var serverQueue = ServerQueue(app: self)
+    /// The server's own audio output as a player output (Subsonic jukebox).
+    @ObservationIgnored private(set) lazy var jukebox = Jukebox(app: self)
     var showNowPlaying = false
     var nowPlayingPanel = NowPlayingPanel.lyrics
     /// Song shown in the "Get Info" sheet.
@@ -165,6 +167,7 @@ final class AppModel {
         path = []
         shelves = []; starOverrides = [:]; ratingOverrides = [:]; ratingUnsupported = false; lyricsCache = [:]
         queueKeeper.leave()
+        jukebox.leave()
         player.stop()
         await stopLibrary()
         await downloads.stop()
@@ -189,6 +192,7 @@ final class AppModel {
         let library = makeLibrary(client.config)
         startLibrary(library, client: client)
         Task { await queueKeeper.restore(client, library: library); await serverQueue.connected(client); await bookmarks.connected(client) }
+        Task { await jukebox.connected(client) }
         if await reloadFromDatabase(library) { return }
         let cache = await store.load()
         guard store === self.store else { return }
