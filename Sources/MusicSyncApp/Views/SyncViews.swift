@@ -155,6 +155,7 @@ struct SyncSheet: View {
         }
         .padding(24)
         .frame(width: 480)
+        .tint(Color.musicAccent)
         .onDisappear { sync.dismissRun() }
     }
 

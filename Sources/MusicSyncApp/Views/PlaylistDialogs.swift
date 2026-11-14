@@ -104,6 +104,7 @@ struct NewPlaylistSheet: View {
         }
         .padding(20)
         .frame(width: 420)
+        .tint(Color.musicAccent)
         .onAppear { nameFocused = true }
     }
 

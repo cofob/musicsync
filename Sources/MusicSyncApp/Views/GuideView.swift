@@ -89,6 +89,7 @@ struct GuideView: View {
             .padding(20)
         }
         .frame(width: 520, height: 500)
+        .tint(Color.musicAccent)
         .animation(.easeInOut(duration: 0.2), value: page)
     }
 

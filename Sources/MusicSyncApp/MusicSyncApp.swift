@@ -104,7 +104,7 @@ struct MusicSyncApp: App {
         }
 
         Settings {
-            SettingsView().environment(model)
+            SettingsView().environment(model).tint(Color.musicAccent)
         }
 
         MenuBarExtra(isInserted: Shot.output == nil ? $showsMenuBarItem : .constant(false)) {  // no item during screenshot runs

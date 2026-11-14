@@ -126,6 +126,7 @@ struct SongInfoView: View {
         }
         .padding(20)
         .frame(width: 460)
+        .tint(Color.musicAccent)  // sheets do not get the window's tint
     }
 
     private var fields: [(String, String)] {

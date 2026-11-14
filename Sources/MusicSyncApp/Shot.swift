@@ -230,7 +230,8 @@ import SwiftUI
 
     /// Shows `view` in its own window, for views that are not part of the main window.
     private static func open(_ view: some View, _ title: String, _ model: AppModel) {
-        let window = NSWindow(contentViewController: NSHostingController(rootView: view.environment(model)))
+        // The tint as the Settings scene sets it.
+        let window = NSWindow(contentViewController: NSHostingController(rootView: view.environment(model).tint(Color.musicAccent)))
         window.title = title
         window.orderFront(nil)
         extraWindow = window
