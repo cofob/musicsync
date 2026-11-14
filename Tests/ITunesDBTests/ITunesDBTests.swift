@@ -160,6 +160,16 @@ import Testing
         #expect(types == [1, 100, 52, 53, 52, 53, 52, 53, 52, 53, 52, 53])
     }
 
+    @Test func jumpLetterFollowsSortKey() throws {
+        var db = ITunesDB.empty(name: "x")
+        var track = Track()
+        track.title = "(Untitled)"
+        db.addTrack(track)
+        let data = try db.serialize()
+        let jump = try #require(data.range(of: Data("mhod".utf8) + Data([0x18, 0, 0, 0, 0x34, 0, 0, 0, 0x35, 0, 0, 0])))
+        #expect(data[jump.lowerBound + 40] == 0x30)
+    }
+
     @Test func emptyDatabaseIsValid() throws {
         let data = try ITunesDB.empty(name: "Empty").serialize()
         #expect(try validateStructure(data) == [1, 3, 2, 4, 8, 6, 10, 5])

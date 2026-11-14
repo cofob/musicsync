@@ -19,8 +19,9 @@ extension ITunesDB {
         lists[0].trackIDs = tracks.map(\.id)
         for i in lists.indices.dropFirst() { lists[i].trackIDs.removeAll { !trackIDs.contains($0) } }
         let master = lists.map { PlaylistEncoder(playlist: $0, tracks: $0.isMaster ? tracks : []) }
-        let standard = Self.list("mhlp", master.map { $0.encode(podcastSection: false) })
-        let podcast = Self.list("mhlp", master.map { $0.encode(podcastSection: true) })
+        let encoded = master.map { $0.encode() }
+        let standard = Self.list("mhlp", encoded)
+        let podcast = Self.list("mhlp", zip(master, encoded).map { $0.playlist.raw?.podcastForm ?? $1 })
 
         func raw(_ type: UInt32, empty: String) -> Data {
             sections.first { $0.type == type }?.data ?? Self.section(type, Self.list(empty, []))
@@ -147,8 +148,7 @@ private struct PlaylistEncoder {
     /// Library tracks; non-empty only for the master playlist (used for the sort indexes).
     let tracks: [Track]
 
-    func encode(podcastSection: Bool) -> Data {
-        if podcastSection, let form = playlist.raw?.podcastForm { return form }
+    func encode() -> Data {
         let isMaster = playlist.isMaster
         var mhods = [Mhod.string(Mhod.Kind.title, playlist.name)]
         mhods += playlist.raw?.mhods ?? [Mhod.playlistPrefs()]
@@ -227,10 +227,9 @@ private struct PlaylistEncoder {
         s.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
     }
 
-    /// First alphanumeric character, upper-cased; digits and symbols map to "0".
+    /// First character of the sort key, upper-cased; digits and symbols map to "0".
     private static func jumpLetter(_ s: String) -> UInt16 {
-        guard let scalar = s.unicodeScalars.first(where: { CharacterSet.alphanumerics.contains($0) }),
-              scalar.properties.isAlphabetic else { return 0x30 }
+        guard let scalar = collate(s).unicodeScalars.first, scalar.properties.isAlphabetic else { return 0x30 }
         return String(scalar).uppercased().utf16.first ?? 0x30
     }
 }
