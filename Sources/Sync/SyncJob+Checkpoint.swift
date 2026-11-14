@@ -75,11 +75,10 @@ extension SyncJob {
         let root = device.mountURL.appendingPathComponent("Music").standardizedFileURL.path
         var dir = folder.standardizedFileURL
         while dir.path.hasPrefix(root + "/") {
-            let names = (try? fm.contentsOfDirectory(atPath: dir.path)) ?? []
             let litter = { (name: String) in name == "cover.jpg" || name == ".DS_Store" || name.hasPrefix("._") }
-            guard names.allSatisfy(litter) else { return }
+            guard let names = try? fm.contentsOfDirectory(atPath: dir.path), names.allSatisfy(litter) else { return }
             for name in names { try? fm.removeItem(at: dir.appendingPathComponent(name)) }
-            guard (try? fm.removeItem(at: dir)) != nil else { return }
+            guard rmdir(dir.path) == 0 else { return }
             dir = dir.deletingLastPathComponent()
         }
     }
