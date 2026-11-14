@@ -285,6 +285,33 @@ struct EndToEndTests {
         #expect(try f.pod.database().tracks.count == 7)
     }
 
+    @Test func lyricsGoIntoTheFileAndTheDatabase() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        f.server.reply("getLyricsBySongId:s-1", StubServer.reply(["lyricsList": ["structuredLyrics": [
+            ["synced": true, "line": [["start": 0, "value": "First line"], ["start": 1000, "value": "Second line"]]],
+        ]]]))
+        let plan = try await makePlan(selection: Self.selection(playlists: []), server: f.server, pod: f.pod)
+        let run = await runSync(plan, pod: f.pod, server: f.server)
+        #expect(run.error == nil && run.summary?.added == 2)
+        let db = try ITunesDB.parse(Data(contentsOf: f.pod.device.iTunesDBURL))
+        let first = try #require(db.tracks.first { $0.title == "First" })
+        let second = try #require(db.tracks.first { $0.title == "Second" })
+        #expect(first.lyricsFlag && !second.lyricsFlag)
+
+        let tools = try #require(ffmpegTools)
+        let probe = Process()
+        let pipe = Pipe()
+        probe.executableURL = tools.ffprobe
+        probe.arguments = ["-v", "error", "-show_entries", "format_tags=lyrics", "-of", "default=nw=1:nk=1",
+                           f.pod.device.mountURL.appendingPathComponent(ITunesDB.relativePath(ipodLocation: first.location)).path]
+        probe.standardOutput = pipe
+        try probe.run()
+        probe.waitUntilExit()
+        let text = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        #expect(text.trimmingCharacters(in: .whitespacesAndNewlines) == "First line\nSecond line")
+    }
+
     @Test func deletedForeignTrackLeavesDatabaseAndDisk() async throws {
         let f = try Fixture(foreignTracks: 2)
         defer { f.cleanup() }

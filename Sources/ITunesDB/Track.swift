@@ -46,6 +46,8 @@ public struct Track: Sendable, Equatable {
     public var artworkCount: UInt16 = 0
     public var artworkSize: UInt32 = 0
     public var hasArtwork = false
+    /// The file has lyrics (the iPod shows them from the file's tag).
+    public var lyricsFlag = false
     /// Image id in the ArtworkDB (`mhii::song_id` link).
     public var mhiiLink: UInt32 = 0
 
@@ -107,7 +109,7 @@ private struct Field {
             .int(0x5C, \.discNumber), .int(0x60, \.discCount), .date(0x68, \.timeAdded),
             .int(0x6C, \.bookmarkTime), .int(0x70, \.dbid), .int(0x7C, \.artworkCount),
             .int(0x80, \.artworkSize), .int(0x9C, \.skipCount), .flag(0xA4, width: 1, \.hasArtwork, off: 2),
-            .int(0xB2, \.markUnplayed), .int(0xB8, \.pregap), .int(0xBC, \.sampleCount), .int(0xC8, \.postgap),
+            .flag(0xB0, width: 1, \.lyricsFlag), .int(0xB2, \.markUnplayed), .int(0xB8, \.pregap), .int(0xBC, \.sampleCount), .int(0xC8, \.postgap),
             .int(0xD0, \.mediaType), .int(0xF8, \.gaplessData),
             .flag(0x100, width: 2, \.gaplessTrackFlag), .flag(0x102, width: 2, \.gaplessAlbumFlag),
             .int(0x160, \.mhiiLink),

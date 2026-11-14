@@ -42,3 +42,17 @@ public extension SubsonicClient {
         try await fetch("getStarred2", "starred2")
     }
 }
+
+public extension SubsonicClient {
+    /// Plain text lyrics (synced lines without times), or nil. Tries OpenSubsonic, then the legacy call.
+    func plainLyrics(for song: Song) async -> String? {
+        func clean(_ s: String) -> String? {
+            let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            return t.isEmpty ? nil : t
+        }
+        if let list = try? await getLyricsBySongId(id: song.id), let best = list.first(where: { !$0.synced }) ?? list.first,
+           let text = clean(best.line.map(\.value).joined(separator: "\n")) { return text }
+        guard let artist = song.artist, let legacy = try? await getLyrics(artist: artist, title: song.title) else { return nil }
+        return clean(legacy.value ?? "")
+    }
+}

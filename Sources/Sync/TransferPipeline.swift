@@ -12,6 +12,7 @@ struct Prepared: Sendable {
     var transcoded: Bool
     var gapless: GaplessInfo?
     var ext: String
+    var hasLyrics = false
 }
 
 /// download -> probe -> passthrough or transcode -> probe. Runs in parallel workers; touches only the work dir.
@@ -19,6 +20,8 @@ struct TransferPipeline: Sendable {
     let client: SubsonicClient
     let ffmpeg: FFmpeg
     let workDir: URL
+    /// Adds lyrics to stock iPod m4a files.
+    var lyrics = false
 
     func prepare(_ d: DesiredSong, stage: @escaping @Sendable (ItemStage) -> Void) async throws -> Prepared {
         let expected = Int64(d.song.size ?? 0)
@@ -31,25 +34,31 @@ struct TransferPipeline: Sendable {
             let source = try await ffmpeg.probe(downloaded)
             var file = downloaded
             var transcoded = false
-            if FFmpeg.needsTranscode(source: source, preset: d.preset) {
+            let needsTranscode = FFmpeg.needsTranscode(source: source, preset: d.preset)
+            let ext = needsTranscode ? d.preset.fileExtension : Self.passthroughExtension(source, preset: d.preset)
+            let text = lyrics && d.preset.target == .stock && ext == "m4a" ? await client.plainLyrics(for: d.song) : nil
+            if needsTranscode {
                 stage(.transcoding(0))
                 file = workDir.appendingPathComponent("\(UUID().uuidString).\(d.preset.fileExtension)")
                 temporary.append(file)
-                try await ffmpeg.transcode(input: downloaded, output: file, preset: d.preset, source: source, tags: d.tags) {
-                    stage(.transcoding($0))
-                }
+                try await ffmpeg.transcode(input: downloaded, output: file, preset: d.preset, source: source, tags: d.tags,
+                                           lyrics: text) { stage(.transcoding($0)) }
                 transcoded = true
+            } else if let text {
+                file = workDir.appendingPathComponent("\(UUID().uuidString).m4a")
+                temporary.append(file)
+                try await ffmpeg.addLyrics(text, input: downloaded, output: file)
             }
             let output = try await ffmpeg.probe(file)
-            let ext = transcoded ? d.preset.fileExtension : Self.passthroughExtension(source, preset: d.preset)
             var gapless: GaplessInfo?
             if ext == "m4a" {
                 let exact = transcoded ? Int((source.durationSeconds * Double(output.sampleRate)).rounded()) : nil
                 gapless = try? Gapless.read(from: file, exactSampleCount: exact)
             }
             // The caller removes `file`; only the download is dropped here when it is not the result.
-            if transcoded { try? FileManager.default.removeItem(at: downloaded) }
-            return Prepared(file: file, source: source, output: output, transcoded: transcoded, gapless: gapless, ext: ext)
+            if file != downloaded { try? FileManager.default.removeItem(at: downloaded) }
+            return Prepared(file: file, source: source, output: output, transcoded: transcoded, gapless: gapless, ext: ext,
+                            hasLyrics: text != nil)
         } catch {
             for url in temporary { try? FileManager.default.removeItem(at: url) }
             throw error

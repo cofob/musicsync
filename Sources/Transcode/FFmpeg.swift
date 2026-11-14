@@ -75,9 +75,9 @@ public struct FFmpeg: Sendable {
     public static func needsTranscode(source: MediaInfo, preset: Preset) -> Bool { !preset.accepts(source) }
 
     /// Encodes `input` into `output`; `progress` gets 0...1. Partial output is removed on failure or cancellation.
-    public func transcode(input: URL, output: URL, preset: Preset, source: MediaInfo, tags: TrackTags,
+    public func transcode(input: URL, output: URL, preset: Preset, source: MediaInfo, tags: TrackTags, lyrics: String? = nil,
                           progress: @escaping @Sendable (Double) -> Void) async throws {
-        let args = Self.arguments(input: input, output: output, preset: preset, source: source, tags: tags)
+        let args = Self.arguments(input: input, output: output, preset: preset, source: source, tags: tags, lyrics: lyrics)
         let total = source.durationSeconds
         do {
             let result = try await runProcess(ffmpeg, args) { line in
@@ -94,7 +94,7 @@ public struct FFmpeg: Sendable {
 
     /// ffmpeg arguments (without the executable) for one track.
     public static func arguments(input: URL, output: URL, preset: Preset, source: MediaInfo,
-                                 tags: TrackTags) -> [String] {
+                                 tags: TrackTags, lyrics: String? = nil) -> [String] {
         var a = ["-y", "-nostdin", "-hide_banner", "-v", "error", "-progress", "pipe:1",
                  "-i", input.path, "-map", "0:a:0", "-map_metadata", "-1"]
         let depth = preset.bitDepth
@@ -104,9 +104,21 @@ public struct FFmpeg: Sendable {
         if depth == 16 { a += ["-sample_fmt", "s16"] }
         a += preset.codec.encoderArguments
         for (key, value) in tags.metadata(vorbis: !preset.format.hasPrefix("ipod")) { a += ["-metadata", "\(key)=\(value)"] }
+        if let lyrics { a += ["-metadata", "lyrics=\(lyrics)"] }
         if preset.format == "ipod" { a += ["-movflags", "+faststart"] }
         a += ["-f", preset.format, output.path]
         return a
+    }
+
+    /// Copies an m4a file with the lyrics tag (`©lyr`) added; the audio is not re-encoded.
+    public func addLyrics(_ lyrics: String, input: URL, output: URL) async throws {
+        let args = ["-y", "-nostdin", "-hide_banner", "-v", "error", "-i", input.path, "-map", "0", "-c", "copy",
+                    "-metadata", "lyrics=\(lyrics)", "-movflags", "+faststart", "-f", "ipod", output.path]
+        let result = try await runProcess(ffmpeg, args)
+        guard result.status == 0 else {
+            try? FileManager.default.removeItem(at: output)
+            throw TranscodeError.ffmpegFailed(status: result.status, stderr: result.stderr)
+        }
     }
 }
 

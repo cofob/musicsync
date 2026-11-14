@@ -44,6 +44,11 @@ struct SyncSettingsView: View {
             } footer: {
                 Text("Songs from synced playlists bring their full albums.").font(.caption).foregroundStyle(.secondary)
             }
+            Section {
+                Toggle("Add lyrics to songs", isOn: $model.syncSettings.lyrics)
+            } footer: {
+                Text("The iPod shows lyrics of new AAC songs from the server.").font(.caption).foregroundStyle(.secondary)
+            }
             Section("FireWire GUID") { guidFields }
         }
         .formStyle(.grouped)

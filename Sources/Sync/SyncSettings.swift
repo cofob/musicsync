@@ -16,6 +16,8 @@ public struct SyncSettings: Codable, Sendable, Equatable {
     public var ejectAfterSync: Bool = false
     /// Sync whole albums: songs of selected playlists bring their albums too.
     public var fullAlbums: Bool = false
+    /// Puts the server's lyrics into new stock iPod files.
+    public var lyrics: Bool = true
     /// Manual FirewireGuid per volume UUID (for test images or failed detection).
     public var manualGuids: [String: String] = [:]
 
@@ -30,6 +32,7 @@ public struct SyncSettings: Codable, Sendable, Equatable {
         soundCheck = try c.decodeIfPresent(SoundCheckSource.self, forKey: .soundCheck) ?? soundCheck
         ejectAfterSync = try c.decodeIfPresent(Bool.self, forKey: .ejectAfterSync) ?? ejectAfterSync
         fullAlbums = try c.decodeIfPresent(Bool.self, forKey: .fullAlbums) ?? fullAlbums
+        lyrics = try c.decodeIfPresent(Bool.self, forKey: .lyrics) ?? lyrics
         manualGuids = try c.decodeIfPresent([String: String].self, forKey: .manualGuids) ?? manualGuids
     }
 
