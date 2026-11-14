@@ -95,6 +95,8 @@ final class Player {
     @ObservationIgnored private var timeObserver: Any?
     /// Queue indexes that failed raw and are streamed as mp3 instead.
     @ObservationIgnored private var transcoded: Set<Int> = []
+    /// Tracks that failed since the last one became ready; a full queue of them stops playback.
+    @ObservationIgnored private var failures = 0
     @ObservationIgnored private var startedAt = Date()
     @ObservationIgnored private var scrobbled = false
     /// Item the UI shows as current; guards against handling the same item change twice.
@@ -121,8 +123,10 @@ final class Player {
 
     /// `shuffled` turns shuffle on (true) or off (false); nil keeps the current mode.
     func play(_ items: [PlayItem], startAt: Int = 0, shuffled: Bool? = nil) {
+        guard !items.isEmpty else { return }
         if let shuffled { shuffle = shuffled }
         transcoded = []
+        failures = 0
         if shuffle, !items.isEmpty {
             unshuffled = items
             var rest = items
@@ -198,8 +202,12 @@ final class Player {
 
     /// Clears the queue when it holds local files under `root`, so that volume can be ejected.
     func stopPlayback(under root: URL) {
-        let held = queue.contains { if case .file(let url, _, _, _) = $0 { url.path.hasPrefix(root.path) } else { false } }
-        guard held else { return }
+        let held = queue.contains { if case .file(let url, _, _, _) = $0 { url.path.hasPrefix(root.path + "/") } else { false } }
+        if held { stop() }
+    }
+
+    /// Stops and clears the queue.
+    func stop() {
         player.removeAllItems()
         slots = [:]
         currentItemID = nil
@@ -324,17 +332,20 @@ final class Player {
 
     /// Falls back to an mp3 stream when a raw stream fails; skips the track if that fails too.
     private func itemStatusChanged(_ id: ObjectIdentifier) {
-        guard let slot = slots[id], slot.item.status == .failed else { return }
+        guard let slot = slots[id] else { return }
+        if slot.item.status == .readyToPlay { failures = 0 }
+        guard slot.item.status == .failed else { return }
         let i = slot.index
         var retry = false
         if case .server = queue[i], !transcoded.contains(i) { transcoded.insert(i); retry = true }
-        if !retry { errorMessage = slot.item.error?.localizedDescription ?? "Playback failed" }
+        if !retry { errorMessage = slot.item.error?.localizedDescription ?? "Playback failed"; failures += 1 }
+        let skip = failures < queue.count
         if i == index {
-            if retry { start(at: i) } else { next() }
+            if retry { start(at: i) } else if skip { next() } else { player.pause() }
         } else {
             player.remove(slot.item)
             slots[id] = nil
-            if retry { enqueue(i) }
+            if retry { enqueue(i) } else if skip { enqueue(following(i)) }
         }
     }
 
