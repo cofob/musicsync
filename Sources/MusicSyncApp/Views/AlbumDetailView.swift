@@ -40,7 +40,7 @@ struct AlbumDetailView<Accessory: View>: View {
     private func load() async {
         loadError = nil
         do { full = try await model.album(album.id) } catch where !error.isCancellation {
-            loadError = error.localizedDescription
+            loadError = error.friendlyMessage
         } catch {}
     }
 

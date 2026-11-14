@@ -1,4 +1,5 @@
 import Observation
+import Subsonic
 import SwiftUI
 
 /// A window over a long list. Pages load when a row of theirs is first shown; the least recently
@@ -56,7 +57,7 @@ final class PagedList<Item: Sendable> {
             touch(page)
             while recent.count > maxPages { pages[recent.removeFirst()] = nil }
         } catch where !error.isCancellation {
-            self.error = error.localizedDescription
+            self.error = error.friendlyMessage
             if total == nil, pages.isEmpty { count = 0 }
         } catch {}
     }

@@ -71,7 +71,7 @@ struct GenreDetailView: View {
             let found = try await model.browse.genrePage(genre)
             if !Task.isCancelled { page = found }
         } catch where !error.isCancellation {
-            loadError = error.localizedDescription
+            loadError = error.friendlyMessage
         } catch {}
     }
 }

@@ -52,7 +52,7 @@ struct ArtistDetailView: View {
             page = found
             browse.keep(found)
         } catch where !error.isCancellation {
-            if page == nil { loadError = error.localizedDescription }
+            if page == nil { loadError = error.friendlyMessage }
         } catch {}
     }
 

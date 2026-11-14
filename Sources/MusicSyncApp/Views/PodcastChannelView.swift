@@ -70,7 +70,7 @@ struct PodcastChannelView: View {
     private func load() async {
         loadError = nil
         do { full = try await model.podcasts.channel(channel.id) ?? channel } catch where !error.isCancellation {
-            loadError = error.localizedDescription
+            loadError = error.friendlyMessage
         } catch {}
     }
 

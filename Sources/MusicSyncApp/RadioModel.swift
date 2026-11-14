@@ -33,7 +33,7 @@ final class RadioModel {
             error = nil
         } catch where !error.isCancellation {
             guard client.baseURL == app.client?.baseURL else { return }
-            self.error = error.localizedDescription
+            self.error = error.friendlyMessage
         } catch {}
     }
 

@@ -141,7 +141,7 @@ final class SearchModel {
         do {
             return try await client.search3(text, artistCount: min(limit, 20), albumCount: limit, songCount: limit)
         } catch where !error.isCancellation && !Task.isCancelled {
-            if debounce == nil { self.error = error.localizedDescription }
+            if debounce == nil { self.error = error.friendlyMessage }
         } catch {}
         return nil
     }

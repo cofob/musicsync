@@ -1,4 +1,5 @@
 import Library
+import Subsonic
 import SwiftUI
 
 extension Color {
@@ -58,7 +59,7 @@ struct GenresView: View {
             let found = try await model.browse.genres()
             if !Task.isCancelled { genres = found }
         } catch where !error.isCancellation {
-            if genres == nil { loadError = error.localizedDescription }
+            if genres == nil { loadError = error.friendlyMessage }
         } catch {}
     }
 }

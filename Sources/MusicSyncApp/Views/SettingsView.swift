@@ -125,7 +125,7 @@ private struct ServerSettingsView: View {
             status = .ok([server.isEmpty ? "Connected" : server, info.openSubsonic == true ? "OpenSubsonic" : nil]
                 .compactMap { $0 }.joined(separator: " · "))
         } catch {
-            status = .failed(error.localizedDescription)
+            status = .failed(error.friendlyMessage)
         }
     }
 

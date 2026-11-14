@@ -212,13 +212,13 @@ final class AppModel {
             if !usesLocalLibrary { apply(artists: cache.artists, albums: cache.albums, playlists: cache.playlists) }
             libraryError = nil
         } catch where !error.isCancellation && store === self.store {
-            if force { report(error) } else { libraryError = error.localizedDescription }
+            if force { report(error) } else { libraryError = error.friendlyMessage }
         } catch {}
     }
 
     /// Shows `error` in the alert unless it is a cancelled request (navigation, debounce).
     func report(_ error: Error) {
-        if !error.isCancellation { errorMessage = error.localizedDescription }
+        if !error.isCancellation { errorMessage = error.friendlyMessage }
     }
 
     /// Replaces the lists. `onlyIfChanged` keeps views (and their scroll state) when nothing changed.
@@ -305,7 +305,7 @@ final class AppModel {
             result = kinds.compactMap { type, title in lists[type].flatMap { $0.isEmpty ? nil : Shelf(id: type, title: title, albums: $0) } }
             libraryError = nil
         } catch where !error.isCancellation {
-            libraryError = error.localizedDescription
+            libraryError = error.friendlyMessage
         } catch { return }
         if client.baseURL == self.client?.baseURL { shelves = result }
     }

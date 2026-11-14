@@ -41,7 +41,7 @@ final class PodcastsModel {
         } catch where !error.isCancellation {
             guard isCurrent(client) else { return }
             if case .api(let code, _)? = error as? SubsonicError, [50, 70].contains(code) { isLoaded = false }
-            self.error = error.localizedDescription
+            self.error = error.friendlyMessage
         } catch {}
     }
 

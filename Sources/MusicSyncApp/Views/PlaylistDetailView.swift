@@ -66,7 +66,7 @@ struct PlaylistDetailView: View {
     private func load() async {
         loadError = nil
         do { full = try await model.playlist(playlist.id) } catch where !error.isCancellation {
-            loadError = error.localizedDescription
+            loadError = error.friendlyMessage
         } catch {}
     }
 

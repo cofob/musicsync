@@ -51,7 +51,7 @@ struct FavoritesView: View {
             result = found
             loadError = nil
         } catch where !error.isCancellation {
-            loadError = error.localizedDescription
+            loadError = error.friendlyMessage
         } catch {}
     }
 

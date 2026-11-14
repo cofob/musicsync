@@ -69,7 +69,7 @@ struct SharesSettingsView: View {
             let list = try await model.system.shares()
             shares = list.sorted { ($0.created ?? "") > ($1.created ?? "") }
         } catch where !error.isCancellation {
-            failure = error.localizedDescription
+            failure = error.friendlyMessage
         } catch {}
     }
 
