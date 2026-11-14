@@ -550,6 +550,11 @@ import SwiftUI
         podcasts.play(episode, in: full.episodes)
         try? await Task.sleep(for: .seconds(4))
         check(await wait { player.isPlaying && player.elapsed > 419 && player.elapsed < 440 }, "plays on from the bookmark at 7:00: \(player.elapsed)")
+        player.seek(to: 500)
+        _ = await wait { abs(player.elapsed - 500) < 2 }
+        model.bookmarks.saveNow()  // as on quit: the server has it when this returns
+        let quit = try? await model.client?.getBookmarks().first { $0.entry.id == "st-0-1" }?.position
+        check(quit.map { abs($0 - 500_000) < 3000 } == true, "quitting saves the position: \(String(describing: quit))")
         player.seek(to: 600)
         try? await Task.sleep(for: .seconds(2))
         player.toggle()

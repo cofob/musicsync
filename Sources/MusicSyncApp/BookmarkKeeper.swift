@@ -1,10 +1,10 @@
-import Foundation
+import AppKit
 import Observation
 import Playback
 import Subsonic
 
 /// Server bookmarks for long items such as podcast episodes (`ResumePoint`): saved on pause, on song change, on stop
-/// and every 30 s while playing. An item played again goes on from its bookmark.
+/// every 30 s while playing and on quit. An item played again goes on from its bookmark.
 @MainActor @Observable
 final class BookmarkKeeper {
     /// Saved positions in milliseconds, by song id; episode rows show them.
@@ -22,9 +22,13 @@ final class BookmarkKeeper {
     @ObservationIgnored private var throttle = SaveThrottle(minimumGap: 5, interval: 30)
     /// The long item playing at the last check, where it was and whether it played.
     @ObservationIgnored private var seen: (item: Item?, elapsed: TimeInterval, playing: Bool) = (nil, 0, false)
+    @ObservationIgnored private var observer: Any?
 
     init(app: AppModel) {
         self.app = app
+        observer = NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) {
+            [weak self] _ in MainActor.assumeIsolated { self?.saveNow() }
+        }
         // Every second while playing; otherwise until the song or the play state changes.
         Task { [weak self] in
             var busy = true
@@ -49,6 +53,14 @@ final class BookmarkKeeper {
     func clear(_ id: String) {
         guard supported, let client = app.client, positions.removeValue(forKey: id) != nil else { return }
         Task { try? await client.deleteBookmark(id: id) }
+    }
+
+    /// Saves the place of the long item now and waits up to 2 s for the server; for quitting.
+    func saveNow() {
+        guard let task = longItem().flatMap({ write($0, at: app.player.elapsed) }) else { return }
+        let done = DispatchSemaphore(value: 0)
+        Task.detached { await task.value; done.signal() }
+        _ = done.wait(timeout: .now() + 2)
     }
 
     /// True while playing.
@@ -78,17 +90,18 @@ final class BookmarkKeeper {
         return Item(id: song.id, duration: duration, client: client)
     }
 
-    private func write(_ item: Item, at elapsed: TimeInterval) {
-        guard supported, isCurrent(item.client) else { return }
+    /// The request runs off the main actor, so `saveNow` can wait for it.
+    @discardableResult private func write(_ item: Item, at elapsed: TimeInterval) -> Task<Void, Never>? {
+        guard supported, isCurrent(item.client) else { return nil }
         switch ResumePoint.action(elapsed: elapsed, duration: item.duration) {
         case .save(let ms):
-            guard positions[item.id] != ms else { return }
+            guard positions[item.id] != ms else { return nil }
             positions[item.id] = ms
-            Task { try? await item.client.createBookmark(id: item.id, position: ms) }
+            return Task.detached { try? await item.client.createBookmark(id: item.id, position: ms) }
         case .delete:
-            guard positions.removeValue(forKey: item.id) != nil else { return }
-            Task { try? await item.client.deleteBookmark(id: item.id) }
-        case .none: break
+            guard positions.removeValue(forKey: item.id) != nil else { return nil }
+            return Task.detached { try? await item.client.deleteBookmark(id: item.id) }
+        case .none: return nil
         }
     }
 
