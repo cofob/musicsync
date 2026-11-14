@@ -23,6 +23,8 @@ final class SmartDownloads {
     @ObservationIgnored private var settings: SmartSettings?
     /// Newest play seen by the last evaluation.
     @ObservationIgnored private var lastPlay: Date?
+    /// Tells of power source changes on the main run loop.
+    @ObservationIgnored private nonisolated(unsafe) var powerSource: CFRunLoopSource?
 
     init(app: AppModel) {
         self.app = app
@@ -33,8 +35,11 @@ final class SmartDownloads {
         }
         monitor.start(queue: DispatchQueue(label: "SmartDownloads.network"))
         watch()
+        watchPower()
         poll()
     }
+
+    deinit { if let powerSource { CFRunLoopSourceInvalidate(powerSource) } }
 
     var wait: SmartConditions.Wait? { conditions.wait(for: app.downloads.settings.smart) }
 
@@ -94,17 +99,26 @@ final class SmartDownloads {
         if let manager { Task { await manager.setSmartAllowed(allowed) } }
     }
 
-    /// Every minute: the power source; every 30 minutes: new plays change the most played songs and the mixes.
+    /// Reads the power source again when it changes.
+    private func watchPower() {
+        powerSource = IOPSNotificationCreateRunLoopSource({ context in
+            guard let context else { return }
+            MainActor.assumeIsolated {
+                let model = Unmanaged<SmartDownloads>.fromOpaque(context).takeUnretainedValue()
+                let power = SmartDownloads.onPower
+                if model.conditions.onPower != power { model.conditions.onPower = power }
+            }
+        }, Unmanaged.passUnretained(self).toOpaque())?.takeRetainedValue()
+        if let powerSource { CFRunLoopAddSource(CFRunLoopGetMain(), powerSource, .commonModes) }
+    }
+
+    /// Every 30 minutes: new plays change the most played songs and the mixes.
     private func poll() {
         Task { [weak self] in
-            var minutes = 0
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(60))
+                try? await Task.sleep(for: .seconds(1800))
                 guard let self else { return }
-                minutes += 1
-                let power = Self.onPower
-                if conditions.onPower != power { conditions.onPower = power }
-                guard minutes % 30 == 0, !isRunning, let library = app.library else { continue }
+                guard !isRunning, let library = app.library else { continue }
                 if await library.history.events(limit: 1).last?.startedAt != lastPlay { run() }
             }
         }
