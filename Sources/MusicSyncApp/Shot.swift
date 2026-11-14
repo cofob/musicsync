@@ -122,10 +122,11 @@ import SwiftUI
     }
 
     /// Captures the front app window through the window server (with materials), else through AppKit.
-    /// `MUSICSYNC_SHOT_METHOD=cache` forces the AppKit path.
+    /// `MUSICSYNC_SHOT_METHOD=cache` forces the AppKit path; a locked screen uses it too, as the window server gives a blank image then.
     private static func save(to url: URL) -> Bool {
         guard let window = NSApp.orderedWindows.first(where: \.isVisible) else { return false }
-        let image = env["MUSICSYNC_SHOT_METHOD"] == "cache" ? nil : windowServerImage(window)
+        let locked = (CGSessionCopyCurrentDictionary() as? [String: Any])?["CGSSessionScreenIsLocked"] as? Bool == true
+        let image = env["MUSICSYNC_SHOT_METHOD"] == "cache" || locked ? nil : windowServerImage(window)
         guard let rep = image.map(NSBitmapImageRep.init(cgImage:)) ?? cachedImage(window),
               let png = rep.representation(using: .png, properties: [:]) else { return false }
         return (try? png.write(to: url)) != nil
