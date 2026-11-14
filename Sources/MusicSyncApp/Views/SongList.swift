@@ -1,4 +1,5 @@
 import Integration
+import Preferences
 import SwiftUI
 import Subsonic
 
@@ -73,7 +74,7 @@ struct SongList: View {
         let isCurrent = model.player.current?.id == song.id
         return TrackRow(title: song.title, subtitle: subtitle(song), time: song.duration.map(TimeInterval.init),
                         isCurrent: isCurrent, isSelected: selected?.index == index && selected?.id == song.id,
-                        isStarred: model.isStarred(song), badge: model.downloads.badge(song)) {
+                        isStarred: model.isStarred(song), badge: model.downloads.badge(song), detail: detail(song)) {
             switch leading {
             case .track:
                 TrackNumber(text: song.track.map(String.init) ?? "", isCurrent: isCurrent)
@@ -90,6 +91,11 @@ struct SongList: View {
         .opacity(model.downloads.isAvailable(song) ? 1 : 0.4)
         .onTapGesture(count: 2) { onPlay(index) }
         .simultaneousGesture(TapGesture().onEnded { selected = (index, song.id) })
+    }
+
+    private func detail(_ song: Song) -> String? {
+        AppearanceSettings.SongColumn.detail(AppPreferences.shared.appearance.songColumns, rating: model.rating(song),
+                                             plays: song.playCount, suffix: song.suffix, bitRate: song.bitRate)
     }
 
     private func subtitle(_ song: Song) -> String? {

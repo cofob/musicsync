@@ -1,3 +1,4 @@
+import Preferences
 import SwiftUI
 import Subsonic
 
@@ -14,27 +15,14 @@ struct HomeView: View {
                     NavigationLink(value: Route.stats) { Label("Your Stats", systemImage: "chart.bar.fill") }.buttonStyle(FilledCapsuleStyle())
                 }
                 if model.shelves.isEmpty && model.libraryError == nil { placeholder }
-                ForEach(Array(model.shelves.enumerated()), id: \.element.id) { offset, shelf in
-                    VStack(alignment: .leading, spacing: 14) {
-                        ShelfHeader(title: offset == 0 ? "Top Picks for You" : shelf.title,
-                                    action: shelf.id == "newest" ? { model.selection = .recentlyAdded } : nil)
-                        ScrollView(.horizontal) {
-                            LazyHStack(alignment: .top, spacing: offset == 0 ? 22 : 18) {
-                                ForEach(shelf.albums) { album in
-                                    if offset == 0 {
-                                        FeatureCard(album: album, label: shelf.title)
-                                    } else {
-                                        AlbumCard(album: album).frame(width: 180)
-                                    }
-                                }
-                            }
-                            // Room for the card shadows, which the scroll view would clip.
-                            .padding(.horizontal, 32).padding(.vertical, 20)
+                // The order and the shown sections come from Settings > Library.
+                if !model.shelves.isEmpty {
+                    ForEach(AppPreferences.shared.home.visible, id: \.self) { kind in
+                        switch kind {
+                        case .madeForYou, .because: MadeForYouSection(part: kind)
+                        default: if let shelf = model.shelves.first(where: { $0.id == kind.listType }) { albumShelf(shelf, featured: kind == .topPicks) }
                         }
-                        .scrollIndicators(.never)
-                        .padding(.horizontal, -32).padding(.vertical, -20)
                     }
-                    if offset == 0 { MadeForYouSection() }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -51,7 +39,43 @@ struct HomeView: View {
     }
 }
 
+extension HomeShelf {
+    /// `AppModel.Shelf.id` of the album shelves.
+    var listType: String? {
+        switch self {
+        case .topPicks: "newest"
+        case .recentlyPlayed: "recent"
+        case .mostPlayed: "frequent"
+        case .discover: "random"
+        case .madeForYou, .because: nil
+        }
+    }
+}
+
 extension HomeView {
+    /// A row of album cards; `featured` draws the big "Top Picks" cards.
+    private func albumShelf(_ shelf: AppModel.Shelf, featured: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            ShelfHeader(title: featured ? HomeShelf.topPicks.title : shelf.title,
+                        action: shelf.id == "newest" ? { model.selection = .recentlyAdded } : nil)
+            ScrollView(.horizontal) {
+                LazyHStack(alignment: .top, spacing: featured ? 22 : 18) {
+                    ForEach(shelf.albums) { album in
+                        if featured {
+                            FeatureCard(album: album, label: shelf.title)
+                        } else {
+                            AlbumCard(album: album).frame(width: 180)
+                        }
+                    }
+                }
+                // Room for the card shadows, which the scroll view would clip.
+                .padding(.horizontal, 32).padding(.vertical, 20)
+            }
+            .scrollIndicators(.never)
+            .padding(.horizontal, -32).padding(.vertical, -20)
+        }
+    }
+
     /// Shelves with gray cards while Home loads.
     private var placeholder: some View {
         VStack(alignment: .leading, spacing: 32) {

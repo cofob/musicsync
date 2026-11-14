@@ -65,7 +65,11 @@ struct AlbumMenuItems: View {
     }
 }
 
-let albumGridColumns = [GridItem(.adaptive(minimum: 160, maximum: 240), spacing: 24, alignment: .top)]
+/// Card size from Settings > Appearance > Album covers.
+@MainActor var albumGridColumns: [GridItem] {
+    let width = AppPreferences.shared.appearance.density.cardWidth
+    return [GridItem(.adaptive(minimum: width.lowerBound, maximum: width.upperBound), spacing: 24, alignment: .top)]
+}
 
 /// Adaptive grid of `AlbumCard`s.
 struct AlbumGrid<Badge: View>: View {

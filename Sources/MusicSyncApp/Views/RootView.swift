@@ -76,6 +76,7 @@ struct RootView: View {
             if model.ipod.current == nil { model.search.scope = .library }
         }
         .onChange(of: model.selection) {
+            AppPreferences.shared.remember(model.selection)
             model.path = []
             model.searchText = ""
             model.search.clear()

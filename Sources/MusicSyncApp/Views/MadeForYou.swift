@@ -1,3 +1,4 @@
+import Preferences
 import Recommend
 import Subsonic
 import SwiftUI
@@ -5,22 +6,31 @@ import SwiftUI
 /// Home: the "Made for You" mix cards and the "Because You Listened to" shelves. Hidden without the local mirror.
 struct MadeForYouSection: View {
     @Environment(AppModel.self) private var model
+    /// `.madeForYou` draws the mix cards, `.because` the shelves; Settings > Library orders them.
+    var part = HomeShelf.madeForYou
 
     var body: some View {
         let mixes = model.mixes
         if mixes.isAvailable, !mixes.mixes.isEmpty {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    ShelfHeader(title: "Made for You")
-                    Spacer()
-                    Button("New Mixes", systemImage: "arrow.clockwise") { Task { await mixes.load(refresh: true) } }
-                        .buttonStyle(CircleIconStyle(size: 28)).help("Make New Mixes")
-                }
-                HorizontalShelf {
-                    ForEach(mixes.mixes) { MixCard(mix: $0).frame(width: 180) }
-                }
+            if part == .because {
+                ForEach(mixes.because) { BecauseShelf(mix: $0) }
+            } else {
+                mixCards(mixes)
             }
-            ForEach(mixes.because) { BecauseShelf(mix: $0) }
+        }
+    }
+
+    private func mixCards(_ mixes: MixModel) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                ShelfHeader(title: "Made for You")
+                Spacer()
+                Button("New Mixes", systemImage: "arrow.clockwise") { Task { await mixes.load(refresh: true) } }
+                    .buttonStyle(CircleIconStyle(size: 28)).help("Make New Mixes")
+            }
+            HorizontalShelf {
+                ForEach(mixes.mixes) { MixCard(mix: $0).frame(width: 180) }
+            }
         }
     }
 }

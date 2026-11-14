@@ -79,6 +79,9 @@ final class SyncModel {
     @ObservationIgnored private var contextTask: Task<Void, Never>?
     @ObservationIgnored private var planTask: Task<Void, Never>?
     @ObservationIgnored private var saveTask: Task<Void, Never>?
+    /// Mount of the iPod seen last; a new one starts a sync by itself when Settings > Sync asks for it.
+    @ObservationIgnored private var connectedDevice: URL?
+    @ObservationIgnored private var autoSyncPending = false
     private static let lastDeviceKey = "lastSyncDevice"
 
     init() {
@@ -107,6 +110,10 @@ final class SyncModel {
             return
         }
         setKey(DeviceKey.resolve(for: device, settings: app.syncSettings))
+        if connectedDevice != device.id {
+            connectedDevice = device.id
+            autoSyncPending = app.syncSettings.autoSync
+        }
         let serverKey = app.client?.serverKey ?? ""
         contextTask = Task {
             let result = await Task.detached(priority: .userInitiated) { () -> Result<Context, Error> in
@@ -139,7 +146,7 @@ final class SyncModel {
     private func updateMatcher() {
         guard let context, let app else { matcher = nil; return }
         matcher = Matcher(library: context.library, manifest: context.manifest, selection: selection,
-                          defaultPresetID: app.syncSettings.presetID)
+                          defaultPresetID: app.syncSettings.presetID, presets: app.syncSettings.presets)
     }
 
     // MARK: Selection
@@ -202,6 +209,7 @@ final class SyncModel {
         planID += 1
         let selection = selection, settings = app.syncSettings
         let needsGuid = app.ipod.snapshot?.guid == nil
+        let rename = app.deviceRename
         // The mirror answers in milliseconds; the server is asked only for albums it lacks.
         let expander = expander ?? SelectionExpander(client: client, local: app.usesLocalLibrary ? app.library?.database.local : nil)
         self.expander = expander
@@ -209,7 +217,7 @@ final class SyncModel {
             do {
                 try await Task.sleep(for: .milliseconds(500))
                 let expansion = try await expander.expand(selection, defaultPresetID: settings.presetID, soundCheck: settings.soundCheck,
-                                                              fullAlbums: settings.fullAlbums) { done, total in
+                                                              fullAlbums: settings.fullAlbums, presets: settings.presets) { done, total in
                     Task { @MainActor in
                         guard self.planID == planID, self.isPlanning, done > self.checked?.done ?? 0 else { return }
                         self.checked = (done, total)
@@ -219,8 +227,11 @@ final class SyncModel {
                 // The iPod disk can be slow or busy: read it off the main thread.
                 let (plan, hasPlayCounts) = await Task.detached(priority: .userInitiated) {
                     let input = PlannerInput(desired: songs, playlists: playlists, manifest: context.manifest,
-                                             library: context.library, freeBytes: (try? device.capacity().available) ?? 0)
-                    return (SyncPlanner.plan(input), FileManager.default.fileExists(atPath: device.playCountsURL.path))
+                                             library: context.library, freeBytes: (try? device.capacity().available) ?? 0,
+                                             reserveBytes: settings.reserveBytes)
+                    var plan = SyncPlanner.plan(input)
+                    plan.rename = rename
+                    return (plan, FileManager.default.fileExists(atPath: device.playCountsURL.path))
                 }.value
                 try Task.checkCancellation()
                 var warnings = [context.warning].compactMap { $0 }
@@ -231,6 +242,10 @@ final class SyncModel {
                                   hasPlayCounts: hasPlayCounts)
                 app.ipod.projectedSyncDelta = plan.isEmpty ? nil : plan.addBytes - plan.freedBytes
                 isPlanning = false
+                if autoSyncPending {
+                    autoSyncPending = false
+                    if preview?.canRun == true { showSheet = true; start() }
+                }
             } catch where !error.isCancellation && !Task.isCancelled {
                 // Never plan without a full expansion: missing songs would be deleted.
                 previewError = error.localizedDescription

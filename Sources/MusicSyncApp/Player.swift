@@ -321,7 +321,7 @@ final class Player {
         updateNowPlaying()
         onTrackStart?()
         // A song loaded paused (after the sleep timer) is not playing yet.
-        if case .server(let song)? = current, let client, !privateSession, isPlaying {
+        if case .server(let song)? = current, let client, sendsScrobbles, isPlaying {
             Task { try? await client.scrobble(ids: [song.id], submission: false) }
         }
         let cover = current?.coverArt
@@ -351,7 +351,7 @@ final class Player {
         }
         elapsed = max(0, time)
         // Submit after 50% of the track or 4 minutes, whichever comes first.
-        guard !scrobbled, !privateSession, case .server(let song)? = current, let client, duration > 0,
+        guard !scrobbled, sendsScrobbles, case .server(let song)? = current, let client, duration > 0,
               elapsed >= min(duration / 2, 240) else { return }
         scrobbled = true
         let start = startedAt

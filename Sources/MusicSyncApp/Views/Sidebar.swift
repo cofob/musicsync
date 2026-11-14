@@ -68,10 +68,10 @@ struct Sidebar: View {
     var body: some View {
         // No List selection: the system draws it blue (red icons on blue are unreadable); `pick` draws a gray one.
         List {
-            ForEach([SidebarItem.search, .home], id: \.self, content: row)
+            ForEach([SidebarItem.search, .home].filter(\.isShown), id: \.self, content: row)
             Section("Library") {
-                ForEach(SidebarItem.libraryItems, id: \.self, content: row)
-                if model.radio.isVisible { row(.radio) }
+                ForEach(SidebarItem.libraryItems.filter(\.isShown), id: \.self, content: row)
+                if model.radio.isVisible, SidebarItem.radio.isShown { row(.radio) }
             }
             if model.ipod.current != nil || model.ipod.isOffline {
                 Section {
@@ -80,7 +80,7 @@ struct Sidebar: View {
                 } header: { DeviceSectionHeader() }
             }
             Section {
-                row(.playlists)
+                if SidebarItem.playlists.isShown { row(.playlists) }
                 ForEach(model.playlists) { playlist in
                     PlaylistSidebarRow(playlist: playlist, isSelected: selection == .playlist(playlist.id))
                         .modifier(Pick(item: .playlist(playlist.id), selection: $selection))

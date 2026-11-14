@@ -157,7 +157,9 @@ final class MixModel {
             input = (db, version, tracks, playlists)
         }
         guard let input, !input.tracks.isEmpty else { return nil }
-        let events = await library.history.events(), stats = await library.history.stats()
+        // Settings > Library can leave the local history out: the server's play counts are always in `tracks`.
+        let usesHistory = AppPreferences.shared.listening.usesHistory
+        let events = usesHistory ? await library.history.events() : [], stats = usesHistory ? await library.history.stats() : [:]
         return await Task.detached(priority: .userInitiated) {
             Catalog(tracks: input.tracks, playlists: input.playlists, history: events, stats: stats)
         }.value

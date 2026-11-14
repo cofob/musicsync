@@ -59,7 +59,7 @@ final class AppModel {
     /// Inline messages for failed background loads (library, Home, songs, search).
     private(set) var libraryError: String?
 
-    var selection: SidebarItem? = .home
+    var selection: SidebarItem? = AppPreferences.shared.startPage
     var path: [Route] = []
     var searchText = ""
     /// `searchText` without leading and trailing spaces; the filter of the list pages.
@@ -107,7 +107,9 @@ final class AppModel {
     var syncSettings = SyncSettings.load() {
         didSet {
             syncSettings.save()
-            if syncSettings.fullAlbums != oldValue.fullAlbums { sync.schedulePlan() }
+            let (new, old) = (syncSettings, oldValue)
+            if (new.fullAlbums, new.keepFreeGB, new.deviceNames, new.aacBitrate, new.opusBitrate)
+                != (old.fullAlbums, old.keepFreeGB, old.deviceNames, old.aacBitrate, old.opusBitrate) { sync.schedulePlan() }
         }
     }
     @ObservationIgnored private var spaceMonitor: Any?
@@ -155,8 +157,9 @@ final class AppModel {
         player.stop()
         await stopLibrary()
         await downloads.stop()
-        let client = demo ? config.map { SubsonicClient(baseURL: $0.baseURL, username: $0.username, password: "demo") }
-                          : config.flatMap { SubsonicClient(config: $0) }
+        let session = AppPreferences.shared.advanced.session()
+        let client = demo ? config.map { SubsonicClient(baseURL: $0.baseURL, username: $0.username, password: "demo", session: session) }
+                          : config.flatMap { SubsonicClient(config: $0, session: session) }
         guard let client else {
             self.client = nil; store = nil; covers = nil
             player.client = nil; player.covers = nil
@@ -168,6 +171,7 @@ final class AppModel {
         let covers = CoverArtCache(client: client, offline: downloads.manager?.coversDirectory)
         self.client = client; self.store = store; self.covers = covers
         player.client = client; player.covers = covers
+        trimCoverCache()
         Task { await player.loadFeatures(client) }
         sync.flushScrobbles(client)
         sync.deviceUpdated()  // the manifest belongs to the server

@@ -2,7 +2,8 @@ import SwiftUI
 
 /// Shared look of the media pages (modeled on Apple Music): red accent, big covers, capsule buttons.
 extension Color {
-    static let musicAccent = Color(red: 0.98, green: 0.14, blue: 0.24)
+    /// Settings > Appearance; red by default, as in Apple Music. Views that read it draw again when it changes.
+    @MainActor static var musicAccent: Color { AppPreferences.shared.appearance.accent.color }
 }
 
 /// Sidebar row with an accent-colored symbol.
@@ -153,6 +154,8 @@ struct TrackRow<Leading: View, MenuItems: View>: View {
     var isStarred = false
     /// Small gray symbol before the time, e.g. the download state.
     var badge: String?
+    /// Gray text before the time: the song columns of Settings > Appearance.
+    var detail: String?
     @ViewBuilder var leading: Leading
     @ViewBuilder var menu: MenuItems
 
@@ -166,6 +169,7 @@ struct TrackRow<Leading: View, MenuItems: View>: View {
                 }
             }
             Spacer(minLength: 8)
+            if let detail { Text(detail).font(.callout).monospacedDigit().foregroundStyle(.secondary).lineLimit(1) }
             if isStarred { Image(systemName: "star.fill").font(.caption2).foregroundStyle(Color.musicAccent) }
             if let badge { Image(systemName: badge).font(.caption).foregroundStyle(.secondary) }
             Text(time.map(formatTime) ?? "").monospacedDigit().foregroundStyle(.secondary)

@@ -21,7 +21,7 @@ extension BrowseModel {
 
     func statsInput() async -> StatsInput {
         guard let library = app.library else { return StatsInput(events: [], tracks: [:]) }
-        let events = await library.history.events(limit: 50_000)
+        let events = AppPreferences.shared.listening.usesHistory ? await library.history.events(limit: 50_000) : []
         let tracks = await library.database.recommendationTracks()
         return StatsInput(events: events, tracks: Dictionary(tracks.map { ($0.id, $0) }) { a, _ in a })
     }

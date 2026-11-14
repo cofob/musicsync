@@ -16,7 +16,7 @@ struct NowPlayingView: View {
         let song: Song? = if case .server(let s)? = player.current { s } else { nil }
         let panel = model.nowPlayingPanel == .lyrics && !showLyrics ? .none : model.nowPlayingPanel
         ZStack {
-            ArtworkBackground(image: player.artwork)
+            ArtworkBackground(image: AppPreferences.shared.appearance.nowPlayingBackground == .artwork ? player.artwork : nil)
             HStack(spacing: 40) {
                 PlayerColumn().frame(maxWidth: 440)
                 if panel != .none {
