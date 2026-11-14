@@ -35,6 +35,7 @@ import Subsonic
         do {
             let db = dir.database()
             try await seed(db, albums: (1...50).map { n in (album("al-\(n)", "Album \(n)"), [song("s\(n)", "Song \(n)", albumId: "al-\(n)")]) })
+            await db.close()
         }
         let url = dir.database().fileURL
         try? FileManager.default.removeItem(atPath: url.path + "-wal")
@@ -57,6 +58,7 @@ import Subsonic
             let db = dir.database()
             try await seed(db, albums: [(album("al", "First"), [song("s1", "One")])])
             path = db.fileURL.path
+            await db.close()
         }
         let raw = try SQLiteConnection(path: path)
         try raw.exec("PRAGMA user_version = \(Schema.version + 1)")
@@ -77,6 +79,7 @@ import Subsonic
             let db = dir.database()
             try await db.beginAlbumListing(cursor)
             try await db.storeAlbumPage([album("a1", "One"), album("a2", "Two")], run: "run-1", nextOffset: 2)
+            await db.close()
         }
         let db = dir.database()
         #expect(await db.albumCursor() == AlbumCursor(run: "run-1", offset: 2, scan: "scan"))
@@ -126,7 +129,8 @@ import Subsonic
         for (a, songs) in data { try await db.storeAlbumTracks(albumId: a.id, songs: songs) }
         let elapsed = ContinuousClock.now - start
         #expect(await db.songCount() == 20_000)
-        #expect(elapsed < .seconds(3))
+        // Wide enough for a debug build on a busy machine; a missing transaction takes minutes.
+        #expect(elapsed < .seconds(10))
         #expect(await db.search("song 1999").song.isEmpty == false)
     }
 

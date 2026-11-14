@@ -89,6 +89,10 @@ public actor LibraryDatabase {
 
     // MARK: Opening and recovery
 
+    /// Closes the file now; the next call opens it again. A released database closes only when the actor
+    /// goes away, which can be later, so code that changes the file from outside closes it first.
+    func close() { connection = nil }
+
     private func open() -> SQLiteConnection? {
         if let connection { return connection }
         do {
