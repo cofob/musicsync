@@ -197,6 +197,14 @@ private struct Fixture {
         #expect(await f.db.coversToFetch().isEmpty)
     }
 
+    @Test func missingCoversAreNoFailure() async {
+        let f = await Fixture(server: makeServer(albums: 9))
+        f.server.coverStatus = 404
+        await f.sync()
+        #expect(f.mirror.currentStatus.lastSuccess != nil && f.mirror.currentStatus.warnings == 0)
+        #expect(await f.db.coversToFetch().isEmpty)
+    }
+
     @Test func cancelledSyncResumesWithoutDuplicates() async {
         let server = makeServer(albums: 12, songsPerAlbum: 3)
         let f = await Fixture(server: server)
