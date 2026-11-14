@@ -341,13 +341,18 @@ import SwiftUI
         guard let albums = await Shot.first({ model.albums.count >= 3 ? Array(model.albums.prefix(3)) : nil }) else { return check(false, "3 albums") }
         var songs: [Song] = []
         for album in albums { songs += (try? await model.album(album.id)?.song) ?? [] }
+        let autoPlay = model.mixes.autoPlay
+        model.mixes.autoPlay = false  // no rows added while the keys run
+        defer { model.mixes.autoPlay = autoPlay }
         player.play(songs)
         if player.isPlaying { player.toggle() }
         model.nowPlayingPanel = .queue
         model.showNowPlaying = true
         try? await Task.sleep(for: .seconds(2))
         guard let window = mainWindow, let content = window.contentView,
-              let table = views(content, of: NSTableView.self).first(where: { $0.numberOfRows >= songs.count }) else { return check(false, "Up Next list") }
+              // The rightmost list: the sidebar's list under Now Playing may hold more rows with a big library.
+              let table = views(content, of: NSTableView.self).max(by: { $0.convert($0.bounds, to: nil).minX < $1.convert($1.bounds, to: nil).minX })
+        else { return check(false, "Up Next list") }
         let last = table.numberOfRows - 1
         check(!table.rows(in: table.visibleRect).contains(last), "the last row starts out of view")
         window.makeFirstResponder(table)
