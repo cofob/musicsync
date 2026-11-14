@@ -95,7 +95,7 @@ struct MusicSyncApp: App {
             SettingsView().environment(model)
         }
 
-        MenuBarExtra(isInserted: $showsMenuBarItem) {
+        MenuBarExtra(isInserted: Shot.output == nil ? $showsMenuBarItem : .constant(false)) {  // no item during screenshot runs
             MenuBarPlayer().environment(model)
         } label: {
             MenuBarLabel(player: model.player)
