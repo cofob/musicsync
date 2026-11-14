@@ -23,7 +23,7 @@ struct MirrorPass: Sendable {
             hub.update { $0.phase = phase; $0.done = 0; $0.total = nil }
             do { try await body(); return true } catch {
                 if Task.isCancelled || error is CancellationError { return false }
-                failure = failure ?? "\(phase.rawValue): \(error.localizedDescription)"
+                failure = failure ?? "\(phase.rawValue): \(error.friendlyMessage)"
                 warn("\(phase.rawValue) failed: \(error.localizedDescription)")
                 return false
             }
