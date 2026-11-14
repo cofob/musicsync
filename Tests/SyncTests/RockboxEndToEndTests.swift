@@ -102,15 +102,9 @@ struct RockboxEndToEndTests {
         let again = try await makePlan(selection: f.selection(), server: f.server, pod: pod)
         #expect(again.isEmpty, "add \(again.add.map(\.id)) re \(again.reencode.map(\.desired.id)) rt \(again.retag.map(\.desired.id)) rm \(again.remove.map(\.songID)) up \(again.playlistsToUpdate.map(\.id)) cr \(again.playlistsToCreate.map(\.id))")
 
-        // Dropping the album removes files, cover, folders and the list entries.
+        // Dropping the album and the playlist from the selection keeps their files.
         let removal = try await makePlan(selection: f.selection(rockbox: false, playlist: false), server: f.server, pod: pod)
-        #expect(removal.remove.map(\.target) == [.rockbox, .rockbox])
-        let run2 = await runSync(removal, pod: pod, server: f.server)
-        #expect(run2.error == nil && run2.summary?.removed == 2)
-        #expect(try FileManager.default.contentsOfDirectory(atPath: pod.device.mountURL.appendingPathComponent("Music").path).isEmpty)
-        #expect(!pod.exists("Playlists/Mix.m3u8") && pod.manifest().rockboxPlaylists.isEmpty)
-        #expect(pod.manifest().rockboxEntries.isEmpty)
-        #expect(try pod.database().tracks.count == 3)
+        #expect(removal.remove.isEmpty && removal.playlistsToDelete.isEmpty)
     }
 
     @Test func rockboxOnlyDeviceNeedsNeitherGuidNorDatabase() async throws {

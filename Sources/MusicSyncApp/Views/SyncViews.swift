@@ -23,15 +23,12 @@ struct SyncBadge: View {
     private var info: (String, String)? {
         let sync = model.sync
         guard let status = sync.status(of: album) else { return nil }
-        if [.synced, .partial, .outdated].contains(status), !sync.isSelected(album) {
-            return ("minus", "Removed from the iPod on the next sync")
-        }
         switch status {
         case .none: return nil
         case .synced: return ("checkmark", "On iPod")
         case .partial: return ("circle.lefthalf.filled", "Partly on iPod")
         case .pending: return ("arrow.down", "Waiting to sync")
-        case .outdated: return ("exclamationmark", "On iPod in old quality; updated on the next sync")
+        case .outdated: return ("exclamationmark", sync.isSelected(album) ? "On iPod in old quality; updated on the next sync" : "On iPod in old quality")
         case .foreign: return ("ipod", sync.isSelected(album) ? "On iPod via iTunes; skipped by sync to avoid a duplicate" : "On iPod via iTunes")
         }
     }

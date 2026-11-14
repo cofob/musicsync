@@ -116,20 +116,21 @@ struct EndToEndTests {
         let again = try await makePlan(selection: Self.selection(), server: f.server, pod: pod)
         #expect(again.isEmpty, "\(again.add.count) \(again.reencode.count) \(again.retag.count) \(again.remove.count)")
 
-        // --- Unselect everything
-        let removal = try await makePlan(selection: Selection(), server: f.server, pod: pod)
-        #expect(removal.remove.count == 2 && removal.playlistsToDelete.count == 1)
+        // --- Unselecting keeps everything; deleting is explicit.
+        #expect(try await makePlan(selection: Selection(), server: f.server, pod: pod).isEmpty)
+        var removal = SyncPlan()
+        removal.deleteTracks = [first.dbid, second.dbid]
+        removal.reserveBytes = 0
         let run2 = await runSync(removal, pod: pod, server: f.server)
         #expect(run2.error == nil && run2.summary?.removed == 2)
 
         let db2 = try pod.database()
         #expect(db2.tracks.map(\.title) == ["Foreign 1"])
-        #expect(db2.playlists.map(\.name) == ["Test iPod"])
         #expect(Hash58.verify(try Data(contentsOf: pod.device.iTunesDBURL), guid: guidBytes))
         #expect(pod.exists(ITunesDB.relativePath(ipodLocation: foreign.location)))
         for track in [first, second] { #expect(!pod.exists(ITunesDB.relativePath(ipodLocation: track.location))) }
         let manifest2 = pod.manifest()
-        #expect(manifest2.entries.isEmpty && manifest2.playlists.isEmpty && manifest2.artwork.isEmpty)
+        #expect(manifest2.entries.isEmpty && manifest2.artwork.isEmpty)
         #expect(try ArtworkDB.load(artworkDirectory: pod.device.artworkDir).images.isEmpty)
         let engine = SyncEngine(locations: pod.locations)
         #expect(try await engine.orphans(device: pod.device).isEmpty)

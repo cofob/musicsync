@@ -19,6 +19,9 @@ public struct PlannerInput: Sendable {
 }
 
 /// Pure diff of what is wanted against what MusicSync already put on the device.
+/// Sync only adds and updates: songs and playlists that are no longer selected stay on the device.
+/// Deleting is an explicit action (`SyncPlan.deleteTracks`); the selection lives on the Mac, so an empty one
+/// (new Mac, fresh install) must not empty the iPod.
 public enum SyncPlanner {
     public static let reserveBytes: Int64 = 500_000_000
 
@@ -51,13 +54,6 @@ public enum SyncPlanner {
                 plan.reencode.append(.init(desired: d, entry: entry))
             } else if entry.fingerprint != d.fingerprint {
                 plan.retag.append(.init(desired: d, entry: entry))
-            }
-        }
-        for (target, entries) in [(Preset.Target.stock, manifest.entries), (.rockbox, manifest.rockboxEntries)] {
-            for id in entries.keys.sorted() where !seen.contains(id) {
-                if let (entry, found) = present(id), found == target {
-                    plan.remove.append(.init(songID: id, entry: entry, target: target))
-                }
             }
         }
 
@@ -106,10 +102,6 @@ public enum SyncPlanner {
             let stockChanged = existing.map { $0.name != p.name || $0.trackIDs.compactMap { songByTrackID[$0] } != wanted } ?? false
             let rockboxChanged = record.map { $0.songIDs != rockbox || $0.path != RockboxPaths.playlistPath(p.name) } ?? !rockbox.isEmpty
             if isNew { plan.playlistsToCreate.append(p) } else if stockChanged || rockboxChanged { plan.playlistsToUpdate.append(p) }
-        }
-        let wantedIDs = Set(input.playlists.map(\.id))
-        for id in Set(manifest.playlists.keys).union(manifest.rockboxPlaylists.keys).sorted() where !wantedIDs.contains(id) {
-            plan.playlistsToDelete.append(.init(serverID: id, persistentID: manifest.playlists[id], m3uPath: manifest.rockboxPlaylists[id]?.path))
         }
     }
 }

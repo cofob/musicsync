@@ -57,21 +57,15 @@ import Testing
         #expect(plan.freedBytes == 0 && plan.addBytes == 0)
     }
 
-    @Test func removesOnlyManagedSongsThatAreNoLongerWanted() {
+    @Test func keepsSongsThatAreNoLongerSelected() {
         let a = makeDesired(makeSong("a")), b = makeDesired(makeSong("b"))
         let plan = SyncPlanner.plan(fixture(songs: [a], present: [a, b]))
-        #expect(plan.remove.map(\.songID) == ["b"])
-        #expect(plan.remove[0].target == .stock)
-        #expect(plan.freedBytes == 5_000_000)
-        // The foreign track (dbid 1001) is never in the plan.
-        #expect(!plan.remove.contains { $0.entry.dbid == 1001 })
+        #expect(plan.isEmpty && plan.freedBytes == 0)
     }
 
-    @Test func emptySelectionRemovesAllManagedAndKeepsForeign() {
+    @Test func emptySelectionKeepsEverything() {
         let a = makeDesired(makeSong("a")), b = makeDesired(makeSong("b"))
-        let plan = SyncPlanner.plan(fixture(songs: [], present: [a, b]))
-        #expect(Set(plan.remove.map(\.songID)) == ["a", "b"])
-        #expect(plan.add.isEmpty)
+        #expect(SyncPlanner.plan(fixture(songs: [], present: [a, b])).isEmpty)
     }
 
     @Test func staleManifestEntryIsReaddedNotRemoved() {
@@ -158,15 +152,16 @@ import Testing
     }
 
     @Test func freedSpaceCountsTowardsFitting() {
-        let big = makeDesired(makeSong("old", size: 400_000_000))
-        let new = makeDesired(makeSong("new", size: 400_000_000, suffix: "mp3", bitRate: 320))
-        var input = fixture(songs: [new], present: [big]) { m in m.entries["old"]?.outSize = 400_000_000 }
-        input.freeBytes = 600_000_000
+        let old = makeDesired(makeSong("a"))
+        var preset = Preset.stockAAC
+        preset.version = 2
+        var input = fixture(songs: [makeDesired(makeSong("a"), preset: preset)], present: [old]) { m in m.entries["a"]?.outSize = 400_000_000 }
+        input.freeBytes = 400_000_000
         let plan = SyncPlanner.plan(input)
-        #expect(plan.remove.count == 1 && plan.fits)
+        #expect(plan.reencode.count == 1 && plan.fits)
     }
 
-    @Test func playlistsAreCreatedUpdatedAndDeleted() {
+    @Test func playlistsAreCreatedAndUpdatedButNeverDeleted() {
         let a = makeDesired(makeSong("a")), b = makeDesired(makeSong("b"))
         var input = fixture(songs: [a, b], present: [a, b], playlists: [
             DesiredPlaylist(id: "p-new", name: "New", songIDs: ["a"]),
@@ -185,8 +180,7 @@ import Testing
         let plan = SyncPlanner.plan(input)
         #expect(plan.playlistsToCreate.map(\.id) == ["p-new"])
         #expect(plan.playlistsToUpdate.map(\.id) == ["p-order"])
-        #expect(plan.playlistsToDelete.map(\.serverID) == ["p-gone"])
-        #expect(plan.playlistsToDelete.first?.persistentID == 13)
+        #expect(plan.playlistsToDelete.isEmpty)
     }
 
     @Test func coversAreCollectedPerAlbum() {
