@@ -32,7 +32,7 @@ public struct Track: Sendable, Equatable {
     /// Stars x 20 (0...100).
     public var rating: UInt8 = 0
     public var bookmarkTime: UInt32 = 0
-    public var timePlayed: Date?, timeAdded: Date?, timeModified: Date?
+    public var timePlayed: Date?, timeAdded: Date?, timeModified: Date?, lastSkipped: Date?
     public var compilation = false
     public var mediaType: UInt32 = 1
     /// 1 = normal, 2 = shown with the "unplayed" bullet.
@@ -108,7 +108,7 @@ private struct Field {
             .int(0x4C, \.soundcheck), .int(0x50, \.playCount), .date(0x58, \.timePlayed),
             .int(0x5C, \.discNumber), .int(0x60, \.discCount), .date(0x68, \.timeAdded),
             .int(0x6C, \.bookmarkTime), .int(0x70, \.dbid), .int(0x7C, \.artworkCount),
-            .int(0x80, \.artworkSize), .int(0x9C, \.skipCount), .flag(0xA4, width: 1, \.hasArtwork, off: 2),
+            .int(0x80, \.artworkSize), .int(0x9C, \.skipCount), .date(0xA0, \.lastSkipped), .flag(0xA4, width: 1, \.hasArtwork, off: 2),
             .flag(0xB0, width: 1, \.lyricsFlag), .int(0xB2, \.markUnplayed), .int(0xB8, \.pregap), .int(0xBC, \.sampleCount), .int(0xC8, \.postgap),
             .int(0xD0, \.mediaType), .int(0xF8, \.gaplessData),
             .flag(0x100, width: 2, \.gaplessTrackFlag), .flag(0x102, width: 2, \.gaplessAlbumFlag),

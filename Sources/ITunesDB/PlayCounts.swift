@@ -36,6 +36,7 @@ public struct PlayCounts: Sendable, Equatable {
         guard data.count >= 16, (try? r.tag(at: 0)) == "mhdp" else { throw ITunesDBError.corrupt("not a Play Counts file") }
         let headerLength = try r.int(4), size = try r.int(8), count = try r.int(12)
         guard size >= 0x0C else { throw ITunesDBError.corrupt("Play Counts record size \(size)") }
+        guard count <= (data.count - headerLength) / size else { throw ITunesDBError.corrupt("Play Counts record count \(count)") }
         let entries = try (0..<count).map { i -> PlayCountEntry in
             let o = headerLength + i * size
             return PlayCountEntry(
@@ -60,6 +61,7 @@ extension ITunesDB {
             if entry.bookmark != 0 { tracks[i].bookmarkTime = entry.bookmark }
             tracks[i].playCount &+= entry.playCount
             tracks[i].skipCount &+= entry.skipCount
+            if let skipped = entry.lastSkipped { tracks[i].lastSkipped = skipped }
             guard entry.playCount > 0 else { continue }
             tracks[i].markUnplayed = 1
             deltas.append(PlayDelta(trackID: tracks[i].id, plays: entry.playCount, lastPlayed: entry.lastPlayed))
@@ -75,6 +77,7 @@ public enum OTGPlaylists {
         guard data.count >= 16, (try? r.tag(at: 0)) == "mhpo" else { throw ITunesDBError.corrupt("not an OTG playlist file") }
         let headerLength = try r.int(4), size = try r.int(8), count = try r.int(12)
         guard size >= 4 else { throw ITunesDBError.corrupt("OTG record size \(size)") }
+        guard count <= (data.count - headerLength) / size else { throw ITunesDBError.corrupt("OTG record count \(count)") }
         return try (0..<count).map { try r.u32(at: headerLength + $0 * size) }
     }
 }

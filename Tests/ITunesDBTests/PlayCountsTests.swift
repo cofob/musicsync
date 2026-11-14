@@ -26,6 +26,7 @@ import Testing
     @Test func rejectsOtherFiles() {
         #expect(throws: ITunesDBError.self) { try PlayCounts.parse(Data(repeating: 1, count: 40)) }
         #expect(throws: (any Error).self) { try PlayCounts.parse(file(entrySize: 0x1C, [[1]]).dropLast(20)) }
+        #expect(throws: ITunesDBError.self) { try PlayCounts.parse(file(entrySize: 0x1C, []).patching(UInt32.max, at: 12)) }
     }
 
     @Test func mergeFollowsLibgpodRules() throws {
@@ -35,7 +36,7 @@ import Testing
         db.tracks[1].markUnplayed = 2
         let played = Date(timeIntervalSince1970: 1_750_000_000)
         let pc = PlayCounts(entries: [
-            PlayCountEntry(playCount: 2, lastPlayed: played, bookmark: 7, rating: 40, skipCount: 1),
+            PlayCountEntry(playCount: 2, lastPlayed: played, bookmark: 7, rating: 40, skipCount: 1, lastSkipped: played),
             PlayCountEntry(playCount: 1, lastPlayed: nil, rating: 80),
             PlayCountEntry(playCount: 0, lastPlayed: nil, rating: 80),
         ])
@@ -51,6 +52,7 @@ import Testing
 
         let parsed = try ITunesDB.parse(try db.serialize())
         #expect(parsed.tracks[0].playCount == 5 && parsed.tracks[0].rating == 40)
+        #expect(parsed.tracks[0].lastSkipped == MacTime.date(MacTime.mac(played)))
     }
 
     @Test func otgPlaylists() throws {
