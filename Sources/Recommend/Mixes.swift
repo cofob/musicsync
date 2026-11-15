@@ -55,13 +55,15 @@ public extension Catalog {
     private func loved(_ id: String) -> Bool { (tracks[id]?.starred ?? false) || (tracks[id]?.rating ?? 0) >= 4 }
 
     /// Leaves out rejected songs, puts the ones heard in the last hours last, and keeps the spacing and the artist and
-    /// album caps: a shorter mix is better than one artist filling it, but too few songs for a mix take the caps loosely.
+    /// album caps: a shorter mix is better than one artist filling it or two songs of an album in a row, but too few
+    /// songs for a mix take the caps loosely.
     private func finish(_ ids: [String], _ size: Int) -> [String] {
         let kept = ids.filter { !feedback.rejected.contains($0) }
         let ordered = kept.filter { !justHeard.contains($0) } + kept.filter(justHeard.contains)
         let strict = spaced(capped(ordered, size: size, strict: true), limit: size)
-        let spacedWell = strict.indices.allSatisfy { fits(strict[$0], after: Array(strict[..<$0])) }
-        return strict.count >= Self.minimumMix && spacedWell ? strict : spaced(capped(ordered, size: size), limit: size)
+        // The songs before the first one that breaks the spacing (forced in at the end when few are left).
+        let spacedWell = strict.indices.first { !fits(strict[$0], after: Array(strict[..<$0])) }.map { Array(strict[..<$0]) } ?? strict
+        return spacedWell.count >= Self.minimumMix ? spacedWell : spaced(capped(ordered, size: size), limit: size)
     }
 
     private func favorites(_ size: Int, _ rng: SeededRandom) -> [String] {

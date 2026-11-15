@@ -195,6 +195,17 @@ func isSpaced(_ ids: [String]) -> Bool {
         #expect(because.count == 2 && because.allSatisfy { $0.trackIds.count == 10 && !$0.trackIds.contains($0.seedId ?? "") })
     }
 
+    /// A genre of few artists cannot fill a mix of 50 within the caps: the mix comes out shorter, never over the caps.
+    @Test func smallGenresKeepTheCaps() {
+        for day in ["2026-11-14", "2026-11-15", "2026-11-16"] {
+            for mix in coldStart.madeForYou(day: day) where mix.kind == .daily {
+                let artists = Dictionary(grouping: mix.trackIds, by: artist).values.map(\.count).max() ?? 0
+                let albums = Dictionary(grouping: mix.trackIds, by: album).values.map(\.count).max() ?? 0
+                #expect(mix.trackIds.count >= Catalog.minimumMix && artists <= 10 && albums <= 5, "\(day) \(mix.id): \(artists) per artist, \(albums) per album")
+            }
+        }
+    }
+
     @Test func mixesAreStableForADay() {
         let catalog = coldStart
         #expect(catalog.madeForYou(day: "2026-11-14") == catalog.madeForYou(day: "2026-11-14"))
