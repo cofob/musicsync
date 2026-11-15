@@ -50,6 +50,7 @@ struct MusicSyncApp: App {
     var body: some Scene {
         WindowGroup("MusicSync", id: MainWindow.id) {
             RootView().modifier(SystemEvents()).environment(model)
+                .onDisappear { model.covers?.purge() }
         }
         .commands {
             SidebarCommands()

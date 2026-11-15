@@ -1,4 +1,5 @@
 import AppKit
+import ImageIO
 import Library
 import Subsonic
 import Support
@@ -20,6 +21,7 @@ actor CoverArtCache {
         self.offline = offline
         directory = Paths.caches("covers", client.config.account)
         memory.countLimit = 500
+        memory.totalCostLimit = 32 << 20
     }
 
     private static func sizes(in directory: URL) -> [String: Set<Int>] {
@@ -31,6 +33,27 @@ actor CoverArtCache {
         return sizes
     }
 
+    /// Decodes at most `size` px on the long edge, so only the bitmap stays in memory (no file bytes, no oversize).
+    private static func decode(_ source: CGImageSource?, _ size: Int) -> NSImage? {
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true, kCGImageSourceThumbnailMaxPixelSize: size,
+            kCGImageSourceCreateThumbnailWithTransform: true, kCGImageSourceShouldCacheImmediately: true,
+        ]
+        guard let source, let cg = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return NSImage(cgImage: cg, size: NSSize(width: cg.width, height: cg.height))
+    }
+
+    private static func decode(_ url: URL, _ size: Int) -> NSImage? { decode(CGImageSourceCreateWithURL(url as CFURL, nil), size) }
+
+    private static func decode(_ data: Data, _ size: Int) -> NSImage? { decode(CGImageSourceCreateWithData(data as CFData, nil), size) }
+
+    private nonisolated func keep(_ image: NSImage, _ key: String) {
+        memory.setObject(image, forKey: key as NSString, cost: Int(image.size.width * image.size.height) * 4)
+    }
+
+    /// Drops every cover from memory (the main window closed).
+    nonisolated func purge() { memory.removeAllObjects() }
+
     private static func fileID(_ id: String) -> String { id.replacingOccurrences(of: "/", with: "_") }
 
     /// Best full cover already on disk for `size`: the smallest one at least that big, else the biggest one.
@@ -38,11 +61,12 @@ actor CoverArtCache {
     func local(id: String, size: Int) -> (image: NSImage, exact: Bool)? {
         let sizes = sizesOnDisk[Self.fileID(id)] ?? []
         guard let best = sizes.filter({ $0 >= size }).min() ?? sizes.max() else { return offlineCover(id: id, size: size) }
-        let key = "\(id)@\(best)"
+        let target = min(size, best)
+        let key = "\(id)@\(target)"
         let image = memory.object(forKey: key as NSString)
-            ?? NSImage(contentsOf: directory.appendingPathComponent("\(Self.fileID(id))@\(best)"))
+            ?? Self.decode(directory.appendingPathComponent("\(Self.fileID(id))@\(best)"), target)
         guard let image else { return nil }
-        memory.setObject(image, forKey: key as NSString)
+        keep(image, key)
         return (image, best >= size)
     }
 
@@ -53,8 +77,8 @@ actor CoverArtCache {
     func image(file: URL, key: String) -> NSImage? {
         let memoryKey = "\(key)@small" as NSString
         if let hit = memory.object(forKey: memoryKey) { return hit }
-        guard let image = NSImage(contentsOf: file) else { return nil }
-        memory.setObject(image, forKey: memoryKey)
+        guard let image = Self.decode(file, 96) else { return nil }
+        keep(image, memoryKey as String)
         return image
     }
 
@@ -70,17 +94,18 @@ actor CoverArtCache {
         } else {
             data = await download(key: key, id: id, size: size, to: file)
         }
-        guard let data, let image = NSImage(data: data) else { return local(id: id, size: size)?.image }
+        guard let data, let image = Self.decode(data, size) else { return local(id: id, size: size)?.image }
         sizesOnDisk[Self.fileID(id), default: []].insert(size)
-        memory.setObject(image, forKey: key as NSString)
+        keep(image, key)
         return image
     }
 
     private func offlineCover(id: String, size: Int) -> (image: NSImage, exact: Bool)? {
-        let key = "\(id)@offline" as NSString
-        guard let offline, let image = memory.object(forKey: key)
-                ?? NSImage(contentsOf: offline.appendingPathComponent(DownloadManager.coverFileName(id))) else { return nil }
-        memory.setObject(image, forKey: key)
+        let key = "\(id)@offline@\(size)"
+        guard let offline, let image = memory.object(forKey: key as NSString)
+                ?? Self.decode(offline.appendingPathComponent(DownloadManager.coverFileName(id)), min(size, DownloadManager.coverSize))
+        else { return nil }
+        keep(image, key)
         return (image, size <= DownloadManager.coverSize)
     }
 
