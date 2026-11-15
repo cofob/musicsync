@@ -162,8 +162,15 @@ public struct SubsonicClient: Sendable {
         try await retry.run(retries: RetryPolicy.isTransientBinary) {
             let (data, response) = try await session.data(from: coverArtURL(id: id, size: size))
             try Self.check(response, body: data)
+            if Self.isPlaceholderCover(response) { throw SubsonicError.badResponse("placeholder cover") }
             return data
         }
+    }
+
+    /// Navidrome answers an item without art with its own stand-in image (a vinyl record), sent as never to be
+    /// stored; real covers may be cached. That image is no cover.
+    static func isPlaceholderCover(_ response: URLResponse?) -> Bool {
+        (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Cache-Control")?.lowercased().contains("no-store") == true
     }
 
     /// Binary endpoints send a Subsonic error body (XML/JSON) with HTTP 200.
