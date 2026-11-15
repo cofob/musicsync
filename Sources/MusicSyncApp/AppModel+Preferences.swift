@@ -12,7 +12,7 @@ extension AppModel {
 
     /// The iPod name from Settings > Sync when the iPod's database has another one.
     var deviceRename: String? {
-        guard let uuid = ipod.current?.volumeUUID, let snapshot = ipod.snapshot, snapshot.database != nil,
+        guard let uuid = ipod.current?.volumeUUID, let snapshot = ipod.snapshot, snapshot.locations != nil,
               let name = syncSettings.deviceNames[uuid]?.trimmingCharacters(in: .whitespaces), !name.isEmpty,
               name != snapshot.name else { return nil }
         return name

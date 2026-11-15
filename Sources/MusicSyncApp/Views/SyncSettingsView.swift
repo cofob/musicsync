@@ -153,7 +153,7 @@ struct SyncSettingsView: View {
             })
             TextField("Name", text: Binding(get: { model.syncSettings.deviceNames[uuid] ?? model.ipod.snapshot?.name ?? device.volumeName },
                                             set: { model.syncSettings.deviceNames[uuid] = $0.isEmpty ? nil : $0 }))
-                .disabled(model.ipod.snapshot?.database == nil)
+                .disabled(model.ipod.snapshot?.locations == nil)
             LabeledContent("Volume UUID") { Text(uuid).font(.caption.monospaced()).textSelection(.enabled) }
             TextField("Manual GUID", text: manual, prompt: Text("16 hex digits"))
                 .autocorrectionDisabled()

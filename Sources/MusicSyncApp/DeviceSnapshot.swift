@@ -101,8 +101,8 @@ struct DeviceSnapshot: Sendable {
     var guid: String?
     var rockbox = false
     var capacity: Capacity?
-    /// Parsed database; nil when missing or corrupt (see `error`).
-    var database: ITunesDB?
+    /// `location` of every track in the database; nil when it is missing or corrupt (see `error`).
+    var locations: Set<String>?
     var tracks: [DeviceTrack] = []
     var albums: [DeviceAlbum] = []
     var playlists: [DevicePlaylist] = []
@@ -118,7 +118,7 @@ struct DeviceSnapshot: Sendable {
 
     /// Tracks, albums and playlists of `db`.
     mutating func fill(_ db: ITunesDB) {
-        database = db
+        locations = Set(db.tracks.map(\.location))
         if !db.name.isEmpty { name = db.name }
         let all = db.tracks.map(DeviceTrack.init)
         let byID = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })

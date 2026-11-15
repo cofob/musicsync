@@ -83,7 +83,7 @@ final class DeviceModel {
             self.snapshot = snapshot
             version += 1
             isLoading = false
-            if snapshot.database != nil {
+            if snapshot.locations != nil {
                 let last = LastDevice(snapshot)
                 Task.detached(priority: .utility) { last.save() }
             }
@@ -105,9 +105,9 @@ final class DeviceModel {
 
     /// Finds files in `Music/Fxx` that no track references; fills `snapshot.orphans`.
     func scanOrphans() {
-        guard let s = snapshot, let db = s.database, !isScanningOrphans else { return }
+        guard let s = snapshot, let referenced = s.locations, !isScanningOrphans else { return }
         isScanningOrphans = true
-        let device = s.device, referenced = Set(db.tracks.map(\.location)), seen = version
+        let device = s.device, seen = version
         Task {
             let found = await Task.detached(priority: .utility) { try? device.layout.orphans(referenced: referenced) }.value
             isScanningOrphans = false
