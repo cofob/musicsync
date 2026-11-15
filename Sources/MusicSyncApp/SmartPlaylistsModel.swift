@@ -5,8 +5,14 @@ import Preferences
 import Subsonic
 import Sync
 
-extension SmartPlaylistList: StoredSettings {
-    public static let defaultsKey = "smartPlaylists"
+/// The list saved as itself under `defaultsKey`. A wrapper, as Library does not see Preferences.
+private struct SavedSmartPlaylists: StoredSettings {
+    static let defaultsKey = "smartPlaylists"
+    var list = SmartPlaylistList()
+    init() {}
+    init(_ list: SmartPlaylistList) { self.list = list }
+    init(from decoder: Decoder) throws { list = try SmartPlaylistList(from: decoder) }
+    func encode(to encoder: Encoder) throws { try list.encode(to: encoder) }
 }
 
 /// Smart playlists: rules kept on this Mac and evaluated against the local library, never sent to the server.
@@ -14,7 +20,7 @@ extension SmartPlaylistList: StoredSettings {
 @MainActor @Observable
 final class SmartPlaylistsModel {
     /// By name.
-    private(set) var list = SmartPlaylistList.load().playlists
+    private(set) var list = SavedSmartPlaylists.load().list.playlists
     /// Songs and cover of each playlist at its last evaluation.
     private(set) var summaries: [String: Summary] = [:]
     /// The playlist in the editor sheet.
@@ -80,7 +86,7 @@ final class SmartPlaylistsModel {
         list.removeAll { $0.id == p.id }
         list.append(p)
         list.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
-        SmartPlaylistList(playlists: list).save()
+        SavedSmartPlaylists(SmartPlaylistList(playlists: list)).save()
         if isNew { app.selection = .playlist(p.id) }
         if app.downloads.isPinned(.playlist(p.id)), let playlist = playlist(p.id) { app.download(playlist) }
         if app.sync.isPlaylistSelected(p.id) { app.sync.libraryChanged() }
@@ -95,7 +101,7 @@ final class SmartPlaylistsModel {
     func delete(_ p: SmartPlaylist) {
         list.removeAll { $0.id == p.id }
         summaries[p.id] = nil
-        SmartPlaylistList(playlists: list).save()
+        SavedSmartPlaylists(SmartPlaylistList(playlists: list)).save()
         if app.downloads.isPinned(.playlist(p.id)) { app.removeDownload(.playlist(p.id)) }
         if app.sync.isPlaylistSelected(p.id) { app.sync.togglePlaylist(p.id) }
         if app.selection == .playlist(p.id) { app.selection = .playlists }
