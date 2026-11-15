@@ -2,13 +2,18 @@
 
 <h1 align="center">MusicSync</h1>
 
-<p align="center">Native macOS app that syncs a Navidrome / OpenSubsonic library to an iPod classic.</p>
+<p align="center">Native macOS music player for Navidrome / OpenSubsonic servers, with offline downloads and iPod classic sync.</p>
 
 ![MusicSync main window](docs/screenshot.webp)
 
 ## Features
 
 - Browse and play your server library in an Apple Music–style window, with lyrics and a play queue.
+- Gapless playback, crossfade and beat-matched AutoMix, a ten-band equalizer and ReplayGain.
+- Made for You mixes, stations and AutoPlay from a local recommendation engine; listening stats.
+- Smart playlists, podcasts, and offline downloads with smart download rules.
+- Play on the server's jukebox, or control playback from iPhone, iPad and Apple Watch in a browser.
+- MiniPlayer, menu bar player, Shortcuts and Siri actions, Spotlight and global shortcuts.
 - Fast local mirror of the library, so search works at once, also offline.
 - Sync albums, artists and playlists to an iPod classic with stock firmware: own iTunesDB writer with hash58, covers, playlists, gapless playback and Sound Check.
 - Converts lossless files to AAC with Apple's encoder; MP3 and AAC are copied as they are.
@@ -21,7 +26,7 @@
 - macOS 15 or later, Apple silicon or Intel.
 - Swift 6 toolchain: Xcode or the Command Line Tools (`xcode-select --install`).
 - [ffmpeg](https://ffmpeg.org) for conversion: `brew install ffmpeg`.
-- An iPod classic in disk mode. In Finder, turn off automatic sync and turn on manual management of music before the first sync.
+- For sync: an iPod classic in disk mode. In Finder, turn off automatic sync and turn on manual management of music before the first sync.
 
 ## Build
 
