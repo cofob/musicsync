@@ -78,9 +78,9 @@ struct UpNextPanel: View {
         header(title, note: note, clear: clear)
         // The item goes with its slot: a row may draw once more after the queue got shorter. An `if` in the row
         // instead makes the list resolve every row of a long queue to count its views, and Up Next opens late.
-        ForEach(slots.filter { queue.indices.contains($0.index) }.map { ($0, queue[$0.index]) }, id: \.0.id) { slot, item in
+        // The ForEach id is the scroll id: an `.id` on the row makes the list build every row to collect the ids.
+        ForEach(slots.filter { queue.indices.contains($0.index) }.map { ($0, queue[$0.index]) }, id: \.0.row) { slot, item in
             QueueRow(item: item, selected: selected == slot.id) { menu(slot, item) }
-                .id(RowID(key: slot.id))
                 .onTapGesture(count: 2) { player.play(at: slot.index) }
                 .onTapGesture { selected = slot.id }
                 .contextMenu { menu(slot, item) }
@@ -185,6 +185,10 @@ struct UpNextPanel: View {
 
 /// Scroll id of an upcoming row, apart from the History rows' offsets.
 private struct RowID: Hashable { let key: Int }
+
+private extension PlayQueue.Slot {
+    var row: RowID { RowID(key: id) }
+}
 
 /// Red capsule switch above the queue, as Apple Music's Shuffle and AutoPlay.
 private struct QueueToggle: View {
