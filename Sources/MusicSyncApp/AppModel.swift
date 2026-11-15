@@ -129,12 +129,14 @@ final class AppModel {
 
     /// Development only: `MUSICSYNC_DEMO=1` uses the public Navidrome demo (see `Paths.isDemo`),
     /// or `MUSICSYNC_DEMO_SERVER`, e.g. the big library of `scripts/big-server.py`.
+    /// `MUSICSYNC_DEMO_USER` and `MUSICSYNC_DEMO_PASSWORD` (default demo) log in to a local test server.
     @ObservationIgnored let demo = Paths.isDemo
+    @ObservationIgnored private let demoEnv = ProcessInfo.processInfo.environment
 
     init() {
         if demo {
             let server = ProcessInfo.processInfo.environment["MUSICSYNC_DEMO_SERVER"].flatMap(URL.init(string:))
-            config = ServerConfig(baseURL: server ?? URL(string: "https://demo.navidrome.org")!, username: "demo")
+            config = ServerConfig(baseURL: server ?? URL(string: "https://demo.navidrome.org")!, username: demoEnv["MUSICSYNC_DEMO_USER"] ?? "demo")
         } else if let data = UserDefaults.app.data(forKey: Self.configKey) {
             config = try? JSONDecoder().decode(ServerConfig.self, from: data)
         }
@@ -175,7 +177,7 @@ final class AppModel {
         await stopLibrary()
         await downloads.stop()
         let session = AppPreferences.shared.advanced.session()
-        let client = demo ? config.map { SubsonicClient(baseURL: $0.baseURL, username: $0.username, password: "demo", session: session) }
+        let client = demo ? config.map { SubsonicClient(baseURL: $0.baseURL, username: $0.username, password: demoEnv["MUSICSYNC_DEMO_PASSWORD"] ?? "demo", session: session) }
                           : config.flatMap { SubsonicClient(config: $0, session: session) }
         guard let client else {
             self.client = nil; store = nil; covers = nil
