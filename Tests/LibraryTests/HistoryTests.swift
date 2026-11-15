@@ -70,7 +70,7 @@ import Testing
 
     @Test func libraryGivesRecommenderInput() async throws {
         let db = tempDatabase()
-        let starred: Song = decode(["id": "s3", "title": "Loved", "artist": "B", "albumId": "a2", "genre": "Rock; Pop", "year": 2001,
+        let starred: Song = decode(["id": "s3", "title": "Loved", "artist": "B", "displayArtist": "B feat. C", "albumArtist": "X", "displayAlbumArtist": "Y", "albumId": "a2", "genre": "Rock; Pop", "year": 2001,
                                     "starred": "2024-05-01T00:00:00Z", "userRating": 4, "playCount": 7, "created": "2024-03-01T10:00:00.123Z"])
         try await seed(db, albums: [
             (album("a1", "One"), [song("s1", "A", albumId: "a1"), song("s2", "B", albumId: "a1", plays: 2)]),
@@ -82,6 +82,7 @@ import Testing
         #expect(loved.starred && loved.rating == 4 && loved.genres == ["rock", "pop"] && loved.year == 2001 && loved.albumId == "a2")
         #expect(abs((loved.created?.timeIntervalSince1970 ?? 0) - 1_709_287_200.123) < 0.001)
         #expect(loved.lastPlayed == Date(timeIntervalSince1970: 1_735_787_045))
+        #expect(loved.artist == "B feat. C" && loved.serverPlays == 7 && tracks["s1"]?.rating == 0 && tracks["s1"]?.starred == false)
         #expect(await db.songs(ids: ["s3", "gone", "s1"]).map(\.id) == ["s3", "s1"])
 
         let playlist: Playlist = decode(["id": "p1", "name": "Mix"])

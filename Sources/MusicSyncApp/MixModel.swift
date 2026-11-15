@@ -39,8 +39,6 @@ final class MixModel {
 
     @ObservationIgnored unowned let app: AppModel
     @ObservationIgnored let recorder: PlayRecorder
-    /// Library songs and playlists; read again only when the library changes.
-    @ObservationIgnored private var input: (database: LibraryDatabase, version: Int, tracks: [Track], playlists: [[String]])?
     /// Day, library and refresh the shown mixes were made for.
     @ObservationIgnored var loadedKey: String?
     /// Set by Refresh: other mixes for the rest of the day.
@@ -172,20 +170,16 @@ final class MixModel {
     /// A catalog with the newest history.
     private func catalog() async -> Catalog? {
         guard app.usesLocalLibrary, let library = app.library else { return nil }
-        let db = library.database, version = app.libraryVersion
-        if input?.database !== db || input?.version != version {
-            let tracks = await db.recommendationTracks(), playlists = await db.playlistMembers()
-            guard app.library?.database === db else { return nil }
-            input = (db, version, tracks, playlists)
-        }
-        guard let input, !input.tracks.isEmpty else { return nil }
+        let db = library.database
+        let tracks = await db.recommendationTracks(), playlists = await db.playlistMembers()
+        guard app.library?.database === db, !tracks.isEmpty else { return nil }
         // Settings > Library can leave the local history out: the server's play counts are always in `tracks`.
         let usesHistory = AppPreferences.shared.listening.usesHistory
         let events = usesHistory ? await library.history.events() : [], stats = usesHistory ? await library.history.stats() : [:]
         let dislikes = await library.history.dislikes()
         if app.library?.database === db, self.dislikes != dislikes { self.dislikes = dislikes }
         return await Task.detached(priority: .userInitiated) {
-            Catalog(tracks: input.tracks, playlists: input.playlists, history: events, stats: stats, dislikes: dislikes)
+            Catalog(tracks: tracks, playlists: playlists, history: events, stats: stats, dislikes: dislikes)
         }.value
     }
 }

@@ -7,7 +7,6 @@ import Subsonic
 struct StatsView: View {
     @Environment(AppModel.self) private var model
     @AppStorage("statsPeriod", store: .app) private var period = StatsPeriod.month
-    @State private var input: BrowseModel.StatsInput?
     @State private var page: BrowseModel.StatsPage?
 
     var body: some View {
@@ -36,10 +35,8 @@ struct StatsView: View {
             .padding(.horizontal, 32).padding(.vertical, 24)
         }
         .navigationTitle("Your Stats")
-        .task(id: model.libraryVersion) { input = await model.browse.statsInput() }
-        .task(id: [period.rawValue, input == nil ? "" : "loaded"]) {
-            guard let input else { return }
-            let found = await model.browse.statsPage(input, period: period)
+        .task(id: [period.rawValue, String(model.libraryVersion)]) {
+            let found = await model.browse.statsPage(period: period)
             if !Task.isCancelled { page = found }
         }
     }

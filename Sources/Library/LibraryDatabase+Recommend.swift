@@ -6,9 +6,15 @@ import Subsonic
 extension LibraryDatabase {
     /// Every mirrored song, with its album's last play as a hint for songs the local history has not seen.
     public func recommendationTracks() -> [Track] {
-        read([]) { db in
-            try db.rows("SELECT s.json, json_extract(a.json, '$.played') FROM songs s LEFT JOIN albums a ON a.id = s.albumId") { row in
-                decode(Song.self, row).map { Track($0, albumPlayed: row.text(1).flatMap(parseDate)) }
+        let fields = ["id", "title", "displayArtist", "artist", "displayAlbumArtist", "albumArtist", "albumId", "genre", "year", "duration",
+                      "starred", "userRating", "playCount", "created"].map { "json_extract(s.json, '$.\($0)')" }.joined(separator: ", ")
+        return read([]) { db in
+            try db.rows("SELECT \(fields), json_extract(a.json, '$.played') FROM songs s LEFT JOIN albums a ON a.id = s.albumId") { row in
+                func int(_ i: Int32) -> Int? { row.isNull(i) ? nil : row.int(i) }
+                guard let id = row.text(0), let title = row.text(1) else { return nil }
+                return Track(id: id, title: title, artist: row.text(2) ?? row.text(3), albumArtist: row.text(4) ?? row.text(5), albumId: row.text(6),
+                             genre: row.text(7), year: int(8), duration: int(9), starred: !row.isNull(10), rating: int(11) ?? 0,
+                             serverPlays: int(12) ?? 0, created: row.text(13).flatMap(parseDate), lastPlayed: row.text(14).flatMap(parseDate))
             }.compactMap { $0 }
         }
     }
@@ -32,15 +38,6 @@ extension LibraryDatabase {
             }
             return lists
         }
-    }
-}
-
-extension Track {
-    init(_ song: Song, albumPlayed: Date?) {
-        self.init(id: song.id, title: song.title, artist: song.artistName, albumArtist: song.displayAlbumArtist ?? song.albumArtist,
-                  albumId: song.albumId, genre: song.genre, year: song.year, duration: song.duration, starred: song.starred != nil,
-                  rating: song.userRating ?? 0, serverPlays: song.playCount ?? 0, created: song.created.flatMap(parseDate),
-                  lastPlayed: albumPlayed)
     }
 }
 
