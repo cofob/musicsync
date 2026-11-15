@@ -1,5 +1,6 @@
 import AVFoundation
 import Playback
+import Subsonic
 
 /// `check:quality`: the streaming quality, also the one for metered networks, sets the stream URL parameters.
 extension ShotChecks {
@@ -34,8 +35,13 @@ extension ShotChecks {
         player.isMetered = false
         check(params() == "mp3 128", "back on Wi-Fi: \(params())")
         // The stub sends its WAV file for every format (BIG_MEDIA=1), or nothing: no conversion, or unknown.
+        // Navidrome converts to both with its ffmpeg.
         await ServerFormats.shared.probe(model.client)
         let formats = ServerFormats.shared.formats
-        check(formats?.isEmpty != false && ServerFormats.shared.allows("raw"), "the stub converts nothing: \(formats.map { "\($0)" } ?? "unknown")")
+        if await onStub(model) {
+            check(formats?.isEmpty != false && ServerFormats.shared.allows("raw"), "the stub converts nothing: \(formats.map { "\($0)" } ?? "unknown")")
+        } else {
+            check(formats == Set(TranscodeProbe.formats), "Navidrome converts to \(formats.map { "\($0.sorted())" } ?? "unknown")")
+        }
     }
 }

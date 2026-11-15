@@ -42,6 +42,9 @@ import SwiftUI
         }
     }
 
+    /// The local stub (`scripts/big-server.py`) names no server type; a real Navidrome (`scripts/navidrome-dev.sh`) does.
+    static func onStub(_ model: AppModel) async -> Bool { (try? await model.client?.ping())?.type == nil }
+
     static func check(_ ok: Bool, _ what: String) {
         FileHandle.standardError.write(Data("CHECK \(ok ? "PASS" : "FAIL") \(what)\n".utf8))
         if !ok { failed = true }
@@ -99,14 +102,15 @@ import SwiftUI
     /// A library refresh brings a new list of the same rows; the table stays where it was.
     private static func libraryRefresh(_ table: NSTableView, _ coordinator: SongsTable.Coordinator, _ model: AppModel) async {
         let old = coordinator.list
-        table.scrollRowToVisible(300)
+        let row = min(300, table.numberOfRows - 1)  // a small real library has fewer rows
+        table.scrollRowToVisible(row)
         try? await Task.sleep(for: .milliseconds(300))
         let top = table.rows(in: table.visibleRect).location
         model.apply(artists: model.artists, albums: model.albums, playlists: model.playlists)
         let changed = await wait { coordinator.list !== old }
         try? await Task.sleep(for: .milliseconds(300))
         let now = table.rows(in: table.visibleRect).location
-        check(changed && top > 200 && abs(now - top) < 3, "a library refresh keeps the scroll place: row \(top) → \(now)")
+        check(changed && top > row / 2 && abs(now - top) < 3, "a library refresh keeps the scroll place: row \(top) → \(now)")
     }
 
     /// The table once its first rows have loaded.
@@ -603,6 +607,11 @@ import SwiftUI
     private static func podcastResume(_ model: AppModel) async {
         guard model.config?.baseURL.host == "127.0.0.1" else { return check(false, "podcast-resume needs MUSICSYNC_DEMO_SERVER on 127.0.0.1") }
         let podcasts = model.podcasts, player = model.player
+        guard await onStub(model) else {
+            // Navidrome has no podcasts: the page stays hidden, bookmarks still work.
+            check(await wait { model.bookmarks.supported } && !podcasts.isVisible, "no podcasts: the page stays hidden")
+            return
+        }
         check(await wait { podcasts.isVisible && model.bookmarks.supported }, "podcasts and bookmarks load")
         guard let channel = podcasts.channels.first(where: { $0.id == "ch-0" }), let full = try? await podcasts.channel(channel.id),
               let episode = full.episodes.first(where: { $0.song?.id == "st-0-1" }) else { return check(false, "stub episode st-0-1") }

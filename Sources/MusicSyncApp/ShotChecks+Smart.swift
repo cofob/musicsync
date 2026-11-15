@@ -1,16 +1,16 @@
 import Library
 import Subsonic
 
-/// `check:smart`: against `scripts/big-server.py` in a fresh demo folder. Smart playlists of several rules give the
-/// songs a plain filter over every mirrored song gives; limits hold; the page, the editor preview and a download
-/// pin show the same songs.
+/// `check:smart`: against `scripts/big-server.py` or `scripts/navidrome-dev.sh` in a fresh demo folder. Smart playlists
+/// of several rules give the songs a plain filter over every mirrored song gives; limits hold; the page, the editor
+/// preview and a download pin show the same songs.
 extension ShotChecks {
     static func smart(_ model: AppModel) async {
         guard model.config?.baseURL.host == "127.0.0.1" else { return check(false, "smart needs MUSICSYNC_DEMO_SERVER on 127.0.0.1") }
         await Shot.mirrored(model)
         guard let db = model.library?.database, model.usesLocalLibrary else { return check(false, "local library ready") }
         let songs = await db.songs()
-        check(songs.count > 1000, "mirror has the library (\(songs.count) songs)")
+        check(songs.count >= 200, "mirror has the library (\(songs.count) songs)")
         typealias P = SmartPlaylist
         func fold(_ text: String?) -> String { (text ?? "").folding(options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive], locale: nil) }
         func make(_ name: String, _ match: P.Match, _ items: [P.Item], limit: P.Limit = P.Limit()) -> P {

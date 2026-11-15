@@ -4,7 +4,8 @@ import Subsonic
 
 /// `check:downloads`: against `scripts/big-server.py` with `BIG_MEDIA=1` and faults on (`FAULT_TRUNCATE`, `FAULT_DROP`).
 /// Every finished download has the song's size and length and plays; cancel and Remove All leave no files; failures and
-/// server errors read as the short messages of `FriendlyError`.
+/// server errors read as the short messages of `FriendlyError`. Against `scripts/navidrome-dev.sh` downloads end too
+/// fast to cancel and there are no faults to turn on: those parts are left out.
 extension ShotChecks {
     static func downloads(_ model: AppModel) async {
         guard let base = model.config?.baseURL, base.host == "127.0.0.1", let client = model.client else {
@@ -12,7 +13,7 @@ extension ShotChecks {
         }
         _ = await waitLong(seconds: 120) { model.albums.count > 3 && model.downloads.manager != nil }
         guard let manager = model.downloads.manager, model.albums.count > 3 else { return check(false, "albums and downloads open") }
-        let downloads = model.downloads
+        let downloads = model.downloads, stub = await onStub(model)
         // Reading an album can fail on a faulty server: the user tries again.
         for album in model.albums.prefix(3) {
             for _ in 0..<5 where !downloads.isPinned(.album(album.id)) {
@@ -53,17 +54,18 @@ extension ShotChecks {
             model.download(album)
             _ = await waitLong(seconds: 10) { downloads.isPinned(.album(album.id)) }
         }
-        if await waitLong(seconds: 60, { downloads.entries.values.contains { $0.state == .downloading } }),
+        if stub, await waitLong(seconds: 60, { downloads.entries.values.contains { $0.state == .downloading } }),
            let running = downloads.entries.values.first(where: { $0.state == .downloading }) {
             await manager.cancel(running.id)
             model.removeDownload(.album(album.id))
             check(await waitLong(seconds: 10) { !downloads.isPinned(.album(album.id)) && parts().isSubset(of: kept) },
                   "cancel and remove leave no part files (\(parts().subtracting(kept)))")
-        } else { check(false, "a download to cancel") }
+        } else if stub { check(false, "a download to cancel") }
         model.removeAllDownloads()
         check(await waitLong(seconds: 20) { downloads.entries.isEmpty && leftovers(manager).isEmpty }, "Remove All leaves no files (\(leftovers(manager).prefix(3)))")
 
         // Server errors as the user reads them.
+        guard stub else { return }
         await fault(base, "random=0&outage=6")
         try? await Task.sleep(for: .seconds(1))
         // A kept-alive connection is closed by the stub instead of refused.
