@@ -63,7 +63,7 @@ struct TrackTable<Item: TrackTableItem>: NSViewRepresentable {
         table.intercellSpacing = NSSize(width: 8, height: 0)
         table.allowsMultipleSelection = true
         table.allowsColumnReordering = true
-        table.columnAutoresizingStyle = .sequentialColumnAutoresizingStyle  // only the title column has `autoresizingMask`
+        table.columnAutoresizingStyle = .uniformColumnAutoresizingStyle  // the text columns with `autoresizingMask` share the width
         table.rowSizeStyle = .custom
         for column in Item.columns {
             let tableColumn = column.tableColumn
@@ -381,7 +381,7 @@ extension SongsTable.Column {
         column.minWidth = min
         column.width = ideal
         column.maxWidth = max
-        column.resizingMask = self == .title ? [.autoresizingMask, .userResizingMask] : .userResizingMask
+        column.resizingMask = [.title, .artist, .album, .genre].contains(self) ? [.autoresizingMask, .userResizingMask] : .userResizingMask
         return column
     }
 }
