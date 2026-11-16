@@ -92,7 +92,6 @@ struct TrackTable<Item: TrackTableItem>: NSViewRepresentable {
         let coordinator = context.coordinator
         coordinator.parent = self
         scroll.contentInsets.bottom = bottomInset
-        scroll.scrollerInsets.bottom = bottomInset
         coordinator.show(columns, rowHeight: rowHeight)
         guard coordinator.list !== list, let table = coordinator.table else { return }
         coordinator.list = list
