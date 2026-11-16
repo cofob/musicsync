@@ -205,4 +205,16 @@ import Testing
         let a = makeDesired(makeSong("a", albumId: "x")), b = makeDesired(makeSong("b", albumId: "y"))
         #expect(SyncPlanner.plan(fixture(songs: [a, b], present: [])).albumCovers == ["x": "cov-x", "y": "cov-y"])
     }
+
+    @Test func serverRatingsHoldOnlyChangedOrNeverSyncedSongs() {
+        let songs = ["a", "b", "c"].map { makeDesired(makeSong($0, extra: ["userRating": 4])) }
+        var input = fixture(songs: songs, present: songs) { m in
+            m.entries["a"]?.rating = 3
+            m.entries["b"]?.rating = nil
+        }
+        #expect(SyncPlanner.plan(input).serverRatings == ["a": 4, "b": 4])
+        #expect(!SyncPlanner.plan(input).isEmpty)
+        input.syncRatings = false
+        #expect(SyncPlanner.plan(input).serverRatings == ["b": 4])
+    }
 }

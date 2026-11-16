@@ -36,7 +36,7 @@ func makeEntry(_ d: DesiredSong, dbid: UInt64, trackID: UInt32, path: String = "
     Manifest.Entry(dbid: dbid, trackID: trackID, relativePath: path, presetID: d.preset.id,
                    presetVersion: d.preset.version, albumID: d.albumID, sourceSize: d.song.size,
                    sourceSuffix: d.song.suffix, sourceCreated: d.song.created, outSize: outSize,
-                   fingerprint: d.fingerprint, title: d.tags.title)
+                   fingerprint: d.fingerprint, title: d.tags.title, rating: SyncPlanner.rating(d.song))
 }
 
 func makeTrack(_ n: Int, album: String = "Foreign Album", artist: String = "Foreign Artist", dbid: UInt64? = nil,

@@ -20,6 +20,8 @@ public struct SyncPlan: Sendable, Equatable {
     public var reencode: [Change] = []
     /// Database-only update.
     public var retag: [Change] = []
+    /// Server rating (0-5) of present stock songs whose rating changed since the last sync, or was never synced.
+    public var serverRatings: [String: Int] = [:]
 
     public var playlistsToCreate: [DesiredPlaylist] = []
     public var playlistsToUpdate: [DesiredPlaylist] = []
@@ -53,14 +55,14 @@ public struct SyncPlan: Sendable, Equatable {
     public var transferCount: Int { add.count + reencode.count }
 
     public var isEmpty: Bool {
-        add.isEmpty && remove.isEmpty && deleteTracks.isEmpty && reencode.isEmpty && retag.isEmpty
+        add.isEmpty && remove.isEmpty && deleteTracks.isEmpty && reencode.isEmpty && retag.isEmpty && serverRatings.isEmpty
             && playlistsToCreate.isEmpty && playlistsToUpdate.isEmpty && rename == nil
     }
 
     /// True when the iTunesDB (and so the FireWire GUID) is needed.
     public var touchesStock: Bool {
         add.contains { $0.preset.target == .stock } || remove.contains { $0.target == .stock }
-            || reencode.contains { $0.desired.preset.target == .stock } || !retag.isEmpty
+            || reencode.contains { $0.desired.preset.target == .stock } || !retag.isEmpty || !serverRatings.isEmpty
             || playlistsTouchStock || !deleteTracks.isEmpty || rename != nil
     }
 

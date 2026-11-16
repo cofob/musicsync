@@ -27,7 +27,7 @@ enum TrackBuilder {
         t.bitrate = UInt32(clamping: (p.output.bitRate ?? 0) / 1000)
         t.sampleRate = UInt32(clamping: p.output.sampleRate)
         t.playCount = UInt32(clamping: d.song.playCount ?? 0)
-        t.rating = UInt8(min(max(d.song.userRating ?? 0, 0), 5) * 20)
+        t.rating = UInt8(SyncPlanner.rating(d.song) * 20)
         t.lyricsFlag = p.hasLyrics
         t.timeAdded = now
         t.timeModified = now

@@ -38,6 +38,27 @@ struct EndToEndTests {
         }
 
         func cleanup() { pod.cleanup(); try? FileManager.default.removeItem(at: dir) }
+
+        /// Server ratings of First and Second.
+        func serveRatings(first: Int, second: Int) throws {
+            server.reply("getAlbum:al-1", StubServer.albumReply(albumJSON(id: "al-1", name: "Album One", songs: [
+                songJSON("s-1", title: "First", track: 1, file: dir.appendingPathComponent("a.flac"), seconds: 2,
+                         extra: ["playCount": 3, "userRating": first]),
+                songJSON("s-2", title: "Second", track: 2, file: dir.appendingPathComponent("b.flac"), seconds: 3,
+                         extra: ["userRating": second]),
+            ])))
+        }
+
+        /// A Play Counts file with these iPod ratings (0-5) by title; other tracks keep theirs.
+        func writeRatings(_ ratings: [String: Int]) throws {
+            let entries = try pod.database().tracks.map { PlayCountEntry(rating: ratings[$0.title].map { UInt32($0 * 20) } ?? UInt32($0.rating)) }
+            try EndToEndTests.writePlayCounts(entries, to: pod.device.playCountsURL)
+        }
+
+        /// iTunesDB ratings (0-100) of the managed tracks by title.
+        func ratings() throws -> [String: UInt8] {
+            Dictionary(try pod.database().tracks.filter { ["First", "Second"].contains($0.title) }.map { ($0.title, $0.rating) }) { a, _ in a }
+        }
     }
 
     static func selection(albums: [String] = ["al-1"], playlists: [String] = ["pl-1"]) -> Selection {
@@ -347,7 +368,79 @@ struct EndToEndTests {
         #expect(broken.exists("iPod_Control/Music/F01/KEEP.m4a"))
     }
 
+    @Test func ratingsGoBothWaysAndTheIPodWins() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        for method in ["setRating", "star", "unstar"] { f.server.reply(method, StubServer.ok) }
+        let selection = Self.selection(playlists: [])
+        _ = await runSync(try await makePlan(selection: selection, server: f.server, pod: f.pod), pod: f.pod, server: f.server)
+        #expect(f.pod.manifest().entries.mapValues(\.rating) == ["s-1": 4, "s-2": 0])
+
+        // iPod: First 4 -> 2. Server: Second 0 -> 3.
+        try f.serveRatings(first: 4, second: 3)
+        try f.writeRatings(["First": 2, "Second": 0])
+        let plan = try await makePlan(selection: selection, server: f.server, pod: f.pod)
+        #expect(plan.serverRatings == ["s-2": 3])
+        _ = await runSync(plan, pod: f.pod, server: f.server)
+        #expect(f.server.values("setRating", "id") == [["s-1"]] && f.server.values("setRating", "rating") == [["2"]])
+        #expect(try f.ratings() == ["First": 40, "Second": 60])
+
+        // Both sides change First: the iPod wins.
+        try f.serveRatings(first: 1, second: 3)
+        try f.writeRatings(["First": 5, "Second": 3])
+        _ = await runSync(try await makePlan(selection: selection, server: f.server, pod: f.pod), pod: f.pod, server: f.server)
+        #expect(f.server.values("setRating", "rating").last == ["5"] && f.server.values("setRating", "id").count == 2)
+        #expect(try f.ratings() == ["First": 100, "Second": 60])
+        #expect(f.pod.manifest().entries.mapValues(\.rating) == ["s-1": 5, "s-2": 3])
+        #expect(f.server.values("star", "id").isEmpty)
+    }
+
+    @Test func fiveStarsStarAndUnstar() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        for method in ["setRating", "star", "unstar"] { f.server.reply(method, StubServer.ok) }
+        var settings = f.pod.settings()
+        settings.starSource = .fiveStars
+        let selection = Self.selection(playlists: [])
+        _ = await runSync(try await makePlan(selection: selection, server: f.server, pod: f.pod), pod: f.pod, server: f.server)
+        try f.writeRatings(["First": 5, "Second": 0])
+        _ = await runSync(try await makePlan(selection: selection, server: f.server, pod: f.pod), pod: f.pod, server: f.server, settings: settings)
+        #expect(f.server.values("star", "id") == [["s-1"]])
+        try f.writeRatings(["First": 3, "Second": 0])
+        _ = await runSync(try await makePlan(selection: selection, server: f.server, pod: f.pod), pod: f.pod, server: f.server, settings: settings)
+        #expect(f.server.values("unstar", "id") == [["s-1"]])
+    }
+
+    @Test func onTheGoStarsAndUploadsOnce() async throws {
+        let f = try Fixture()
+        defer { f.cleanup() }
+        for method in ["star", "createPlaylist"] { f.server.reply(method, StubServer.ok) }
+        var settings = f.pod.settings()
+        settings.uploadOnTheGo = true
+        let selection = Self.selection(playlists: [])
+        _ = await runSync(try await makePlan(selection: selection, server: f.server, pod: f.pod), pod: f.pod, server: f.server)
+        let titles = try f.pod.database().tracks.map(\.title)
+        // The foreign track (position 0) has no song id and is skipped.
+        let positions = [titles.firstIndex(of: "Second")!, 0, titles.firstIndex(of: "First")!].map(UInt32.init)
+        for _ in 0..<2 {
+            try Self.writeOTG(positions, to: f.pod.device.iTunesDir.appendingPathComponent("OTGPlaylistInfo"))
+            _ = await runSync(try await makePlan(selection: selection, server: f.server, pod: f.pod), pod: f.pod, server: f.server, settings: settings)
+        }
+        #expect(f.server.values("star", "id").first.map(Set.init) == ["s-1", "s-2"])
+        #expect(f.server.values("createPlaylist", "songId") == [["s-2", "s-1"]])
+        #expect(f.server.values("createPlaylist", "name").first?.first?.hasPrefix("On-The-Go ") == true)
+    }
+
     // MARK: Helpers
+
+    /// Writes an `OTGPlaylistInfo` file.
+    static func writeOTG(_ positions: [UInt32], to url: URL) throws {
+        var d = Data("mhpo".utf8)
+        func u32(_ v: UInt32) { withUnsafeBytes(of: v.littleEndian) { d.append(contentsOf: $0) } }
+        u32(0x14); u32(4); u32(UInt32(positions.count)); u32(0)
+        positions.forEach(u32)
+        try d.write(to: url)
+    }
 
     /// Writes a `Play Counts` file (24-byte records).
     static func writePlayCounts(_ entries: [PlayCountEntry], to url: URL) throws {

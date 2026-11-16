@@ -122,7 +122,7 @@ extension SyncJob {
     private func applyStock(_ t: Transferred) {
         let d = t.work.desired
         var track = TrackBuilder.make(d, prepared: t.prepared, relativePath: t.path, size: t.size)
-        let trackID: UInt32
+        let trackID: UInt32, rating: Int?
         if let old = t.work.old, let i = db.tracks.firstIndex(where: { $0.dbid == old.dbid }) {
             let previous = db.tracks[i]
             track.id = previous.id; track.dbid = previous.dbid
@@ -133,10 +133,13 @@ extension SyncJob {
             db.tracks[i] = track
             pendingDeletes.append(ITunesDB.relativePath(ipodLocation: previous.location))
             trackID = previous.id
+            rating = manifest.entries[d.id]?.rating
         } else {
             trackID = db.addTrack(track)
+            rating = SyncPlanner.rating(d.song)
         }
         manifest.entries[d.id] = entry(t, dbid: track.dbid, trackID: trackID)
+        manifest.entries[d.id]?.rating = rating
         dbDirty = true
     }
 

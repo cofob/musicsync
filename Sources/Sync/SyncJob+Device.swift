@@ -22,6 +22,7 @@ extension SyncJob {
             }
             await mergePlayStatistics()
             pruneStale()
+            await mergeRatings()
             if let name = plan.rename, db.name != name {
                 db.name = name
                 dbDirty = true
@@ -53,11 +54,55 @@ extension SyncJob {
                 }
             } catch { warn("Play Counts is unreadable, discarded (a copy is kept in the Mac backup): \(error)") }
         }
-        let lists = names.filter { $0.hasPrefix("OTGPlaylistInfo") }.sorted().compactMap { name in
-            (try? Data(contentsOf: device.iTunesDir.appendingPathComponent(name))).flatMap { try? OTGPlaylists.parse($0) }
-        }
+        let files = names.filter { $0.hasPrefix("OTGPlaylistInfo") }.sorted()
+            .compactMap { try? Data(contentsOf: device.iTunesDir.appendingPathComponent($0)) }
+        let lists = files.compactMap { try? OTGPlaylists.parse($0) }
         let day = Date().formatted(.iso8601.year().month().day())
-        db.addOTGPlaylists(lists) { lists.count > 1 ? "On-The-Go \(day) #\($0 + 1)" : "On-The-Go \(day)" }
+        let name = { (n: Int) in lists.count > 1 ? "On-The-Go \(day) #\(n + 1)" : "On-The-Go \(day)" }
+        await sendOnTheGo(lists, name: name, source: files.reduce(Data(), +))
+        db.addOTGPlaylists(lists, name: name)
+    }
+
+    /// On-The-Go songs become server stars and playlists, as the settings say.
+    private func sendOnTheGo(_ lists: [[UInt32]], name: (Int) -> String, source: Data) async {
+        let songs = songIDsByDbid()
+        let ids = lists.map { $0.compactMap { Int($0) < db.tracks.count ? songs[db.tracks[Int($0)].dbid] : nil } }
+        let stars = settings.starSource == .onTheGo ? Dictionary(ids.joined().map { ($0, true) }) { a, _ in a } : [:]
+        let playlists = settings.uploadOnTheGo
+            ? ids.enumerated().filter { !$0.element.isEmpty }.map { PendingPlaylist(name: name($0.offset), songIDs: $0.element) } : []
+        guard !stars.isEmpty || !playlists.isEmpty else { return }
+        await scrobbler.enqueue(stars: stars, playlists: playlists, source: source)
+    }
+
+    private func songIDsByDbid() -> [UInt64: String] {
+        Dictionary(manifest.entries.map { ($0.value.dbid, $0.key) }) { a, _ in a }
+    }
+
+    /// Three-way rating merge against the rating of the last sync: a change on the iPod wins and goes to the server,
+    /// else a change on the server goes to the iPod.
+    private func mergeRatings() async {
+        let index = Dictionary(db.tracks.indices.map { (db.tracks[$0].dbid, $0) }) { a, _ in a }
+        var ratings: [String: Int] = [:], stars: [String: Bool] = [:]
+        for (id, var entry) in manifest.entries {
+            guard let i = index[entry.dbid], let server = plan.serverRatings[id] ?? entry.rating else { continue }
+            // Never synced: an unrated iPod track takes the server rating, a rated one wins.
+            let ipod = Int(db.tracks[i].rating) / 20, base = entry.rating ?? (ipod == 0 ? 0 : server)
+            if ipod != base {
+                if settings.syncRatings, ipod != server { ratings[id] = ipod }
+                if settings.starSource == .fiveStars, ipod == 5 || entry.rating == 5 { stars[id] = ipod == 5 }
+                entry.rating = ipod
+            } else if settings.syncRatings, server != ipod {
+                db.tracks[i].rating = UInt8(server * 20)
+                entry.rating = server
+                dbDirty = true
+            } else {
+                entry.rating = ipod
+            }
+            guard entry != manifest.entries[id] else { continue }
+            manifest.entries[id] = entry
+            manifestDirty = true
+        }
+        if !ratings.isEmpty || !stars.isEmpty { await scrobbler.enqueue(ratings: ratings, stars: stars) }
     }
 
     static let statsFiles: Set<String> = ["Play Counts", "iTunesStats", "PlayCounts.plist"]
@@ -65,7 +110,7 @@ extension SyncJob {
     /// N plays of a managed track become N timestamps, one track length apart.
     private func scrobbleRequests(_ deltas: [PlayDelta]) -> [ScrobbleRequest] {
         let tracks = Dictionary(db.tracks.map { ($0.id, $0) }) { a, _ in a }
-        let songs = Dictionary(manifest.entries.map { ($0.value.dbid, $0.key) }) { a, _ in a }
+        let songs = songIDsByDbid()
         return deltas.flatMap { delta -> [ScrobbleRequest] in
             guard let track = tracks[delta.trackID], let songID = songs[track.dbid] else { return [] }
             return Scrobbler.timestamps(plays: Int(delta.plays), lastPlayed: delta.lastPlayed, duration: Double(track.lengthMs) / 1000)

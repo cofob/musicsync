@@ -87,6 +87,19 @@ struct SyncSettingsView: View {
                 SettingsFooter("Plays counted on the iPod always stay on it; when sending is on, the next sync also counts them on the server.")
             }
             Section {
+                Toggle("Sync ratings", isOn: $model.syncSettings.syncRatings)
+                Picker("Favorite on the iPod", selection: $model.syncSettings.starSource) {
+                    Text("Off").tag(SyncSettings.StarSource.off)
+                    Text("On-The-Go songs").tag(SyncSettings.StarSource.onTheGo)
+                    Text("5 stars").tag(SyncSettings.StarSource.fiveStars)
+                }
+                Toggle("Copy On-The-Go playlists to the server", isOn: $model.syncSettings.uploadOnTheGo)
+            } header: {
+                Text("iPod and Server")
+            } footer: {
+                SettingsFooter("When a rating changed on both sides, the iPod wins. The Favorites playlist brings server favorites to the iPod.")
+            }
+            Section {
                 Picker("Album cover size", selection: $model.syncSettings.rockboxCoverSize) {
                     ForEach([200, 320, 500], id: \.self) { Text("\($0) × \($0)").tag($0) }
                 }

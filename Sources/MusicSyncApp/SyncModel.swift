@@ -226,9 +226,10 @@ final class SyncModel {
                 let songs = expansion.songs, playlists = expansion.playlists, fillers = expansion.fillers
                 // The iPod disk can be slow or busy: read it off the main thread.
                 let (plan, hasPlayCounts) = await Task.detached(priority: .userInitiated) {
-                    let input = PlannerInput(desired: songs, playlists: playlists, manifest: context.manifest,
+                    var input = PlannerInput(desired: songs, playlists: playlists, manifest: context.manifest,
                                              library: context.library, freeBytes: (try? device.capacity().available) ?? 0,
                                              reserveBytes: settings.reserveBytes, fillers: fillers)
+                    input.syncRatings = settings.syncRatings
                     var plan = SyncPlanner.plan(input)
                     plan.rename = rename
                     return (plan, FileManager.default.fileExists(atPath: device.playCountsURL.path))

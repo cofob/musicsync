@@ -8,6 +8,11 @@ public struct SyncSettings: Codable, Sendable, Equatable {
         case album, track, off
     }
 
+    /// What on the iPod stars a song on the server.
+    public enum StarSource: String, Codable, Sendable, CaseIterable {
+        case off, onTheGo, fiveStars
+    }
+
     /// Default preset id for new devices (see `Preset.builtIns`).
     public var presetID: String = "stock-aac"
     /// ffmpeg binary or its directory; nil = auto-detect.
@@ -33,6 +38,11 @@ public struct SyncSettings: Codable, Sendable, Equatable {
     public var autoSync = false
     /// Sends plays from the iPod's Play Counts to the server (scrobbles).
     public var sendPlayCounts = true
+    /// Ratings go both ways; a change made on the iPod wins.
+    public var syncRatings = true
+    public var starSource: StarSource = .onTheGo
+    /// On-The-Go lists become playlists on the server.
+    public var uploadOnTheGo = false
     /// Edge of the Rockbox `cover.jpg` in pixels.
     public var rockboxCoverSize = 500
     /// iPod name per volume UUID; a sync writes it into the iTunesDB.
@@ -57,6 +67,9 @@ public struct SyncSettings: Codable, Sendable, Equatable {
         keepFreeGB = try c.decodeIfPresent(Double.self, forKey: .keepFreeGB) ?? keepFreeGB
         autoSync = try c.decodeIfPresent(Bool.self, forKey: .autoSync) ?? autoSync
         sendPlayCounts = try c.decodeIfPresent(Bool.self, forKey: .sendPlayCounts) ?? sendPlayCounts
+        syncRatings = try c.decodeIfPresent(Bool.self, forKey: .syncRatings) ?? syncRatings
+        starSource = try c.decodeIfPresent(StarSource.self, forKey: .starSource) ?? starSource
+        uploadOnTheGo = try c.decodeIfPresent(Bool.self, forKey: .uploadOnTheGo) ?? uploadOnTheGo
         rockboxCoverSize = try c.decodeIfPresent(Int.self, forKey: .rockboxCoverSize) ?? rockboxCoverSize
         deviceNames = try c.decodeIfPresent([String: String].self, forKey: .deviceNames) ?? deviceNames
     }

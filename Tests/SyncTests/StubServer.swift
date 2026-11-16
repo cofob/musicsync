@@ -20,6 +20,8 @@ final class StubServer: @unchecked Sendable {
     private var scrobbleCalls = 0
     private var _failScrobblesAfter: Int?
     private(set) var requests: [String] = []
+    /// Every request with its query, in order.
+    private(set) var calls: [(method: String, items: [URLQueryItem])] = []
     /// Makes every download slow, so tests can cancel mid-run.
     var downloadDelay: TimeInterval = 0
     /// Network latency of every API reply; requests still run in parallel.
@@ -47,6 +49,10 @@ final class StubServer: @unchecked Sendable {
     func serveConverted(songID: String, file: URL) { locked { converted[songID] = file } }
     func serveCover(_ data: Data) { locked { coverData = data } }
     var scrobbles: [Scrobble] { locked { _scrobbles } }
+    /// Values of `name` in each call of `method`.
+    func values(_ method: String, _ name: String) -> [[String]] {
+        locked { calls.filter { $0.method == method }.map { $0.items.filter { $0.name == name }.compactMap(\.value) } }
+    }
     var failScrobblesAfter: Int? {
         get { locked { _failScrobblesAfter } }
         set { locked { _failScrobblesAfter = newValue; scrobbleCalls = 0 } }
@@ -66,6 +72,7 @@ final class StubServer: @unchecked Sendable {
         let id = items.first { $0.name == "id" }?.value
         return locked {
             requests.append(method)
+            calls.append((method, items))
             switch method {
             case "download":
                 if downloadDelay > 0 { Thread.sleep(forTimeInterval: downloadDelay) }

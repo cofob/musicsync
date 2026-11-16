@@ -22,6 +22,8 @@ public struct Manifest: Codable, Sendable, Equatable {
         public var outSize: Int64
         public var fingerprint: String
         public var title: String?
+        /// Rating (0-5) both sides had at the last sync; nil before ratings were synced.
+        public var rating: Int? = nil
     }
 
     public struct RockboxPlaylist: Codable, Sendable, Equatable {

@@ -10,6 +10,7 @@ import Transcode
         #expect(s.presetID == "rockbox-opus" && s.fullAlbums)
         #expect(s.aacBitrate == 256 && s.opusBitrate == 128 && s.keepFreeGB == 0.5 && s.rockboxCoverSize == 500)
         #expect(!s.autoSync && s.sendPlayCounts && s.deviceNames.isEmpty)
+        #expect(s.syncRatings && s.starSource == .onTheGo && !s.uploadOnTheGo)
         #expect(s.reserveBytes == SyncPlanner.reserveBytes)
     }
 

@@ -1,4 +1,5 @@
 import Foundation
+import Subsonic
 import Transcode
 
 public struct PlannerInput: Sendable {
@@ -11,6 +12,8 @@ public struct PlannerInput: Sendable {
     public var reserveBytes: Int64
     /// Songs for the space left, best album first; whole albums are added while they fit.
     public var fillers: [DesiredSong]
+    /// Server ratings go to the iPod (`SyncSettings.syncRatings`).
+    public var syncRatings = true
 
     public init(desired: [DesiredSong], playlists: [DesiredPlaylist] = [], manifest: Manifest,
                 library: DeviceLibrary, freeBytes: Int64, reserveBytes: Int64 = SyncPlanner.reserveBytes,
@@ -87,6 +90,9 @@ public enum SyncPlanner {
                 if skipped.contains(d.albumID) { plan.skippedForeignAlbums[d.albumID] = d.tags.album } else { plan.add.append(d) }
                 continue
             }
+            if target == .stock, entry.rating == nil || (input.syncRatings && entry.rating != Self.rating(d.song)) {
+                plan.serverRatings[d.id] = Self.rating(d.song)
+            }
             if target != d.preset.target {
                 plan.remove.append(.init(songID: d.id, entry: entry, target: target))
                 plan.add.append(d)
@@ -104,6 +110,9 @@ public enum SyncPlanner {
         planPlaylists(&plan, input, stockSongs: Set(stock.map(\.id)), rockboxSongs: Set(rockbox.map(\.id)))
         return plan
     }
+
+    /// Server rating clamped to 0-5.
+    static func rating(_ song: Song) -> Int { min(max(song.userRating ?? 0, 0), 5) }
 
     /// Wanted albums with no managed track that iTunes/Finder already put on the device.
     /// Syncing them would make duplicates, so they are skipped.
