@@ -26,6 +26,27 @@ import Testing
         #expect(await Scrobbler(queueURL: url).pendingCount == 2)
     }
 
+    @Test func oldQueueLoadsAndAFailedUpdateStays() async throws {
+        let dir = try tempDirectory()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let url = dir.appendingPathComponent("q.json")
+        try Data(#"{"queue":[{"songID":"s","time":"2023-11-14T22:13:20Z"}],"seen":[]}"#.utf8).write(to: url)
+        let scrobbler = Scrobbler(queueURL: url)
+        #expect(await scrobbler.pendingCount == 1)
+
+        let server = StubServer()
+        server.reply("scrobble", StubServer.ok)
+        server.reply("star", StubServer.ok)
+        await scrobbler.enqueue(ratings: ["s": 4], stars: ["s": true])
+        _ = await scrobbler.flush(client: server.client)  // setRating has no reply: it fails
+        #expect(await scrobbler.pendingCount == 0)
+        #expect(await scrobbler.pendingUpdateCount == 1)
+        #expect(await Scrobbler(queueURL: url).pendingUpdateCount == 1)
+        server.reply("setRating", StubServer.ok)
+        _ = await scrobbler.flush(client: server.client)
+        #expect(await scrobbler.pendingUpdateCount == 0)
+    }
+
     @Test func playsQueuedDuringAFlushAreKeptAndFlushesDoNotOverlap() async throws {
         let dir = try tempDirectory()
         defer { try? FileManager.default.removeItem(at: dir) }
