@@ -63,10 +63,12 @@ public struct AppearanceSettings: StoredSettings {
 
     /// A column of the Songs table.
     public enum SongsTableColumn: String, Codable, CaseIterable, Sendable {
-        case track, title, artist, album, time, plays, rating, star, genre, year, added, bitRate
+        case track, title, artist, album, time, plays, rating, star, genre, year, added, bitRate, size
 
         /// Shown before the user changes them, in this order.
         public static let defaults: [SongsTableColumn] = [.title, .time, .artist, .album, .genre, .star, .rating, .plays]
+        /// Defaults of the iPod Songs table.
+        public static let deviceDefaults: [SongsTableColumn] = [.title, .time, .artist, .album, .rating, .plays, .size]
     }
 
     /// Cover size in album grids.
@@ -122,6 +124,8 @@ public struct AppearanceSettings: StoredSettings {
     public var listDensity = ListDensity.comfortable
     /// Shown columns of the Songs table, in order; the title is always one of them.
     public private(set) var tableColumns = SongsTableColumn.defaults
+    /// Shown columns of the iPod Songs table, in order.
+    public private(set) var deviceTableColumns = SongsTableColumn.deviceDefaults
     /// Keys of sidebar rows the user turned off (Edit Sidebar).
     public var hiddenSidebarItems: Set<String> = []
     public var nowPlayingBackground = NowPlayingBackground.animated
@@ -138,18 +142,24 @@ public struct AppearanceSettings: StoredSettings {
         if shown { hiddenSidebarItems.remove(sidebarKey) } else { hiddenSidebarItems.insert(sidebarKey) }
     }
 
-    public func shows(_ column: SongsTableColumn) -> Bool { tableColumns.contains(column) }
+    /// Shown columns of the library table, or of the iPod table when `device`.
+    public func tableColumns(device: Bool) -> [SongsTableColumn] { device ? deviceTableColumns : tableColumns }
+
+    public func shows(_ column: SongsTableColumn, device: Bool = false) -> Bool { tableColumns(device: device).contains(column) }
 
     /// A shown column goes at the end; the title cannot be hidden.
-    public mutating func setShown(_ column: SongsTableColumn, _ shown: Bool) {
-        if shown, !shows(column) { tableColumns.append(column) } else if !shown, column != .title { tableColumns.removeAll { $0 == column } }
+    public mutating func setShown(_ column: SongsTableColumn, _ shown: Bool, device: Bool = false) {
+        var columns = tableColumns(device: device)
+        if shown, !columns.contains(column) { columns.append(column) } else if !shown { columns.removeAll { $0 == column } }
+        setTableColumns(columns, device: device)
     }
 
     /// Sets the shown columns and their order, e.g. after a drag in the table header.
-    public mutating func setTableColumns(_ columns: [SongsTableColumn]) {
+    public mutating func setTableColumns(_ columns: [SongsTableColumn], device: Bool = false) {
         var seen = Set<SongsTableColumn>()
         let unique = columns.filter { seen.insert($0).inserted }
-        tableColumns = unique.contains(.title) ? unique : [.title] + unique
+        let result = unique.contains(.title) ? unique : [.title] + unique
+        if device { deviceTableColumns = result } else { tableColumns = result }
     }
 
     /// Missing or unknown values keep their defaults, so settings of an older or newer version still load.
@@ -160,6 +170,7 @@ public struct AppearanceSettings: StoredSettings {
         density = c.value(.density, or: d.density)
         listDensity = c.value(.listDensity, or: d.listDensity)
         setTableColumns(c.value(.tableColumns, or: d.tableColumns.map(\.rawValue)).compactMap(SongsTableColumn.init))
+        setTableColumns(c.value(.deviceTableColumns, or: d.deviceTableColumns.map(\.rawValue)).compactMap(SongsTableColumn.init), device: true)
         hiddenSidebarItems = c.value(.hiddenSidebarItems, or: d.hiddenSidebarItems)
         nowPlayingBackground = c.value(.nowPlayingBackground, or: d.nowPlayingBackground)
         startPage = c.value(.startPage, or: d.startPage)

@@ -2,7 +2,7 @@ import AppKit
 
 /// Cells of `SongsTable`. Each one is a single view that draws itself: SwiftUI cells, Auto Layout and even text
 /// fields take too long to make and lay out when a big window shows the table or it reloads on each typed letter.
-extension SongsTable {
+extension TrackTable {
     /// One line of text, truncated. The title cell adds a gray download badge and the "•••" button,
     /// which opens `menuItems` under itself.
     final class TextCell: NSView {
@@ -13,7 +13,7 @@ extension SongsTable {
         var menuItems: (() -> NSMenu?)? { didSet { if (menuItems == nil) != (oldValue == nil) { needsDisplay = true } } }
         private let font: NSFont
         private let hasMenu: Bool
-        private static let menuWidth: CGFloat = 26
+        private static var menuWidth: CGFloat { 26 }
 
         init(_ id: NSUserInterfaceItemIdentifier, digits: Bool = false, menu: Bool = false) {
             font = digits ? .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular) : .systemFont(ofSize: NSFont.systemFontSize)
@@ -92,8 +92,8 @@ extension SongsTable {
         var tint = NSColor.controlAccentColor { didSet { if tint != oldValue { needsDisplay = true } } }
         var onSet: ((Int) -> Void)?
         private var hovering = false { didSet { needsDisplay = true } }
-        private static let size: CGFloat = 10
-        private static let step = size * 1.4
+        private static var size: CGFloat { 10 }
+        private static var step: CGFloat { size * 1.4 }
 
         init(_ id: NSUserInterfaceItemIdentifier) {
             super.init(frame: .zero)
@@ -119,7 +119,7 @@ extension SongsTable {
         }
 
         override func draw(_ dirtyRect: NSRect) {
-            for n in 1...5 where n <= rating || hovering {
+            for n in 1...5 where n <= rating || (hovering && onSet != nil) {
                 let filled = n <= rating
                 guard let image = symbol(filled ? "star.fill" : "star", size: Self.size, color: filled ? tint : .tertiaryLabelColor) else { continue }
                 let origin = NSPoint(x: 2 + CGFloat(n - 1) * Self.step, y: ((bounds.height - image.size.height) / 2).rounded())

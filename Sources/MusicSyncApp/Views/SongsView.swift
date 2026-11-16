@@ -1,4 +1,5 @@
 import Library
+import Preferences
 import SwiftUI
 import Subsonic
 
@@ -6,7 +7,7 @@ import Subsonic
 /// the database sorts and filters. Double-click plays from the clicked row.
 struct SongsView: View {
     @Environment(AppModel.self) private var model
-    @State private var sort = SongSort.artist
+    @State private var sort = SongsTable.Column.artist
     @State private var descending = false
     @State private var list: PagedList<Song>?
 
@@ -28,7 +29,7 @@ struct SongsView: View {
         .task(id: [String(model.libraryVersion), String(reload), model.searchText, String(describing: sort), String(descending)]) {
             if list != nil { try? await Task.sleep(for: .milliseconds(150)) }  // typing
             guard !Task.isCancelled else { return }
-            let found = await model.songPages(sort: sort, descending: descending, query: model.query)
+            let found = await model.songPages(sort: sort.sort ?? .artist, descending: descending, query: model.query)
             guard !Task.isCancelled else { return }
             list = found
         }

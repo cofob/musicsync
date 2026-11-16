@@ -5,13 +5,45 @@ import Preferences
 import SwiftUI
 import Subsonic
 
+/// A row of `TrackTable`: a library song or an iPod track.
+@MainActor protocol TrackTableItem: Sendable {
+    /// Shows the iPod column settings, not the library ones.
+    static var isDevice: Bool { get }
+    /// Columns of the header menu.
+    static var columns: [AppearanceSettings.SongsTableColumn] { get }
+    static func sortable(_ column: AppearanceSettings.SongsTableColumn) -> Bool
+    func cellText(_ column: AppearanceSettings.SongsTableColumn) -> String
+    func isCurrent(_ model: AppModel) -> Bool
+    func badge(_ model: AppModel) -> String?
+    func isAvailable(_ model: AppModel) -> Bool
+    /// nil hides the stars.
+    func shownRating(_ model: AppModel) -> Int?
+    /// nil: the rating cannot change.
+    func ratingSetter(_ model: AppModel) -> ((Int) -> Void)?
+    func isStarred(_ model: AppModel) -> Bool
+    var dragText: String? { get }
+    /// Context menu of `items`; `play` plays from the first row.
+    static func menu(_ items: [Self], _ model: AppModel, play: @escaping () -> Void) -> NSMenu?
+}
+
+extension TrackTableItem {
+    func isCurrent(_ model: AppModel) -> Bool { false }
+    func badge(_ model: AppModel) -> String? { nil }
+    func isAvailable(_ model: AppModel) -> Bool { true }
+    func ratingSetter(_ model: AppModel) -> ((Int) -> Void)? { nil }
+    func isStarred(_ model: AppModel) -> Bool { false }
+    var dragText: String? { nil }
+}
+
+typealias SongsTable = TrackTable<Song>
+
 /// The Songs page table, in AppKit: a SwiftUI `Table` stalls for seconds each time tens of thousands of rows
 /// come or go. Rows are the items of `list`; a cell redraws when its page loads or what it shows changes.
 /// Click, ⌘-click and ⇧-click select; double-click and Return play; selected rows drag onto sidebar playlists.
-struct SongsTable: NSViewRepresentable {
+struct TrackTable<Item: TrackTableItem>: NSViewRepresentable {
     @Environment(AppModel.self) private var model
-    let list: PagedList<Song>?
-    @Binding var sort: SongSort
+    let list: PagedList<Item>?
+    @Binding var sort: Column
     @Binding var descending: Bool
     let onPlay: (Int) -> Void
     /// Rows scroll on under the player at the bottom, as in the SwiftUI table.
@@ -19,7 +51,7 @@ struct SongsTable: NSViewRepresentable {
     /// A new list scrolls to the top only when this changes (sort, filter); a library refresh keeps the place.
     var scrollKey = ""
     /// Settings > Appearance; read here so that a change updates the table.
-    var columns = AppPreferences.shared.appearance.tableColumns
+    var columns = AppPreferences.shared.appearance.tableColumns(device: Item.isDevice)
     var rowHeight = AppPreferences.shared.appearance.listDensity.tableRowHeight
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -33,9 +65,13 @@ struct SongsTable: NSViewRepresentable {
         table.allowsColumnReordering = true
         table.columnAutoresizingStyle = .sequentialColumnAutoresizingStyle  // only the title column has `autoresizingMask`
         table.rowSizeStyle = .custom
-        for column in Column.allCases { table.addTableColumn(column.tableColumn) }
+        for column in Item.columns {
+            let tableColumn = column.tableColumn
+            if Item.sortable(column) { tableColumn.sortDescriptorPrototype = NSSortDescriptor(key: column.rawValue, ascending: true) }
+            table.addTableColumn(tableColumn)
+        }
         table.headerView?.menu = context.coordinator.headerMenu()
-        table.sortDescriptors = [NSSortDescriptor(key: Column(sort)?.rawValue ?? Column.artist.rawValue, ascending: !descending)]
+        table.sortDescriptors = [NSSortDescriptor(key: sort.rawValue, ascending: !descending)]
         table.setDraggingSourceOperationMask(.copy, forLocal: true)
         table.dataSource = context.coordinator
         table.delegate = context.coordinator
@@ -100,8 +136,8 @@ struct SongsTable: NSViewRepresentable {
 
     @MainActor
     final class Coordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSMenuDelegate {
-        var parent: SongsTable?
-        var list: PagedList<Song>?
+        var parent: TrackTable?
+        var list: PagedList<Item>?
         weak var table: Table?
         /// Columns with a tracked cell of a loaded song. All cells of a column read the same properties,
         /// so one tracked cell is enough; tracking every cell slows each reload down the longer the app runs.
@@ -112,6 +148,7 @@ struct SongsTable: NSViewRepresentable {
 
         /// Puts the shown columns in their order and hides the others; a row height change redraws the rows.
         func show(_ columns: [Column], rowHeight: CGFloat) {
+            let columns = columns.filter(Item.columns.contains)
             guard let table, shown.map({ $0 != columns || $1 != rowHeight }) ?? true else { return }
             shown = nil  // the moves below are not the user's
             for (index, column) in columns.enumerated() {
@@ -136,11 +173,11 @@ struct SongsTable: NSViewRepresentable {
         func menuNeedsUpdate(_ menu: NSMenu) {
             menu.removeAllItems()
             let settings = AppPreferences.shared.appearance
-            for column in Column.allCases {
+            for column in Item.columns {
                 let item = NSMenuItem(title: column.title, action: #selector(toggleColumn), keyEquivalent: "")
                 item.target = self
                 item.representedObject = column.rawValue
-                item.state = settings.shows(column) ? .on : .off
+                item.state = settings.shows(column, device: Item.isDevice) ? .on : .off
                 item.isEnabled = column != .title
                 menu.addItem(item)
             }
@@ -148,14 +185,14 @@ struct SongsTable: NSViewRepresentable {
 
         @objc func toggleColumn(_ item: NSMenuItem) {
             guard let column = (item.representedObject as? String).flatMap(Column.init) else { return }
-            AppPreferences.shared.appearance.setShown(column, item.state != .on)
+            AppPreferences.shared.appearance.setShown(column, item.state != .on, device: Item.isDevice)
         }
 
         /// A column dragged to another place keeps it.
         func tableViewColumnDidMove(_ notification: Notification) {
             guard let table, let shown, !table.tableColumns.isEmpty else { return }
             let order = table.tableColumns.filter { !$0.isHidden }.compactMap { Column(rawValue: $0.identifier.rawValue) }
-            if order != shown.0 { AppPreferences.shared.appearance.setTableColumns(order) }
+            if order != shown.0 { AppPreferences.shared.appearance.setTableColumns(order, device: Item.isDevice) }
         }
 
         func numberOfRows(in tableView: NSTableView) -> Int { list?.count ?? 0 }
@@ -181,11 +218,11 @@ struct SongsTable: NSViewRepresentable {
 
         /// Reads are tracked: a page that loads, a new star or rating redraws the shown rows.
         private func view(_ column: Column, row: Int, reusing reused: NSView?) -> NSView {
-            guard !observed.contains(column) else { return cell(column, list?.item(at: row), reusing: reused) }
+            guard !observed.contains(column) else { return cell(column, row, list?.item(at: row), reusing: reused) }
             return withObservationTracking {
-                let song = list?.item(at: row)
-                if song != nil { observed.insert(column) }
-                return cell(column, song, reusing: reused)
+                let item = list?.item(at: row)
+                if item != nil { observed.insert(column) }
+                return cell(column, row, item, reusing: reused)
             } onChange: { [weak self] in
                 Task { @MainActor in self?.refresh() }
             }
@@ -193,13 +230,13 @@ struct SongsTable: NSViewRepresentable {
 
         func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
             guard let first = tableView.sortDescriptors.first, let column = first.key.flatMap(Column.init),
-                  let sort = column.sort else { return }
-            parent?.sort = sort
+                  Item.sortable(column) else { return }
+            parent?.sort = column
             parent?.descending = !first.ascending
         }
 
         func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> (any NSPasteboardWriting)? {
-            list?.item(at: row).map { DragPayload.songs([$0.id], index: nil).text as NSString }
+            list?.item(at: row)?.dragText.map { $0 as NSString }
         }
 
         @objc func doubleClicked() {
@@ -212,10 +249,7 @@ struct SongsTable: NSViewRepresentable {
 
         func menu(_ rows: [Int]) -> NSMenu? {
             guard let parent, let list else { return nil }
-            let songs = rows.compactMap { list.item(at: $0) }
-            guard let first = songs.first else { return nil }
-            let items = Group { if songs.count == 1 { SongMenuItems(song: first) } else { SongsMenuItems(songs: songs) } }
-            return NSHostingMenu(rootView: items.environment(parent.model))
+            return Item.menu(rows.compactMap { list.item(at: $0) }, parent.model) { parent.onPlay(rows[0]) }
         }
 
         /// Fills the rows again once per change, however many cells saw it.
@@ -232,52 +266,75 @@ struct SongsTable: NSViewRepresentable {
             }
         }
 
-        private func cell(_ column: Column, _ song: Song?, reusing reused: NSView?) -> NSView {
+        private func cell(_ column: Column, _ row: Int, _ item: Item?, reusing reused: NSView?) -> NSView {
             guard let model = parent?.model else { return NSView() }
             let accent = NSColor(Color.musicAccent)
             switch column {
             case .title:
                 let cell = reused as? TextCell ?? TextCell(column.cellID, menu: true)
-                cell.text = song?.title ?? ""
-                cell.color = song.map { model.player.current?.id == $0.id } == true ? accent : .labelColor
-                cell.badge = song.flatMap { model.downloads.badge($0) }
+                cell.text = item?.cellText(.title) ?? ""
+                cell.color = item?.isCurrent(model) == true ? accent : .labelColor
+                cell.badge = item?.badge(model)
                 cell.tint = accent
-                cell.alphaValue = song.map(model.downloads.isAvailable) == false ? 0.4 : 1
-                cell.menuItems = song.map { song in { NSHostingMenu(rootView: SongMenuItems(song: song).environment(model)) } }
+                cell.alphaValue = item?.isAvailable(model) == false ? 0.4 : 1
+                cell.menuItems = item.map { item in { [weak self] in Item.menu([item], model) { self?.parent?.onPlay(row) } } }
                 return cell
             case .rating:
                 let cell = reused as? RatingCell ?? RatingCell(column.cellID)
-                cell.isHidden = song == nil || model.ratingUnsupported
-                cell.rating = song.map(model.rating) ?? 0
+                let rating = item?.shownRating(model)
+                cell.isHidden = rating == nil
+                cell.rating = rating ?? 0
                 cell.tint = accent
-                cell.onSet = { rating in song.map { model.setRating(rating, for: $0) } }
+                cell.onSet = item?.ratingSetter(model)
                 return cell
             case .star:
                 let cell = reused as? StarCell ?? StarCell(column.cellID)
                 cell.tint = accent
-                cell.isOn = song.map(model.isStarred) ?? false
+                cell.isOn = item?.isStarred(model) ?? false
                 return cell
             default:
                 let cell = reused as? TextCell ?? TextCell(column.cellID, digits: [.time, .plays, .track, .year, .bitRate].contains(column))
-                cell.text = song.map { text(column, $0) } ?? ""
+                cell.text = item?.cellText(column) ?? ""
                 return cell
             }
         }
+    }
+}
 
-        private func text(_ column: Column, _ song: Song) -> String {
-            switch column {
-            case .time: song.duration.map { formatTime(TimeInterval($0)) } ?? ""
-            case .artist: song.artistName ?? ""
-            case .album: song.album ?? ""
-            case .genre: song.genre ?? ""
-            case .plays: (song.playCount ?? 0) > 0 ? String(song.playCount ?? 0) : ""
-            case .track: song.track.map(String.init) ?? ""
-            case .year: song.year.map(String.init) ?? ""
-            case .added: formatDay(song.created) ?? ""
-            case .bitRate: song.bitRate.map { "\($0) kbps" } ?? ""
-            default: ""
-            }
+extension Song: TrackTableItem {
+    static var isDevice: Bool { false }
+    static var columns: [AppearanceSettings.SongsTableColumn] { AppearanceSettings.SongsTableColumn.allCases }
+    static func sortable(_ column: AppearanceSettings.SongsTableColumn) -> Bool { column.sort != nil }
+
+    func cellText(_ column: AppearanceSettings.SongsTableColumn) -> String {
+        switch column {
+        case .title: title
+        case .time: duration.map { formatTime(TimeInterval($0)) } ?? ""
+        case .artist: artistName ?? ""
+        case .album: album ?? ""
+        case .genre: genre ?? ""
+        case .plays: (playCount ?? 0) > 0 ? String(playCount ?? 0) : ""
+        case .track: track.map(String.init) ?? ""
+        case .year: year.map(String.init) ?? ""
+        case .added: formatDay(created) ?? ""
+        case .bitRate: bitRate.map { "\($0) kbps" } ?? ""
+        case .size: size.map { formatBytes(Int64($0)) } ?? ""
+        case .rating, .star: ""
         }
+    }
+
+    func isCurrent(_ model: AppModel) -> Bool { model.player.current?.id == id }
+    func badge(_ model: AppModel) -> String? { model.downloads.badge(self) }
+    func isAvailable(_ model: AppModel) -> Bool { model.downloads.isAvailable(self) }
+    func shownRating(_ model: AppModel) -> Int? { model.ratingUnsupported ? nil : model.rating(self) }
+    func ratingSetter(_ model: AppModel) -> ((Int) -> Void)? { { model.setRating($0, for: self) } }
+    func isStarred(_ model: AppModel) -> Bool { model.isStarred(self) }
+    var dragText: String? { DragPayload.songs([id], index: nil).text }
+
+    static func menu(_ songs: [Song], _ model: AppModel, play: @escaping () -> Void) -> NSMenu? {
+        guard let first = songs.first else { return nil }
+        let items = Group { if songs.count == 1 { SongMenuItems(song: first) } else { SongsMenuItems(songs: songs) } }
+        return NSHostingMenu(rootView: items.environment(model))
     }
 }
 
@@ -287,11 +344,6 @@ private extension SongsTable.Column {
 
 /// A sortable column names its database order.
 extension SongsTable.Column {
-    init?(_ sort: SongSort) {
-        guard let column = Self.allCases.first(where: { $0.sort == sort }) else { return nil }
-        self = column
-    }
-
     var sort: SongSort? {
         switch self {
         case .title: .title
@@ -301,7 +353,7 @@ extension SongsTable.Column {
         case .rating: .rating
         case .plays: .mostPlayed
         case .added: .newest
-        case .track, .genre, .star, .year, .bitRate: nil
+        case .track, .genre, .star, .year, .bitRate, .size: nil
         }
     }
 
@@ -323,13 +375,13 @@ extension SongsTable.Column {
         case .year: ("Year", 40, 48, 60)
         case .added: ("Date Added", 80, 96, 140)
         case .bitRate: ("Bit Rate", 60, 72, 100)
+        case .size: ("Size", 60, 80, 100)
         }
         column.title = title
         column.minWidth = min
         column.width = ideal
         column.maxWidth = max
         column.resizingMask = self == .title ? [.autoresizingMask, .userResizingMask] : .userResizingMask
-        if sort != nil { column.sortDescriptorPrototype = NSSortDescriptor(key: rawValue, ascending: true) }
         return column
     }
 }

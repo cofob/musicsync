@@ -111,6 +111,8 @@ private func decode<T: Decodable>(_ json: String) throws -> T {
         #expect(settings.shows(.title) && !settings.shows(.genre))
         settings.setTableColumns([.artist, .year])
         #expect(settings.tableColumns == [.title, .artist, .year])
+        settings.setShown(.size, false, device: true)
+        #expect(settings.deviceTableColumns == Array(Column.deviceDefaults.dropLast()) && settings.tableColumns == [.title, .artist, .year])
     }
 
     @Test func listDensity() {
