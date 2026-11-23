@@ -23,5 +23,27 @@ struct SongsMenuItems: View {
                 Button("Remove Download", systemImage: "trash") { model.removeDownload(songs) }
             }
         }
+        Divider()
+        SongFileMenus(songs: songs)
+    }
+}
+
+/// "Save to Folder" and "Share File", each with the original and the converted versions.
+struct SongFileMenus: View {
+    @Environment(AppModel.self) private var model
+    let songs: [Song]
+
+    var body: some View {
+        Menu("Save to Folder", systemImage: "folder") {
+            ForEach(SongFileVersion.allCases, id: \.self) { version in
+                Button(version.title) { model.saveToFolder(songs, version) }
+            }
+        }
+        Menu("Share File", systemImage: "square.and.arrow.up.on.square") {
+            ForEach(SongFileVersion.allCases, id: \.self) { version in
+                ShareLink(items: songs.map { SharedSongFile(song: $0, version: version, model: model) },
+                          preview: { SharePreview($0.song.title, image: Image(systemName: "music.note")) }) { Text(version.title) }
+            }
+        }
     }
 }

@@ -13,5 +13,8 @@ struct ShareMenuItems: View {
             Label("Share", systemImage: "square.and.arrow.up")
         }
         Button("Copy Link", systemImage: "link") { model.system.copyLink(target) }
+        if model.system.sharesSupported {
+            Button("Copy Download Link", systemImage: "arrow.down.circle") { model.system.copyLink(target, downloadable: true) }
+        }
     }
 }

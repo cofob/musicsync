@@ -16,13 +16,15 @@ extension SystemServices {
     }
 
     /// The public link of the item, made on first use; the deep link when the server has no shares.
-    func link(for target: ShareTarget) async throws -> URL {
-        if let known = shareLinks[target.id] { return known }
+    /// `downloadable` makes a separate link whose page lets people download the files.
+    func link(for target: ShareTarget, downloadable: Bool = false) async throws -> URL {
+        let key = target.id + (downloadable ? "#download" : "")
+        if let known = shareLinks[key] { return known }
         guard sharesSupported, let client = app.client else { return target.deepLink }
         let store = app.store
-        guard let share = try await client.createShare(ids: [target.id], description: target.label),
+        guard let share = try await client.createShare(ids: [target.id], description: target.label, downloadable: downloadable ? true : nil),
               let url = URL(string: share.url) else { return target.deepLink }
-        if store === app.store { shareLinks[target.id] = url }
+        if store === app.store { shareLinks[key] = url }
         return url
     }
 
@@ -31,10 +33,10 @@ extension SystemServices {
         target.text(link: try? await link(for: target))
     }
 
-    func copyLink(_ target: ShareTarget) {
+    func copyLink(_ target: ShareTarget, downloadable: Bool = false) {
         Task {
             do {
-                let url = try await link(for: target)
+                let url = try await link(for: target, downloadable: downloadable)
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(url.absoluteString, forType: .string)
             } catch { app.report(error) }

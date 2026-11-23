@@ -20,16 +20,17 @@ extension ClientTests {
         StubProtocol.log = []
         let list = try await c.getShares()
         #expect(list.map(\.id) == ["sh-1"] && list[0].visitCount == 6 && list[0].entry?.first?.title == "Xtal")
-        let created = try await c.createShare(ids: ["al-1"], description: "SAW — Aphex Twin", expires: Date(timeIntervalSince1970: 2))
+        let created = try await c.createShare(ids: ["al-1"], description: "SAW — Aphex Twin", expires: Date(timeIntervalSince1970: 2),
+                                              downloadable: true)
         #expect(created?.url == "https://music.example.com/share/sh-1")
         try await c.deleteShare(id: "sh-1")
         #expect(try await c.getSong(id: "s-1").albumId == "al-1")
         let calls = StubProtocol.log.map { url in
             (url.lastPathComponent, URLComponents(url: url, resolvingAgainstBaseURL: false)!.queryItems!
-                .filter { ["id", "description", "expires"].contains($0.name) }.map { "\($0.name)=\($0.value ?? "")" })
+                .filter { ["id", "description", "expires", "downloadable"].contains($0.name) }.map { "\($0.name)=\($0.value ?? "")" })
         }
         #expect(calls.map(\.0) == ["getShares.view", "createShare.view", "deleteShare.view", "getSong.view"])
-        #expect(calls[1].1 == ["id=al-1", "description=SAW — Aphex Twin", "expires=2000"])
+        #expect(calls[1].1 == ["id=al-1", "description=SAW — Aphex Twin", "downloadable=true", "expires=2000"])
         #expect(calls[2].1 == ["id=sh-1"])
 
         // Navidrome without EnableSharing, and servers without the endpoint.

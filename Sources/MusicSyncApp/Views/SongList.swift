@@ -31,6 +31,7 @@ struct SongMenuItems: View {
         Button("Go to Artist", systemImage: "music.microphone") { model.goToArtist(song) }.disabled(song.artistId == nil)
         Divider()
         ShareMenuItems(target: ShareTarget(song: song))
+        SongFileMenus(songs: [song])
         Button("Copy", systemImage: "doc.on.doc") { model.copy(song) }
     }
 }

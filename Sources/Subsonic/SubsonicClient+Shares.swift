@@ -22,9 +22,11 @@ public extension SubsonicClient {
     }
 
     /// New share of songs, an album or a playlist. Nil when the server sends no share back.
-    func createShare(ids: [String], description: String? = nil, expires: Date? = nil) async throws -> Share? {
+    /// `downloadable` lets people download the files from the share page; Navidrome reads it, other servers ignore it.
+    func createShare(ids: [String], description: String? = nil, expires: Date? = nil, downloadable: Bool? = nil) async throws -> Share? {
         var query = ids.map { ("id", $0) }
         if let description { query.append(("description", description)) }
+        if let downloadable { query.append(("downloadable", String(downloadable))) }
         if let expires { query.append(("expires", String(Int64(expires.timeIntervalSince1970 * 1000)))) }
         let body: SharesBody? = try await request("createShare", key: "shares", query)
         return body?.share?.first
