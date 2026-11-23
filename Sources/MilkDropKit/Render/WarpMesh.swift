@@ -80,17 +80,16 @@ struct WarpMesh {
 
     /// Triangle vertices for the warp pass (two per cell), clip y flipped for the offscreen target.
     /// `alpha`: vertex alpha per vertex, or 1 everywhere.
-    func vertices(aspect: SIMD2<Double>, alpha: Bool) -> [Float] {
+    func vertices(alpha: Bool) -> [Float] {
         var out: [Float] = []
         out.reserveCapacity(size.x * size.y * 6 * Self.floatsPerVertex)
         let stride = size.x + 1
         func vertex(_ col: Int, _ row: Int) {
             let i = row * stride + col
             let px = Float(col) / Float(size.x) * 2 - 1, py = 1 - Float(row) / Float(size.y) * 2
-            let x = px * Float(aspect.x), y = py * Float(aspect.y)
-            var ang = atan2(y, x)
-            if ang < 0 { ang += 2 * .pi }
-            out += [px, -py, uvs[i].x, uvs[i].y, px * 0.5 + 0.5, py * 0.5 + 0.5, (x * x + y * y).squareRoot(), ang,
+            // As butterchurn's warp shader: from uv_orig, without aspect, GLSL atan(x, y).
+            let x = px * 0.5, y = py * 0.5
+            out += [px, -py, uvs[i].x, uvs[i].y, x + 0.5, y + 0.5, (x * x + y * y).squareRoot(), atan2(x, y),
                     1, 1, 1, alpha ? alphas[i] : 1]
         }
         for row in 0..<size.y {

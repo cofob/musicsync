@@ -32,7 +32,7 @@ import Testing
         let center = mesh.uvs[2 * 5 + 2], corner = mesh.uvs[0]
         #expect(abs(center.x - 0.5) < 1e-6 && abs(center.y - 0.5) < 1e-6)
         #expect(corner.x > 0 && corner.x < 0.5)  // zoom 1.5 samples inward
-        #expect(mesh.vertices(aspect: SIMD2(1, 1), alpha: false).count == 4 * 4 * 6 * WarpMesh.floatsPerVertex)
+        #expect(mesh.vertices(alpha: false).count == 4 * 4 * 6 * WarpMesh.floatsPerVertex)
     }
 
     @Test func bundledPresetsRunAFrame() throws {
