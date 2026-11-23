@@ -77,6 +77,17 @@ import Testing
         #expect(mixer.decks.contains { $0.player.currentItem != nil && $0.player.currentItem?.audioMix == nil })
     }
 
+    /// The queued next song moves between decks; AVFoundation throws when one item goes into a second player.
+    @Test func equalizerTogglesWithNextQueued() async throws {
+        mixer.play(try cue(3))
+        mixer.setNext(try cue(2))
+        await sleep(1.5)  // the queue prepares the next song
+        mixer.usesEqualizer = true
+        await sleep(0.3)
+        mixer.usesEqualizer = false
+        _ = try #require(await time(of: .advanced(skipped: false)))
+    }
+
     @Test func crossfadeOverlapsTwoDecks() async throws {
         mixer.play(try cue(3))
         mixer.setNext(try cue(3), transition: Transition(at: 1, duration: 1, curve: .linear))

@@ -6,7 +6,7 @@ import AVFoundation
 @MainActor public final class Mixer {
     /// One song as the mixer plays it.
     public struct Cue {
-        public let item: AVPlayerItem
+        public private(set) var item: AVPlayerItem
         /// Sound Check volume, 0…1.
         public var gain: Float
         /// Time in the song at which `item` starts (a stream that the server starts later).
@@ -19,6 +19,13 @@ import AVFoundation
             self.gain = gain
             self.offset = offset
             self.reload = reload
+        }
+
+        /// A fresh item of the same asset.
+        mutating func renew() {
+            let new = AVPlayerItem(asset: item.asset)
+            new.audioTimePitchAlgorithm = item.audioTimePitchAlgorithm
+            item = new
         }
     }
 
@@ -60,7 +67,8 @@ import AVFoundation
         didSet {
             guard usesEqualizer != oldValue else { return }
             for cue in [current, next].compactMap({ $0 }) { Task { await cue.item.setGain(cue.gain, equalizer: tap) } }
-            if let next, transition == nil || transition?.duration == 0 { setNext(next) }
+            // A new item: one that was in a player cannot go into another one.
+            if var next, transition == nil || transition?.duration == 0 { next.renew(); setNext(next) }
         }
     }
     private var tap: Equalizer? { usesEqualizer ? equalizer : nil }
