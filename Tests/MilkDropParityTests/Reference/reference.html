@@ -73,6 +73,13 @@ window.renderPreset = async (milk, width, height, frames, keep) => {
   const names = (prefix, from, to, digits) => Array.from({ length: to - from + 1 }, (_, i) => prefix + String(from + i).padStart(digits, '0'));
   zero(preset, [...names('q', 1, 32, 1), ...names('reg', 0, 99, 2)]);
   for (const o of [...preset.waves, ...preset.shapes]) zero(o, names('t', 1, 8, 1));
+  // butterchurn works out rad, ang (and in the comp uv_orig) in main(), out of reach of the preset's shader function.
+  const head = 'vec4 main_shader_sentinel(vec2 uv) {';
+  const declare = (glsl, defs) => glsl && glsl.replace(head, head + defs
+    .filter(([n]) => new RegExp(`\\b${n}\\b`).test(glsl) && !new RegExp(`\\b(float|vec2) ${n}\\b`).test(glsl)).map(([, d]) => d).join(''));
+  preset.warp = declare(preset.warp, [['rad', ' float rad = length(uv_orig - 0.5);'], ['ang', ' float ang = atan(uv_orig.x - 0.5, uv_orig.y - 0.5);']]);
+  preset.comp = declare(preset.comp, [['uv_orig', ' vec2 uv_orig = uv;'], ['rad', ' float rad = length(uv - 0.5);'],
+    ['ang', ' float ang = atan(uv.x - 0.5, uv.y - 0.5);']]);
   viz.loadPreset(preset, 0);
   const out = {};
   for (let f = 0; f < frames; f++) {
