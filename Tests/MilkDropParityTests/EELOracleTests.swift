@@ -10,8 +10,7 @@ import Testing
     /// Its .milk has the typo `wave_mysyery`; butterchurn's copy does not.
     private static let knownDifferences: Set = ["Idiot - Star Of Annon"]
 
-    /// butterchurn's EEL helpers, with Math.random fixed and `randint` following our `rand` rule for n < 1
-    /// (butterchurn gives 0 there).
+    /// butterchurn's EEL helpers, with Math.random fixed.
     private static func context() throws -> JSContext {
         let context = try #require(JSContext())
         context.exceptionHandler = { _, error in Issue.record("JavaScript: \(error?.toString() ?? "?")") }
@@ -21,7 +20,6 @@ import Testing
         let end = try #require(butterchurn.range(of: ",e}", range: memcpy.upperBound..<butterchurn.endIndex))
         context.evaluateScript("var window = this, self = this; Math.random = function () { return 0.5 };")
         context.evaluateScript(String(butterchurn[start.lowerBound..<end.upperBound]))
-        context.evaluateScript("window.randint = function (t) { var e = Math.floor(t); return e < 1 ? Math.random() : Math.floor(Math.random() * e) };")
         context.evaluateScript(try String(contentsOf: visualizer.appending(path: "butterchurnPresets.min.js"), encoding: .utf8))
         context.evaluateScript("""
         function setUp(p, keys) {

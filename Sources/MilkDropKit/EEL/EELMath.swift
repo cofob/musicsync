@@ -27,10 +27,10 @@ enum EELMath {
 
     @inline(__always) static func sign(_ x: Double) -> Double { x > 0 ? 1 : x < 0 ? -1 : 0 }
 
-    /// `floor(random * floor(n))`; for `n < 1` just `random`.
+    /// `floor(random * floor(n))`, so 0 for `n < 1`, as MilkDrop's EEL and butterchurn.
     @inline(__always) static func rand(_ n: Double, _ random: () -> Double) -> Double {
         let m = n.rounded(.down)
-        return m < 1 ? random() : (random() * m).rounded(.down)
+        return m < 1 ? 0 : (random() * m).rounded(.down)
     }
 
     /// JavaScript's `Math.floor(x) | 0`: floor, then wrap to Int32; NaN and infinity give 0.
