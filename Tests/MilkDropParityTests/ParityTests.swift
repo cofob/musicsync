@@ -117,8 +117,11 @@ import UniformTypeIdentifiers
         for file in try Self.presets() {
             let preset = try PresetFile.load(file)
             let milk = Self.referenceMilk(String(decoding: try Data(contentsOf: file), as: UTF8.self), preset)
-            guard let theirs = try? await reference.render(milk, width: Self.size.w, height: Self.size.h, frames: Self.frames.max()!, keep: Self.frames),
-                  let ours = try? await Self.native(preset, device: device, keep: Self.frames) else { skipped.append(preset.name); continue }
+            let theirs: [Int: [UInt8]], ours: [Int: [UInt8]]
+            do { theirs = try await reference.render(milk, width: Self.size.w, height: Self.size.h, frames: Self.frames.max()!, keep: Self.frames) }
+            catch { skipped.append("\(preset.name)  (butterchurn: \(error))"); continue }
+            do { ours = try await Self.native(preset, device: device, keep: Self.frames) }
+            catch { skipped.append("\(preset.name)  (native: \(error))"); continue }
             var diffs: [Double] = []
             for f in Self.frames {
                 guard let a = theirs[f], let b = ours[f] else { continue }
