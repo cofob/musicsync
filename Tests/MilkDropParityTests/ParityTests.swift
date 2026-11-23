@@ -101,6 +101,12 @@ import UniformTypeIdentifiers
         return lines.joined(separator: "\n")
     }
 
+    /// The first line of an error, of the JavaScript message for one from the web view.
+    static func reason(_ error: Error) -> String {
+        let text = (error as NSError).userInfo["WKJavaScriptExceptionMessage"] as? String ?? "\(error)"
+        return String(text.prefix { $0 != "\n" }.prefix(120))
+    }
+
     struct Row {
         let name: String, diffs: [Double], failure: String?
         var line: String { "\(diffs.map { String(format: "%6.1f", $0) }.joined(separator: " "))  \(name)\(failure.map { "  (\($0))" } ?? "")" }
@@ -119,9 +125,9 @@ import UniformTypeIdentifiers
             let milk = Self.referenceMilk(String(decoding: try Data(contentsOf: file), as: UTF8.self), preset)
             let theirs: [Int: [UInt8]], ours: [Int: [UInt8]]
             do { theirs = try await reference.render(milk, width: Self.size.w, height: Self.size.h, frames: Self.frames.max()!, keep: Self.frames) }
-            catch { skipped.append("\(preset.name)  (butterchurn: \(error))"); continue }
+            catch { skipped.append("\(preset.name)  (butterchurn: \(Self.reason(error)))"); continue }
             do { ours = try await Self.native(preset, device: device, keep: Self.frames) }
-            catch { skipped.append("\(preset.name)  (native: \(error))"); continue }
+            catch { skipped.append("\(preset.name)  (native: \(Self.reason(error)))"); continue }
             var diffs: [Double] = []
             for f in Self.frames {
                 guard let a = theirs[f], let b = ours[f] else { continue }
