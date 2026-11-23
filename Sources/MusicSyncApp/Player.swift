@@ -72,7 +72,9 @@ final class Player {
     /// Window > Equalizer; saved on every change.
     var equalizer = EqualizerSettings.load() { didSet { equalizerChanged(from: oldValue) } }
     /// Visualizers on screen; they need the audio tap.
-    @ObservationIgnored var visualizers = 0 { didSet { tapChanged() } }
+    @ObservationIgnored var visualizers = 0 { didSet { tapChanged(); analyzeUpcoming() } }
+    /// Where the parts of the current song start, once analyzed for a visualizer that follows them (`Player+AutoMix`).
+    var sections: [TimeInterval]?
     /// Pauses at its deadline, or stops at the end of the current song.
     var sleepTimer: SleepTimer? { didSet { sleepTimerChanged() } }
     /// The server has the OpenSubsonic `transcodeOffset` extension.

@@ -4,6 +4,8 @@ import SwiftUI
 /// Winamp's classic spectrum analyzer: segmented bars from green to red with falling peak caps.
 struct SpectrumVisualizer: View {
     let player: Player
+    /// Color scheme: 0 is Winamp's green to red; each next one turns the hues further.
+    var palette = 0
     @AppStorage(VisualizerSettings.peaks, store: .app) private var peaks = true
     @AppStorage(VisualizerSettings.segmented, store: .app) private var segmented = true
     @AppStorage(VisualizerSettings.falloff, store: .app) private var falloff = 1.6
@@ -13,6 +15,7 @@ struct SpectrumVisualizer: View {
         let spectrum = Spectrum()
         var falloff = Falloff()
         var last: Date?
+        var hue = Palette()
     }
 
     var body: some View {
@@ -25,13 +28,14 @@ struct SpectrumVisualizer: View {
                 let mono = zip(samples.left, samples.right).map { ($0 + $1) / 2 }
                 let dt = state.last.map { timeline.date.timeIntervalSince($0) } ?? 0
                 state.last = timeline.date
+                let shift = state.hue.step(to: palette, dt: dt)
                 state.falloff.barFall = Float(falloff)
                 state.falloff.update(state.spectrum.bands(mono, sampleRate: player.mixer.equalizer.samples.sampleRate, count: count), dt: dt)
                 let height = max(size.height - 2 * pad, 1), bottom = size.height - pad
                 let x0 = (size.width - CGFloat(count) * (barWidth + gap) + gap) / 2
                 // One gradient over the full height, so a bar turns from green to red as it grows.
                 let gradient = GraphicsContext.Shading.linearGradient(
-                    Gradient(colors: [Self.color(1), Self.color(0.5), Self.color(0)]), startPoint: CGPoint(x: 0, y: pad), endPoint: CGPoint(x: 0, y: bottom))
+                    Gradient(colors: [Self.color(1, shift: shift), Self.color(0.5, shift: shift), Self.color(0, shift: shift)]), startPoint: CGPoint(x: 0, y: pad), endPoint: CGPoint(x: 0, y: bottom))
                 var dim = Path(), lit = Path(), caps = Path()
                 for i in 0..<count {
                     let x = x0 + CGFloat(i) * (barWidth + gap)
@@ -52,28 +56,36 @@ struct SpectrumVisualizer: View {
         }
     }
 
-    /// Green at the bottom, yellow in the middle, red at the top.
-    static func color(_ level: Double) -> Color {
-        Color(hue: 0.33 * (1 - level), saturation: 0.9, brightness: 0.95)
+    /// Green at the bottom, yellow in the middle, red at the top; `shift` turns all hues.
+    static func color(_ level: Double, shift: Double = 0) -> Color {
+        Color(hue: (0.33 * (1 - level) + shift).truncatingRemainder(dividingBy: 1), saturation: 0.9, brightness: 0.95)
     }
 }
 
 /// AIMP-style oscilloscope: the left and right channels as glowing lines that leave a short trail.
 struct ScopeVisualizer: View {
     let player: Player
+    var palette = 0
     @State private var state = State()
 
-    final class State { var trail: [(left: [Float], right: [Float])] = [] }
+    final class State {
+        var trail: [(left: [Float], right: [Float])] = []
+        var hue = Palette()
+        var last: Date?
+    }
 
     var body: some View {
         TimelineView(.animation) { timeline in
             Canvas { context, size in
-                _ = timeline.date  // redraws on every frame: the samples are not a SwiftUI input
+                // Redraws on every frame: the samples are not a SwiftUI input.
+                let dt = state.last.map { timeline.date.timeIntervalSince($0) } ?? 0
+                state.last = timeline.date
+                let shift = state.hue.step(to: palette, dt: dt)
                 let frame = player.mixer.equalizer.samples.latest(1024, at: player.mixer.time)
                 state.trail = Array((state.trail + [frame]).suffix(3))
                 for (age, frame) in state.trail.reversed().enumerated() {
                     let opacity = 1 - Double(age) / 3
-                    for (samples, color, row) in [(frame.left, Color(red: 0.3, green: 1, blue: 0.5), 0.3), (frame.right, Color(red: 0.3, green: 0.8, blue: 1), 0.7)] {
+                    for (samples, color, row) in [(frame.left, Self.color(0.39, shift), 0.3), (frame.right, Self.color(0.55, shift), 0.7)] {
                         let path = Self.line(samples, in: size, middle: size.height * row, amplitude: size.height * 0.25)
                         if age == 0 { context.stroke(path, with: .color(color.opacity(0.2)), lineWidth: 5) }  // glow
                         context.stroke(path, with: .color(color.opacity(opacity)), lineWidth: age == 0 ? 2 : 1.5)
@@ -81,6 +93,10 @@ struct ScopeVisualizer: View {
                 }
             }
         }
+    }
+
+    private static func color(_ hue: Double, _ shift: Double) -> Color {
+        Color(hue: (hue + shift).truncatingRemainder(dividingBy: 1), saturation: 0.7, brightness: 1)
     }
 
     private static func line(_ samples: [Float], in size: CGSize, middle: CGFloat, amplitude: CGFloat) -> Path {
@@ -95,5 +111,17 @@ struct ScopeVisualizer: View {
                 if i == 0 { path.move(to: point) } else { path.addLine(to: point) }
             }
         }
+    }
+}
+
+/// Hue turn of a color scheme, easing to the scheme's turn over about half a second.
+struct Palette {
+    /// Turn per scheme: about the golden ratio, so close schemes never look alike.
+    static let step = 0.382
+    private var shift = 0.0
+
+    mutating func step(to palette: Int, dt: TimeInterval) -> Double {
+        shift += (Double(palette) * Self.step - shift) * min(1, max(dt, 0) * 6)
+        return shift
     }
 }

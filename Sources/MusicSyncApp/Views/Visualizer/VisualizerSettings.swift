@@ -7,6 +7,8 @@ enum VisualizerSettings {
     static let mode = "visualizerMode"
     static let lyrics = "visualizerLyrics"
     static let announce = "visualizerAnnounce"
+    /// Change with the parts of the song (analyzed); off by default.
+    static let sections = "visualizerSections"
     static let cycle = "visualizerCycle"
     static let cycleSeconds = "visualizerCycleSeconds"
     static let blend = "visualizerBlend"
@@ -46,6 +48,7 @@ struct VisualizerSettingsView: View {
     @AppStorage(VisualizerSettings.mode, store: .app) private var mode = VisualizerMode.spectrum
     @AppStorage(VisualizerSettings.lyrics, store: .app) private var lyrics = true
     @AppStorage(VisualizerSettings.announce, store: .app) private var announce = true
+    @AppStorage(VisualizerSettings.sections, store: .app) private var sections = false
     @AppStorage(VisualizerSettings.cycle, store: .app) private var cycle = true
     @AppStorage(VisualizerSettings.cycleSeconds, store: .app) private var cycleSeconds = 20.0
     @AppStorage(VisualizerSettings.blend, store: .app) private var blend = 2.7
@@ -64,9 +67,10 @@ struct VisualizerSettingsView: View {
                 Picker("Style", selection: $mode) { ForEach(VisualizerMode.allCases) { Text($0.title).tag($0) } }
                 Toggle("Show synced lyrics", isOn: $lyrics)
                 Toggle("Announce songs", isOn: $announce)
+                Toggle("Change with song parts", isOn: $sections)
                 Button("Show Visualizer") { openWindow(id: VisualizerView.windowID) }
             } footer: {
-                SettingsFooter("Window > Visualizer (⌘T), or the waveform button in Now Playing and the MiniPlayer. Announce Songs shows the artist and title when a song starts.")
+                SettingsFooter("Window > Visualizer (⌘T), or the waveform button in Now Playing and the MiniPlayer. Announce Songs shows the artist and title when a song starts. Change With Song Parts analyzes each song to find where its parts start (verse, chorus…): there MilkDrop changes the preset and the spectrum and oscilloscope their colors. Streamed songs are downloaded once more for this; the results are kept.")
             }
             Section("Spectrum") {
                 Toggle("Peak caps", isOn: $peaks)
@@ -98,7 +102,7 @@ struct VisualizerSettingsView: View {
             } header: {
                 Text("MilkDrop")
             } footer: {
-                SettingsFooter("Blend time is how long two presets mix when the preset changes. Retina quality renders every screen pixel and uses more GPU.")
+                SettingsFooter("With Change With Song Parts, the timer only works until the song is analyzed, or when it has no clear parts. Blend time is how long two presets mix when the preset changes. Retina quality renders every screen pixel and uses more GPU.")
             }
             Section {
                 Toggle("Include built-in presets", isOn: $builtIn)

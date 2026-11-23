@@ -3,7 +3,7 @@ import Foundation
 /// What AutoMix knows about a song from its audio. Times are seconds in the song.
 public struct SongAnalysis: Codable, Equatable, Sendable {
     /// Raised when the analysis changes, so that older cached results are made again.
-    public static let version = 1
+    public static let version = 2
     /// Mono sample rate the analysis works at: enough for beats and loudness, and fast.
     public static let sampleRate = 11025.0
 
@@ -21,9 +21,11 @@ public struct SongAnalysis: Codable, Equatable, Sendable {
     public var downbeat: TimeInterval
     /// 0…1: how clearly the beat stands out. Songs without a steady beat are low.
     public var beatStrength: Double
+    /// Where a new part of the song starts (verse, chorus…), sorted; the visualizer changes there.
+    public var sections: [TimeInterval]
 
     public init(duration: TimeInterval, soundStart: TimeInterval, soundEnd: TimeInterval, introEnd: TimeInterval,
-                outroStart: TimeInterval, bpm: Double, downbeat: TimeInterval, beatStrength: Double) {
+                outroStart: TimeInterval, bpm: Double, downbeat: TimeInterval, beatStrength: Double, sections: [TimeInterval] = []) {
         self.duration = duration
         self.soundStart = soundStart
         self.soundEnd = soundEnd
@@ -32,6 +34,7 @@ public struct SongAnalysis: Codable, Equatable, Sendable {
         self.bpm = bpm
         self.downbeat = downbeat
         self.beatStrength = beatStrength
+        self.sections = sections
     }
 
     /// Analyzes mono PCM. Pure and CPU-bound: call it off the main thread.
@@ -40,6 +43,8 @@ public struct SongAnalysis: Codable, Equatable, Sendable {
         let beat = Beat(samples, sampleRate: sampleRate, soundStart: shape.soundStart)
         self.init(duration: Double(samples.count) / sampleRate, soundStart: shape.soundStart, soundEnd: shape.soundEnd,
                   introEnd: shape.introEnd, outroStart: shape.outroStart, bpm: beat.bpm, downbeat: beat.downbeat,
-                  beatStrength: beat.strength)
+                  beatStrength: beat.strength,
+                  sections: Sections.find(samples, sampleRate: sampleRate, bpm: beat.bpm, downbeat: beat.downbeat,
+                                          beatStrength: beat.strength, soundStart: shape.soundStart, soundEnd: shape.soundEnd))
     }
 }

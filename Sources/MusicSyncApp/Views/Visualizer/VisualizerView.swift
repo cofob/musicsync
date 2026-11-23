@@ -37,6 +37,9 @@ struct VisualizerView: View {
     @AppStorage(VisualizerSettings.shuffle, store: .app) private var shuffle = true
     @AppStorage(VisualizerSettings.builtIn, store: .app) private var builtIn = true
     @AppStorage(VisualizerSettings.quality, store: .app) private var quality = 1.0
+    @AppStorage(VisualizerSettings.sections, store: .app) private var followsSections = false
+    /// Color scheme of the spectrum and the oscilloscope; the next one at each new part of the song.
+    @State private var palette = 0
     @State private var lyrics: Lyrics?
     @State private var milkDrop = MilkDrop()
     @State private var hovering = false
@@ -49,11 +52,13 @@ struct VisualizerView: View {
         let player = model.player
         let song: Song? = if case .server(let s)? = player.current { s } else { nil }
         let line = showsLyrics && showsOverlayLyrics ? lyrics?.line(at: player.elapsed) : nil
+        // The part of the song playing now: −1 before the first boundary, nil while not followed or not analyzed.
+        let section = followsSections ? player.sections.map { s in s.lastIndex { $0 <= player.elapsed } ?? -1 } : nil
         ZStack {
             Color.black
             switch mode {
-            case .spectrum: SpectrumVisualizer(player: player)
-            case .scope: ScopeVisualizer(player: player)
+            case .spectrum: SpectrumVisualizer(player: player, palette: palette)
+            case .scope: ScopeVisualizer(player: player, palette: palette)
             case .milkdrop: MilkDropView(player: player, milkDrop: milkDrop)
             }
             if mode != .milkdrop, let lyrics, let line { VisualizerLyrics(lyrics: lyrics, current: line) }
@@ -87,7 +92,13 @@ struct VisualizerView: View {
         }
         .onChange(of: config, initial: true) { milkDrop.configure(config) }
         // MilkDrop draws the song title and the lyrics into the preset, as it announced songs in Winamp.
-        .onChange(of: player.current?.id, initial: true) {
+        // Only moving on into the next part counts, not a seek.
+        .onChange(of: section) { old, new in
+            if let old, let new, new == old + 1, player.isPlaying { partStarted() }
+        }
+        .onChange(of: followsSections) { player.analyzeUpcoming() }
+        .onChange(of: player.current?.id, initial: true) { old, _ in
+            if followsSections, old != nil, old != player.current?.id { partStarted() }  // a new song is a new part too
             guard announces, let item = player.current else { return }
             milkDrop.title([item.artist, item.title].compactMap { $0 }.joined(separator: " - "))
         }
@@ -199,6 +210,7 @@ struct VisualizerView: View {
             Menu("Choose Preset") { ForEach(milkDrop.presets, id: \.self) { name in Button(name) { milkDrop.select(name) } } }
             Divider()
             Toggle("Change Presets Every \(Int(cycleSeconds)) Seconds", isOn: $cycles)
+            Toggle("Change at Song Parts", isOn: $followsSections)
             Toggle("Announce Songs", isOn: $announces)
             Divider()
             if !milkDrop.failed.isEmpty { Text("Not converted: \(milkDrop.failed.joined(separator: ", "))") }
@@ -215,8 +227,15 @@ struct VisualizerView: View {
 
     /// Options for the MilkDrop page, see `ms.configure` in `Resources/Visualizer/index.html`.
     private var config: String {
-        let options: [String: Any] = ["cycle": cycles, "seconds": cycleSeconds, "blend": blend, "shuffle": shuffle, "builtIn": builtIn, "quality": quality]
+        // The timer stands by while the song's parts are known.
+        let byParts = followsSections && !(model.player.sections ?? []).isEmpty
+        let options: [String: Any] = ["cycle": cycles && !byParts, "seconds": cycleSeconds, "blend": blend, "shuffle": shuffle, "builtIn": builtIn, "quality": quality]
         return (try? JSONSerialization.data(withJSONObject: options, options: .sortedKeys)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+    }
+
+    /// A new part of the song: MilkDrop shows the next preset (compiled ahead), the others their next colors.
+    private func partStarted() {
+        if mode == .milkdrop { shuffle ? milkDrop.random() : milkDrop.step(1) } else { palette += 1 }
     }
 
     private func toggleFullScreen() {

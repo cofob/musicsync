@@ -5,18 +5,37 @@ import Support
 
 /// AutoMix: the current and the next two songs are analyzed in the background, and the transition into the next
 /// song is planned again when an analysis comes in. Until then the songs crossfade.
+/// A visualizer that follows song parts has the current song analyzed too, for its `sections`.
 extension Player {
     /// Asks for the analyses of the current, the next and the one after, when they mix into each other (not an album
-    /// in order); none when AutoMix is off.
+    /// in order), and of the current song for the visualizer; none when neither wants them.
     func analyzeUpcoming() {
-        guard settings.transitions == .autoMix, let index else { return analyses.want([]) }
-        analyses.onResult = { [weak self] _ in self?.retimeNext() }
-        let next = nextIndex ?? index + 1
-        let mixed = [(index, next), (next, next + 1)].filter { a, b in
-            queue.indices.contains(b) && settings.transition(from: queue[a].song, to: queue[b].song, duration: queue[a].duration) != nil
+        analyses.onResult = { [weak self] _ in self?.analysisArrived() }
+        guard let index else { analyses.want([]); return updateSections() }
+        var wanted = wantsSections ? [index] : []
+        if settings.transitions == .autoMix {
+            let next = nextIndex ?? index + 1
+            let mixed = [(index, next), (next, next + 1)].filter { a, b in
+                queue.indices.contains(b) && settings.transition(from: queue[a].song, to: queue[b].song, duration: queue[a].duration) != nil
+            }
+            wanted += mixed.flatMap { [$0.0, $0.1] }
         }
         var seen = Set<Int>()
-        analyses.want(mixed.flatMap { [$0.0, $0.1] }.filter { seen.insert($0).inserted }.compactMap(analysisJob(at:)))
+        analyses.want(wanted.filter { seen.insert($0).inserted }.compactMap(analysisJob(at:)))
+        updateSections()
+    }
+
+    /// A visualizer is open and set to follow song parts (Settings > Visualizer).
+    private var wantsSections: Bool { visualizers > 0 && UserDefaults.app.bool(forKey: VisualizerSettings.sections) }
+
+    private func analysisArrived() {
+        if settings.transitions == .autoMix { retimeNext() }
+        updateSections()
+    }
+
+    private func updateSections() {
+        let new = wantsSections ? index.flatMap(analysis(at:))?.sections : nil
+        if new != sections { sections = new }
     }
 
     /// Analyses of the current entry and entry `i`, when both are ready.

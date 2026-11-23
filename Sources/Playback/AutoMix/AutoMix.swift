@@ -77,7 +77,8 @@ private extension SongAnalysis {
     /// The song as heard at `rate`: shorter times, a faster tempo.
     func played(at rate: Double) -> SongAnalysis {
         SongAnalysis(duration: duration / rate, soundStart: soundStart / rate, soundEnd: soundEnd / rate, introEnd: introEnd / rate,
-                     outroStart: outroStart / rate, bpm: bpm * rate, downbeat: downbeat / rate, beatStrength: beatStrength)
+                     outroStart: outroStart / rate, bpm: bpm * rate, downbeat: downbeat / rate, beatStrength: beatStrength,
+                     sections: sections.map { $0 / rate })
     }
 }
 
