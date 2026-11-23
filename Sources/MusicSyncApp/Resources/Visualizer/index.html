@@ -1,0 +1,87 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>html, body { margin: 0; height: 100%; overflow: hidden; background: #000; } canvas { display: block; width: 100%; height: 100%; }</style>
+<script src="butterchurn.min.js"></script>
+<script src="butterchurnPresets.min.js"></script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// MilkDrop presets through butterchurn. The app feeds 1024 8-bit samples per channel (128 = silence) with `ms.feed`,
+// sets options with `ms.configure` and adds the user's presets with `ms.addPresets` and `ms.convert` (.milk text).
+const lib = window.butterchurn.default || window.butterchurn;
+const builtIn = (window.butterchurnPresets.default || window.butterchurnPresets).getPresets();
+const user = {};
+const config = { cycle: true, seconds: 20, blend: 2.7, shuffle: true, builtIn: true, quality: 1 };
+const canvas = document.getElementById('c');
+const size = () => [Math.round(canvas.clientWidth * config.quality), Math.round(canvas.clientHeight * config.quality)];
+const levels = { timeByteArray: new Uint8Array(1024).fill(128), timeByteArrayL: new Uint8Array(1024).fill(128), timeByteArrayR: new Uint8Array(1024).fill(128) };
+const decode = (s, out) => { const b = atob(s); for (let i = 0; i < out.length && i < b.length; i++) out[i] = b.charCodeAt(i); };
+const post = (msg) => window.webkit?.messageHandlers?.visualizer?.postMessage(msg);
+const sorted = (o) => Object.keys(o).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+let [w, h] = size();
+canvas.width = w; canvas.height = h;
+const viz = lib.createVisualizer(new AudioContext(), canvas, { width: w, height: h, pixelRatio: 1 });
+let presets = {}, names = [], index = -1, changed = 0, converter;
+
+// Built-in presets, unless turned off while the user has their own.
+function rebuild() {
+  const useBuiltIn = config.builtIn || Object.keys(user).length === 0;
+  presets = Object.assign({}, useBuiltIn ? builtIn : {}, user);
+  names = sorted(presets);
+  post({ presets: names });
+}
+
+// The converter is large: it loads on the first .milk file.
+const loadConverter = () => converter ??= new Promise((ok, fail) => {
+  const s = document.createElement('script');
+  s.src = 'milkdrop-preset-converter.min.js';
+  s.onload = () => ok(window.milkdropPresetConverter);
+  s.onerror = fail;
+  document.head.appendChild(s);
+});
+
+window.ms = {
+  feed(mono, left, right) { decode(mono, levels.timeByteArray); decode(left, levels.timeByteArrayL); decode(right, levels.timeByteArrayR); },
+  configure(options) {
+    const lists = options.builtIn !== config.builtIn;
+    Object.assign(config, options);
+    if (lists) rebuild();
+  },
+  select(name, blend = config.blend) {
+    if (!presets[name]) return;
+    index = names.indexOf(name);
+    changed = performance.now();
+    viz.loadPreset(presets[name], blend);
+    post({ current: name });
+  },
+  step(by) { ms.select(names[(index + by + names.length) % names.length]); },
+  random() { ms.select(names[Math.floor(Math.random() * names.length)]); },
+  title(text) { viz.launchSongTitleAnim(text); },
+  addPresets(extra) { Object.assign(user, extra); rebuild(); },
+  async convert(name, text) {
+    try {
+      const preset = await (await loadConverter()).convertPreset(text);
+      ms.addPresets({ [name]: preset });
+      post({ converted: name, preset: JSON.stringify(preset) });
+    } catch (e) {
+      post({ failed: name, error: String(e) });
+    }
+  },
+};
+
+function frame() {
+  const [nw, nh] = size();
+  if (nw !== w || nh !== h) { w = nw; h = nh; canvas.width = w; canvas.height = h; viz.setRendererSize(w, h); }
+  viz.render({ audioLevels: levels });
+  if (config.cycle && performance.now() - changed > config.seconds * 1000) config.shuffle ? ms.random() : ms.step(1);
+  requestAnimationFrame(frame);
+}
+rebuild();
+ms.random();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

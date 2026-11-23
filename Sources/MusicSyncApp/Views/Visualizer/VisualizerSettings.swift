@@ -1,0 +1,120 @@
+import AppKit
+import SwiftUI
+import UniformTypeIdentifiers
+
+/// Keys and defaults of the visualizer options; the window and Settings > Visualizer share them through `@AppStorage(store: .app)`.
+enum VisualizerSettings {
+    static let mode = "visualizerMode"
+    static let lyrics = "visualizerLyrics"
+    static let announce = "visualizerAnnounce"
+    static let cycle = "visualizerCycle"
+    static let cycleSeconds = "visualizerCycleSeconds"
+    static let blend = "visualizerBlend"
+    static let shuffle = "visualizerShuffle"
+    static let builtIn = "visualizerBuiltIn"
+    static let quality = "visualizerQuality"
+    static let peaks = "visualizerPeaks"
+    static let segmented = "visualizerSegmented"
+    static let falloff = "visualizerFalloff"
+
+    /// Copies .milk and .json presets into the presets folder, replacing files of the same name. Returns how many it copied.
+    @MainActor static func importPresets() -> Int {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = true
+        panel.allowedContentTypes = [UTType(filenameExtension: "milk") ?? .data, .json]
+        panel.message = "Choose MilkDrop (.milk) or butterchurn (.json) presets"
+        guard panel.runModal() == .OK else { return 0 }
+        let folder = MilkDrop.userFolder
+        return panel.urls.filter { url in
+            let target = folder.appendingPathComponent(url.lastPathComponent)
+            try? FileManager.default.removeItem(at: target)
+            // A new .milk file gets converted again.
+            if url.pathExtension == "milk" { try? FileManager.default.removeItem(at: target.deletingPathExtension().appendingPathExtension("json")) }
+            return (try? FileManager.default.copyItem(at: url, to: target)) != nil
+        }.count
+    }
+
+    /// Names of the presets in the folder, a .milk file and its converted .json counted once.
+    static func userPresets() -> [String] {
+        let files = (try? FileManager.default.contentsOfDirectory(at: MilkDrop.userFolder, includingPropertiesForKeys: nil)) ?? []
+        return Set(files.filter { ["milk", "json"].contains($0.pathExtension) }.map { $0.deletingPathExtension().lastPathComponent }).sorted()
+    }
+}
+
+/// Settings > Visualizer.
+struct VisualizerSettingsView: View {
+    @AppStorage(VisualizerSettings.mode, store: .app) private var mode = VisualizerMode.spectrum
+    @AppStorage(VisualizerSettings.lyrics, store: .app) private var lyrics = true
+    @AppStorage(VisualizerSettings.announce, store: .app) private var announce = true
+    @AppStorage(VisualizerSettings.cycle, store: .app) private var cycle = true
+    @AppStorage(VisualizerSettings.cycleSeconds, store: .app) private var cycleSeconds = 20.0
+    @AppStorage(VisualizerSettings.blend, store: .app) private var blend = 2.7
+    @AppStorage(VisualizerSettings.shuffle, store: .app) private var shuffle = true
+    @AppStorage(VisualizerSettings.builtIn, store: .app) private var builtIn = true
+    @AppStorage(VisualizerSettings.quality, store: .app) private var quality = 1.0
+    @AppStorage(VisualizerSettings.peaks, store: .app) private var peaks = true
+    @AppStorage(VisualizerSettings.segmented, store: .app) private var segmented = true
+    @AppStorage(VisualizerSettings.falloff, store: .app) private var falloff = 1.6
+    @Environment(\.openWindow) private var openWindow
+    @State private var presets = VisualizerSettings.userPresets()
+
+    var body: some View {
+        Form {
+            Section {
+                Picker("Style", selection: $mode) { ForEach(VisualizerMode.allCases) { Text($0.title).tag($0) } }
+                Toggle("Show synced lyrics", isOn: $lyrics)
+                Toggle("Announce songs", isOn: $announce)
+                Button("Show Visualizer") { openWindow(id: VisualizerView.windowID) }
+            } footer: {
+                SettingsFooter("Window > Visualizer (⌘T), or the waveform button in Now Playing and the MiniPlayer. Announce Songs shows the artist and title when a song starts. While a visualizer is open, songs play through the same audio tap as the equalizer, so the next song starts with a short cut instead of gapless.")
+            }
+            Section("Spectrum") {
+                Toggle("Peak caps", isOn: $peaks)
+                Toggle("Segmented bars", isOn: $segmented)
+                LabeledContent("Bar fall speed") {
+                    Slider(value: $falloff, in: 0.4...4) { EmptyView() } minimumValueLabel: { Text("Slow").foregroundStyle(.secondary) } maximumValueLabel: { Text("Fast").foregroundStyle(.secondary) }
+                }
+            }
+            Section {
+                Toggle("Change presets automatically", isOn: $cycle)
+                Picker("Change every", selection: $cycleSeconds) {
+                    ForEach([10.0, 20, 30, 60, 120], id: \.self) { Text("\(Int($0)) seconds").tag($0) }
+                }
+                .disabled(!cycle)
+                Picker("Order", selection: $shuffle) {
+                    Text("Random").tag(true)
+                    Text("Alphabetical").tag(false)
+                }
+                .disabled(!cycle)
+                LabeledContent("Blend time") {
+                    Slider(value: $blend, in: 0...10, step: 0.5) { EmptyView() } minimumValueLabel: { Text("Cut").foregroundStyle(.secondary) } maximumValueLabel: { Text("10 s").foregroundStyle(.secondary) }
+                }
+                Picker("Quality", selection: $quality) {
+                    Text("Low").tag(0.5)
+                    Text("Normal").tag(1.0)
+                    Text("Retina").tag(2.0)
+                }
+                .pickerStyle(.segmented)
+            } header: {
+                Text("MilkDrop")
+            } footer: {
+                SettingsFooter("Blend time is how long two presets mix when the preset changes. Retina quality renders every screen pixel and uses more GPU.")
+            }
+            Section {
+                Toggle("Include built-in presets", isOn: $builtIn)
+                    .disabled(presets.isEmpty)
+                LabeledContent("Your presets", value: presets.isEmpty ? "None" : "\(presets.count)")
+                HStack {
+                    Button("Import Presets…") { _ = VisualizerSettings.importPresets(); presets = VisualizerSettings.userPresets() }
+                    Button("Show in Finder") { NSWorkspace.shared.open(MilkDrop.userFolder) }
+                }
+            } header: {
+                Text("Presets")
+            } footer: {
+                SettingsFooter("MilkDrop (.milk) presets from Winamp, and butterchurn (.json) presets. A .milk preset is converted the first time MilkDrop shows; some shaders do not convert and the preset is skipped.")
+            }
+        }
+        .formStyle(.grouped)
+        .onAppear { presets = VisualizerSettings.userPresets() }
+    }
+}

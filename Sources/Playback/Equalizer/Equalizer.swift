@@ -8,6 +8,8 @@ public final class Equalizer: Sendable {
     private let shared = Mutex((generation: 0, gains: EqualizerGains.flat))
     private let frames = Atomic<Int>(0)
     let recorder: TapRecorder?
+    /// What the taps put out, for the visualizer.
+    public let samples = SampleTap()
 
     /// `recorder` keeps what the taps put out (tests and dev tools).
     public init(recorder: TapRecorder? = nil) { self.recorder = recorder }
@@ -88,6 +90,7 @@ private final class TapContext {
         equalizer.sync(processor, &generation)
         processor.process(list, frames: frames)
         equalizer.count(frames)
+        equalizer.samples.write(list, frames: frames, time: time, sampleRate: processor.sampleRate)
         if let recorder = equalizer.recorder, let item {
             recorder.record(list, frames: frames, item: item, tap: ObjectIdentifier(self), time: time, sampleRate: processor.sampleRate)
         }

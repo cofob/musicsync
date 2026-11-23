@@ -57,7 +57,7 @@ import AVFoundation
     public var duration: TimeInterval? { decks[active].duration.map { $0 + (current?.offset ?? 0) } }
     /// A transition is running: two songs play.
     public var isFading: Bool { fade != nil }
-    /// Runs on every song through its audio mix while `usesEqualizer` is on.
+    /// Runs on every song through its audio mix while `usesEqualizer` is on (also while a visualizer shows).
     public let equalizer: Equalizer
     /// The equalizer tap delays the start of a song and of a seek, so songs get it only when it is on.
     /// Measured on local files: start and seek take 0.30 and 0.26 s with an empty PostEffects tap, against

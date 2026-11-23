@@ -6,6 +6,12 @@ extension Player {
         guard equalizer != old else { return }
         equalizer.save()
         mixer.equalizer.set(equalizer.gains)
-        mixer.usesEqualizer = equalizer.isOn
+        tapChanged()
+    }
+
+    /// The tap runs for the equalizer and for visible visualizers; only the visualizers need its samples.
+    func tapChanged() {
+        mixer.usesEqualizer = equalizer.isOn || visualizers > 0
+        mixer.equalizer.samples.isOn = visualizers > 0
     }
 }

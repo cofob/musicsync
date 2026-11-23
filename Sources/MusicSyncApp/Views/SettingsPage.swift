@@ -3,7 +3,7 @@ import SwiftUI
 
 /// A page of the Settings window, with its sidebar icon and the words the search finds it by.
 enum SettingsPage: String, CaseIterable, Identifiable {
-    case general, appearance, playback, server, library, downloads, sync, shortcuts, remote, sharing, advanced
+    case general, appearance, playback, visualizer, server, library, downloads, sync, shortcuts, remote, sharing, advanced
 
     var id: Self { self }
 
@@ -19,6 +19,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .general: "gearshape.fill"
         case .appearance: "paintpalette.fill"
         case .playback: "play.fill"
+        case .visualizer: "waveform"
         case .server: "server.rack"
         case .library: "books.vertical.fill"
         case .downloads: "arrow.down.circle.fill"
@@ -36,6 +37,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .general, .advanced: .gray
         case .appearance: .indigo
         case .playback: Color(red: 0.98, green: 0.14, blue: 0.24)
+        case .visualizer: .pink
         case .server, .sharing: .blue
         case .library: .orange
         case .downloads: .green
@@ -51,6 +53,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .appearance: ["accent color", "theme", "album covers", "grid", "density", "size", "sidebar", "now playing", "background",
                            "start page", "song list", "columns", "rating", "plays", "format", "row height", "compact", "album color", "animated"]
         case .playback: ["crossfade", "sound check", "replaygain", "volume", "streaming quality", "bitrate", "speed", "gapless", "autoplay"]
+        case .visualizer: ["milkdrop", "winamp", "aimp", "spectrum", "oscilloscope", "presets", ".milk", "import", "lyrics", "announce", "blend", "full screen"]
         case .server: ["navidrome", "subsonic", "url", "address", "username", "password", "connection", "account"]
         case .library: ["background sync", "mirror", "lyrics", "covers", "home", "shelves", "top picks", "made for you", "recently played",
                         "because you listened", "most played", "discover", "scrobble", "play counts", "history", "stats", "recommendations", "lrclib"]

@@ -8,6 +8,7 @@ enum MiniPlayer {
     static let id = "mini-player"
     static let onTopKey = "miniPlayerOnTop"
     static let queueKey = "miniPlayerQueue"
+    static let visualizerKey = "miniPlayerVisualizer"
     /// Height Up Next adds below the cover.
     static let queueHeight: CGFloat = 340
     /// The main window hidden by `open`, shown again when the MiniPlayer closes.
@@ -46,6 +47,7 @@ struct MiniPlayerView: View {
     @Environment(\.dismissWindow) private var dismissWindow
     @AppStorage(MiniPlayer.onTopKey, store: .app) private var onTop = false
     @AppStorage(MiniPlayer.queueKey, store: .app) private var showsQueue = false
+    @AppStorage(MiniPlayer.visualizerKey, store: .app) private var showsVisualizer = false
     @State private var hovering = false
     /// The controls show for a moment when the window opens, so the user sees them.
     @State private var peek = true
@@ -56,6 +58,7 @@ struct MiniPlayerView: View {
         let player = model.player
         VStack(spacing: 0) {
             CoverFrame(image: player.artwork, cornerRadius: 0)
+                .overlay { if showsVisualizer { VisualizerView(compact: true) } }
                 .overlay { if hovering || peek || player.current == nil { controls.transition(.opacity) } }
                 .onHover { h in withAnimation(.easeOut(duration: 0.2)) { hovering = h } }
             if showsQueue {
@@ -105,6 +108,10 @@ struct MiniPlayerView: View {
                 TransportControls(scale: 0.85, spacing: 10)
                 Spacer(minLength: 0)
                 AirPlayButton(tint: .white).frame(width: 20, height: 20)
+                Button("Visualizer", systemImage: "waveform") { showsVisualizer.toggle() }
+                    .foregroundStyle(showsVisualizer ? Color.musicAccent : .white)
+                    .help("Visualizer")
+                    .accessibilityValue(showsVisualizer ? "On" : "Off")
                 Button("Up Next", systemImage: "list.bullet") { showsQueue.toggle() }
                     .foregroundStyle(showsQueue ? Color.musicAccent : .white)
                     .help("Up Next")

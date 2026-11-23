@@ -50,8 +50,9 @@ import SwiftUI
         case "artist":
             await select(.artists, model)
             if let artist = await first({ model.artists.first }) { model.show(.artist(artist.id)) }
-        case "nowplaying":
+        case "nowplaying", "nowplaying-visualizer":
             await playPaused(model)
+            model.nowPlayingVisualizer = scene == "nowplaying-visualizer"
             model.showNowPlaying = true
         case "nowplaying-lrclib":
             // A canned LRCLIB reply: the scene never asks lrclib.net.
@@ -221,6 +222,26 @@ import SwiftUI
                 _ = await first({ model.player.elapsed > 3 ? true : nil })
             }
             open(EqualizerView(), "Equalizer", model)
+        case "visualizer", "visualizer-scope", "visualizer-milkdrop", "miniplayer-visualizer":
+            // Plays (muted) so the tap has samples.
+            let mode = scene == "visualizer" ? VisualizerMode.spectrum : scene == "visualizer-scope" ? .scope : .milkdrop
+            UserDefaults.app.set(mode.rawValue, forKey: VisualizerSettings.mode)
+            if let album = await first({ model.albums.first }) {
+                model.play(album)
+                // Canned synced lyrics, a line a second, so the lyrics show.
+                let lrc = (0..<60).map { "[00:\(String(format: "%02d", $0)).00]Visualizer line \($0 + 1)" }
+                let reply = try? JSONSerialization.data(withJSONObject: ["syncedLyrics": lrc.joined(separator: "\n")])
+                if case .server(let song)? = model.player.current {
+                    model.lyricsCache[song.id] = Lyrics(lrclib: reply.flatMap { try? LRCLIBClient.decode($0) })
+                }
+                _ = await first({ model.player.elapsed > 2 ? true : nil })
+            }
+            if scene == "miniplayer-visualizer" {
+                UserDefaults.app.set(true, forKey: MiniPlayer.visualizerKey)
+                open(MiniPlayerView().frame(width: 300, height: 300), "MiniPlayer", model)
+            } else {
+                open(VisualizerView().frame(width: 800, height: 480), "Visualizer", model)
+            }
         case "offline":
             await select(.albums, model)
             guard let album = await first({ model.albums.first }) else { break }

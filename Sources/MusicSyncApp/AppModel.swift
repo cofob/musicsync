@@ -93,6 +93,8 @@ final class AppModel {
     @ObservationIgnored private(set) lazy var jukebox = Jukebox(app: self)
     var showNowPlaying = false
     var nowPlayingPanel = NowPlayingPanel.lyrics
+    /// Now Playing shows the visualizer over the whole window.
+    var nowPlayingVisualizer = false
     /// Song shown in the "Get Info" sheet.
     var infoSong: Song?
     /// Song id -> lyrics (nil = none) seen this session.

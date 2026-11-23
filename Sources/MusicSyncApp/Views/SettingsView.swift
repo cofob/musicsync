@@ -47,6 +47,7 @@ struct SettingsView: View {
         case .general: GeneralSettingsView()
         case .appearance: AppearanceSettingsView()
         case .playback: PlaybackSettingsView()
+        case .visualizer: VisualizerSettingsView()
         case .server: ServerSettingsView()
         case .library: LibrarySettingsView()
         case .downloads: DownloadSettingsView()

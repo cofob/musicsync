@@ -30,6 +30,7 @@ struct NowPlayingView: View {
                 }
             }
             .padding(.horizontal, 60).padding(.top, 70).padding(.bottom, 40)
+            if model.nowPlayingVisualizer { VisualizerView().transition(.opacity) }
         }
         .overlay(alignment: .topLeading) {
             Button("Close", systemImage: "xmark") { model.showNowPlaying = false }
@@ -43,6 +44,12 @@ struct NowPlayingView: View {
             HStack(spacing: 4) {
                 panelToggle("Lyrics", "quote.bubble", .lyrics)
                 panelToggle("Queue", "list.bullet", .queue)
+                Button("Visualizer", systemImage: "waveform") { model.nowPlayingVisualizer.toggle() }
+                    .labelStyle(.iconOnly).buttonStyle(HitAreaButtonStyle(width: 34, height: 30)).font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(model.nowPlayingVisualizer ? Color.black : .white)
+                    .background(model.nowPlayingVisualizer ? Color.white.opacity(0.9) : .clear, in: Capsule())
+                    .help("Visualizer")
+                    .accessibilityValue(model.nowPlayingVisualizer ? "On" : "Off")
             }
             .padding(4).glass(in: Capsule())
             .padding(16)
@@ -51,6 +58,7 @@ struct NowPlayingView: View {
         .foregroundStyle(.white)
         .environment(\.colorScheme, .dark)
         .animation(.smooth, value: model.nowPlayingPanel)
+        .animation(.smooth, value: model.nowPlayingVisualizer)
         .task(id: song?.id) {
             // The panel stays while the next song's lyrics load; it goes away only when there are none.
             lyrics = nil
