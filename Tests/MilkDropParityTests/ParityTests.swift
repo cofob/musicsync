@@ -105,7 +105,7 @@ import UniformTypeIdentifiers
         var rows: [Row] = [], skipped: [String] = []
         for file in try Self.presets() {
             let preset = try PresetFile.load(file)
-            let milk = try String(contentsOf: file, encoding: .utf8)
+            let milk = String(decoding: try Data(contentsOf: file), as: UTF8.self)
             guard let theirs = try? await reference.render(milk, width: Self.size.w, height: Self.size.h, frames: Self.frames.max()!, keep: Self.frames),
                   let ours = try? await Self.native(preset, device: device, keep: Self.frames) else { skipped.append(preset.name); continue }
             var diffs: [Double] = []
