@@ -10,7 +10,8 @@ public final class AudioLevels {
     /// 512 equalized frequency magnitudes: of the mono mix, and of each channel.
     public private(set) var spectrum = [Float](repeating: 0, count: 512)
     public private(set) var spectrumLeft = [Float](repeating: 0, count: 512), spectrumRight = [Float](repeating: 0, count: 512)
-    public private(set) var bass: Float = 1, mid: Float = 1, treb: Float = 1
+    /// Before the first `update`: 0, the attenuated ones 1, as butterchurn starts (the first preset's init sees these).
+    public private(set) var bass: Float = 0, mid: Float = 0, treb: Float = 0
     public private(set) var bassAtt: Float = 1, midAtt: Float = 1, trebAtt: Float = 1
 
     private let dft = vDSP.DFT(count: sampleCount, direction: .forward, transformType: .complexComplex, ofType: Float.self)

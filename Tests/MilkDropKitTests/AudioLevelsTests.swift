@@ -7,6 +7,12 @@ import Testing
         (0..<AudioLevels.sampleCount).map { amplitude * Float(sin(2 * .pi * hz * Double($0) / rate)) }
     }
 
+    @Test func startsAtZeroWithAttenuatedOne() {
+        let audio = AudioLevels()
+        #expect(audio.bass == 0 && audio.mid == 0 && audio.treb == 0)
+        #expect(audio.bassAtt == 1 && audio.midAtt == 1 && audio.trebAtt == 1)
+    }
+
     /// As in butterchurn: 0 while the long average fades, 1 once it is gone.
     @Test func silenceIsZeroThenOne() {
         let audio = AudioLevels()
