@@ -323,6 +323,11 @@ public final class Renderer {
         for texture in [fresh.prev, fresh.target] + blur.textures + blur.horizontalTextures {
             pass(buffer, texture, clear: true)?.endEncoding()
         }
+        // Their smaller mip levels too: the comp pass reads the target's mips before any frame made them.
+        if let blit = buffer.makeBlitCommandEncoder() {
+            [fresh.prev, fresh.target].forEach(blit.generateMipmaps)
+            blit.endEncoding()
+        }
         if let old, let encoder = pass(buffer, fresh.target, clear: true) {
             encoder.setRenderPipelineState(copy)
             encoder.setFragmentTexture(old.target, index: 0)

@@ -51,6 +51,14 @@ import Testing
         #expect(dark.count <= sample.count / 4)
     }
 
+    /// A far-zoomed video echo reads small mip levels of the frame; on the first frame they must be black too.
+    @Test func firstFrameEchoIsBlack() async throws {
+        guard let device = MTLCreateSystemDefaultDevice(), let screen = Self.screen(device) else { return }
+        let renderer = try #require(Renderer(device: device))
+        let preset = PresetFile.parse("[preset00]\nfWaveAlpha=0\nfVideoEchoAlpha=1\nfVideoEchoZoom=0.25\nfGammaAdj=1\nmv_a=0\nob_a=0\nib_a=0", name: "T")
+        #expect(try await Self.render(preset, frames: 1, renderer: renderer, screen: screen) < 0.5)
+    }
+
     @Test func blendsTwoPresets() async throws {
         guard let device = MTLCreateSystemDefaultDevice(), let screen = Self.screen(device) else { return }
         let renderer = try #require(Renderer(device: device))
