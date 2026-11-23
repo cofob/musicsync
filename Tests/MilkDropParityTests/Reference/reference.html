@@ -45,7 +45,7 @@ window.setImages = async (urls) => {
 window.renderPreset = async (milk, width, height, frames, keep) => {
   const canvas = document.getElementById('c');
   canvas.width = width; canvas.height = height;
-  viz = lib.createVisualizer(new AudioContext(), canvas, { width, height, pixelRatio: 1, textureRatio: 1 });
+  viz = lib.createVisualizer(new AudioContext({ sampleRate: 44100 }), canvas, { width, height, pixelRatio: 1, textureRatio: 1 });
   viz.loadExtraImages(images);
   const samplers = viz.renderer.image.samplers;
   const missing = () => Object.keys(images).filter((n) => !samplers[n]);
