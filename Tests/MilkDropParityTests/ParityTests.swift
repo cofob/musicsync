@@ -90,6 +90,17 @@ import UniformTypeIdentifiers
         }
     }
 
+    /// The .milk text for butterchurn, with the shaders that parse printed in full parentheses (see `HLSLPrinter`).
+    static func referenceMilk(_ milk: String, _ preset: Preset) -> String {
+        var lines = milk.components(separatedBy: .newlines)
+        for (prefix, hlsl) in [("warp_", preset.warp), ("comp_", preset.comp)] {
+            guard let text = HLSLPrinter.parenthesized(hlsl) else { continue }
+            lines.removeAll { $0.lowercased().hasPrefix(prefix) }
+            lines += text.split(separator: "\n").enumerated().map { "\(prefix)\($0.offset + 1)=`\($0.element)" }
+        }
+        return lines.joined(separator: "\n")
+    }
+
     struct Row {
         let name: String, diffs: [Double], failure: String?
         var line: String { "\(diffs.map { String(format: "%6.1f", $0) }.joined(separator: " "))  \(name)\(failure.map { "  (\($0))" } ?? "")" }
@@ -105,7 +116,7 @@ import UniformTypeIdentifiers
         var rows: [Row] = [], skipped: [String] = []
         for file in try Self.presets() {
             let preset = try PresetFile.load(file)
-            let milk = String(decoding: try Data(contentsOf: file), as: UTF8.self)
+            let milk = Self.referenceMilk(String(decoding: try Data(contentsOf: file), as: UTF8.self), preset)
             guard let theirs = try? await reference.render(milk, width: Self.size.w, height: Self.size.h, frames: Self.frames.max()!, keep: Self.frames),
                   let ours = try? await Self.native(preset, device: device, keep: Self.frames) else { skipped.append(preset.name); continue }
             var diffs: [Double] = []
