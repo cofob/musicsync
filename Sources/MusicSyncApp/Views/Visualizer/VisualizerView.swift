@@ -161,7 +161,7 @@ struct VisualizerView: View {
         window.toggleFullScreen(nil)
     }
 
-    /// Shows the controls; they go away after 2 s without mouse moves.
+    /// Shows the controls; they and the cursor go away after 2 s without mouse moves.
     private func show() {
         withAnimation(.easeOut(duration: 0.2)) { hovering = true }
         hideTask?.cancel()
@@ -169,6 +169,7 @@ struct VisualizerView: View {
             try? await Task.sleep(for: .seconds(2))
             guard !Task.isCancelled, !overControls else { return }
             withAnimation(.easeOut(duration: 0.3)) { hovering = false }
+            if !compact { NSCursor.setHiddenUntilMouseMoves(true) }  // the cursor goes with the controls
         }
     }
 }
