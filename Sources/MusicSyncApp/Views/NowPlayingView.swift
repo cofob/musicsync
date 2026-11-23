@@ -27,13 +27,15 @@ struct NowPlayingView: View {
             }
             .padding(.horizontal, 60).padding(.top, 70).padding(.bottom, 40)
             if model.nowPlayingVisualizer {
-                VisualizerView().transition(.opacity)
-                // The panel stays usable over the visualizer, on the right.
+                // The player keeps clear of the panel, else of the buttons in the bottom right corner.
+                VisualizerView(trailingInset: panel != .none ? Self.panelWidth : 150).transition(.opacity)
+                // The panel stays usable over the visualizer: a dark column on the right.
                 if panel != .none {
                     panelView(panel)
-                        .frame(width: 420).frame(maxHeight: .infinity)
-                        .padding(.top, 70).padding(.bottom, 150).padding(.horizontal, 24)  // above the visualizer's player
-                        .background(LinearGradient(colors: [.clear, .black.opacity(0.75)], startPoint: .leading, endPoint: .trailing))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.top, 70).padding(.bottom, 70).padding(.horizontal, 24)
+                        .frame(width: Self.panelWidth)
+                        .background(.black.opacity(0.85))
                         .frame(maxWidth: .infinity, alignment: .trailing)
                         .transition(.opacity)
                 }
@@ -80,6 +82,9 @@ struct NowPlayingView: View {
             withAnimation(.smooth(duration: 0.5)) { showLyrics = found != nil }
         }
     }
+
+    /// Width of the Lyrics or Queue column over the visualizer.
+    static let panelWidth: CGFloat = 440
 
     @ViewBuilder private func panelView(_ panel: NowPlayingPanel) -> some View {
         if panel == .lyrics { LyricsPanel(lyrics: lyrics) } else { UpNextPanel().padding(.trailing, 20).padding(.bottom, 50) }

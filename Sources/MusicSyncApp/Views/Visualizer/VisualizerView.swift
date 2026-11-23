@@ -20,6 +20,8 @@ enum VisualizerMode: String, CaseIterable, Identifiable {
 struct VisualizerView: View {
     static let windowID = "visualizer"
     var compact = false
+    /// Room the player keeps free on the right, for the Now Playing panel and buttons.
+    var trailingInset: CGFloat = 0
 
     @Environment(AppModel.self) private var model
     @AppStorage(VisualizerSettings.mode, store: .app) private var mode = VisualizerMode.spectrum
@@ -107,7 +109,12 @@ struct VisualizerView: View {
             .lineLimit(1)
             ScrubBar(tint: .white)
             TransportControls(scale: 0.9, spacing: 14)
-            visualizerButtons
+            // Narrow: the modes become a menu, then Lyrics only an icon.
+            ViewThatFits(in: .horizontal) {
+                visualizerButtons(menuModes: false, lyricsTitle: true)
+                visualizerButtons(menuModes: true, lyricsTitle: true)
+                visualizerButtons(menuModes: true, lyricsTitle: false)
+            }
         }
         .padding(.horizontal, 18).padding(.vertical, 12)
         .frame(maxWidth: 640)
@@ -115,21 +122,32 @@ struct VisualizerView: View {
         .background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(.white.opacity(0.12)))
         .padding(.horizontal, 24).padding(.bottom, 20)
+        .padding(.trailing, trailingInset)
         .onHover { overControls = $0 }
     }
 
-    private var visualizerButtons: some View {
+    private func visualizerButtons(menuModes: Bool, lyricsTitle: Bool) -> some View {
         HStack(spacing: 4) {
-            Picker("Mode", selection: $mode) { ForEach(VisualizerMode.allCases) { Text($0.title).tag($0) } }
-                .pickerStyle(.segmented).labelsHidden().fixedSize().controlSize(.small)
+            Group {
+                if menuModes {
+                    Picker("Mode", selection: $mode) { ForEach(VisualizerMode.allCases) { Text($0.title).tag($0) } }
+                        .pickerStyle(.menu).labelsHidden().fixedSize()
+                } else {
+                    Picker("Mode", selection: $mode) { ForEach(VisualizerMode.allCases) { Text($0.title).tag($0) } }
+                        .pickerStyle(.segmented).labelsHidden().fixedSize()
+                }
+            }
+            .controlSize(.small)
             Spacer(minLength: 8)
             if mode == .milkdrop {
                 Button("Previous Preset", systemImage: "chevron.left") { milkDrop.step(-1) }.help("Previous preset")
                 presetsMenu
                 Button("Next Preset", systemImage: "chevron.right") { milkDrop.step(1) }.help("Next preset")
             }
-            Button { showsLyrics.toggle() } label: { Label("Lyrics", systemImage: "quote.bubble").labelStyle(.titleAndIcon) }
-                .buttonStyle(VisualizerButtonStyle(isOn: showsLyrics, wide: true))
+            Button { showsLyrics.toggle() } label: {
+                if lyricsTitle { Label("Lyrics", systemImage: "quote.bubble").labelStyle(.titleAndIcon) } else { Label("Lyrics", systemImage: "quote.bubble") }
+            }
+                .buttonStyle(VisualizerButtonStyle(isOn: showsLyrics, wide: lyricsTitle))
                 .help("Show synced lyrics over the visualizer")
                 .accessibilityValue(showsLyrics ? "On" : "Off")
             Button("Full Screen", systemImage: "arrow.up.left.and.arrow.down.right") { toggleFullScreen() }.help("Full screen")
