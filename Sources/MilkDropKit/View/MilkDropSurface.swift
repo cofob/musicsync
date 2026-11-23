@@ -1,7 +1,7 @@
 import MetalKit
 import SwiftUI
 
-/// Draws frames into a Metal view at up to 60 fps (presets assume about 60; ProMotion would speed them up).
+/// Draws frames into a Metal view at up to 120 fps (ProMotion); the renderer keeps its own frame rate in `fps`.
 @MainActor public protocol MilkDropDrawing: AnyObject {
     func draw(in view: MTKView)
     func sizeChanged(_ size: CGSize, in view: MTKView)
@@ -16,7 +16,7 @@ public struct MilkDropSurface {
     @MainActor func makeView(_ coordinator: Coordinator) -> MTKView {
         let view = MTKView(frame: .zero, device: MTLCreateSystemDefaultDevice())
         view.colorPixelFormat = .bgra8Unorm
-        view.preferredFramesPerSecond = 60
+        view.preferredFramesPerSecond = 120
         view.framebufferOnly = false  // window captures (screenshots) read the drawable
         view.clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
         view.delegate = coordinator

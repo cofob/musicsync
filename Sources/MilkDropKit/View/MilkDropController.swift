@@ -13,7 +13,12 @@ import Observation
 
     @ObservationIgnored private var library: PresetLibrary
     @ObservationIgnored private var cycler = PresetCycler()
-    @ObservationIgnored private var renderer: Renderer?
+    /// Renders off the main thread; `device` and `hasRenderer` are the main thread's view of it.
+    @ObservationIgnored private let loop = RenderLoop()
+    @ObservationIgnored private var device: MTLDevice?
+    @ObservationIgnored private var hasRenderer = false
+    /// A frame is still drawing on the render queue: the next draw skips, so frames never queue up.
+    @ObservationIgnored private var rendering = false
     @ObservationIgnored private var compiled: [String: CompiledPreset] = [:]
     @ObservationIgnored private var compiling: Set<String> = []
     /// The change to show once its preset has compiled.
@@ -21,13 +26,16 @@ import Observation
     @ObservationIgnored private var pendingTitle: (String, Double)?
     @ObservationIgnored private let folders: [URL]
     @ObservationIgnored private let textureFolders: [URL]
+    @ObservationIgnored private let index: CompileIndex?
     @ObservationIgnored private let clock = ContinuousClock()
     @ObservationIgnored private let start = ContinuousClock.now
 
     /// `folders`: preset folders besides the bundled ones (searched one level deep), later ones win on equal names.
-    public init(folders: [URL] = [], textureFolders: [URL] = []) {
+    /// `index`: where to keep which presets compile (`CompileIndex`), so broken ones stay out from the start.
+    public init(folders: [URL] = [], textureFolders: [URL] = [], index: URL? = nil) {
         self.folders = folders
         self.textureFolders = textureFolders
+        self.index = index.map(CompileIndex.at)
         library = PresetLibrary(folders: folders)
         reload()
     }
@@ -43,6 +51,7 @@ import Observation
     /// Reads the folders again (new or removed presets).
     public func reload() {
         library = PresetLibrary(folders: folders)
+        if let index { failed = Array(Set(failed).union(index.failed(in: library))).sorted() }
         updateNames()
     }
 
@@ -52,8 +61,9 @@ import Observation
 
     /// MilkDrop's song title animation; the text flies in and melts into the picture.
     public func title(_ text: String, seconds: Double = 4) {
-        guard let renderer else { pendingTitle = (text, seconds); return }
-        renderer.showTitle(text, seconds: seconds)
+        guard hasRenderer else { pendingTitle = (text, seconds); return }
+        let loop = loop
+        loop.queue.async { loop.renderer?.showTitle(text, seconds: seconds) }
     }
 
     private func updateNames() {
@@ -66,30 +76,30 @@ import Observation
 
     private func apply(_ change: PresetCycler.Change?) {
         guard let change else { return }
-        if let ready = compiled[change.name], let renderer {
-            show(ready, change, renderer)
+        if let ready = compiled[change.name], hasRenderer {
+            show(ready, change)
         } else {
             waiting = change
             prepare(change.name)
         }
     }
 
-    private func show(_ preset: CompiledPreset, _ change: PresetCycler.Change, _ renderer: Renderer) {
-        do {
-            try renderer.show(preset, blend: current == nil ? 0 : change.blend)
-            current = change.name
-            waiting = nil
-            compiled = compiled.filter { $0.key == change.name || $0.key == cycler.upcoming }
-            prepare(cycler.upcoming)
-        } catch {
-            fail(change.name)
+    private func show(_ preset: CompiledPreset, _ change: PresetCycler.Change) {
+        let name = change.name, blend = current == nil ? 0 : change.blend, loop = loop
+        current = name
+        waiting = nil
+        compiled = compiled.filter { $0.key == name || $0.key == cycler.upcoming }
+        prepare(cycler.upcoming)
+        // In order with the frames; equations that do not compile drop the preset.
+        loop.queue.async {
+            do { try loop.renderer?.show(preset, blend: blend) } catch { Task { @MainActor in self.fail(name) } }
         }
     }
 
     /// Parses and compiles `name` off the main thread.
     private func prepare(_ name: String?) {
         guard let name, compiled[name] == nil, !compiling.contains(name), let entry = library.entries[name],
-              let device = renderer?.device ?? MTLCreateSystemDefaultDevice() else { return }
+              let device = device ?? MTLCreateSystemDefaultDevice() else { return }
         compiling.insert(name)
         Task.detached(priority: .utility) {
             let result = try? await CompiledPreset.compile(PresetFile.load(entry.url), device: device, screenFormat: Self.screenFormat)
@@ -99,9 +109,13 @@ import Observation
 
     private func compiled(_ name: String, _ result: CompiledPreset?) {
         compiling.remove(name)
+        if let entry = library.entries[name], let index {
+            index.record(entry, ok: result != nil)
+            index.save()
+        }
         guard let result else { return fail(name) }
         compiled[name] = result
-        if waiting?.name == name, let waiting, let renderer { show(result, waiting, renderer) }
+        if waiting?.name == name, let waiting, hasRenderer { show(result, waiting) }
     }
 
     private func fail(_ name: String) {
@@ -118,24 +132,35 @@ import Observation
 
     nonisolated static let screenFormat = MTLPixelFormat.bgra8Unorm
 
+    /// On the main thread only the preset changes and the audio snapshot; the frame renders on `loop.queue`.
     public func draw(in view: MTKView) {
-        guard let device = view.device else { return }
-        if renderer == nil {
-            renderer = Renderer(device: device, textureFolders: textureFolders)
-            if let (text, seconds) = pendingTitle { renderer?.showTitle(text, seconds: seconds); pendingTitle = nil }
+        guard let device = view.device, !rendering else { return }
+        let loop = loop
+        if !hasRenderer {
+            hasRenderer = true
+            self.device = device
+            let folders = textureFolders
+            loop.queue.async { loop.renderer = Renderer(device: device, textureFolders: folders) }
+            if let (text, seconds) = pendingTitle { pendingTitle = nil; title(text, seconds: seconds) }
         }
-        guard let renderer else { return }
         if current == nil, waiting == nil { random() }
         apply(cycler.tick(now: now))
-        guard renderer.current != nil, let drawable = view.currentDrawable, let buffer = renderer.queue.makeCommandBuffer() else { return }
+        guard current != nil, let metalLayer = view.layer as? CAMetalLayer else { return }
         let scale = view.bounds.width > 0 ? Double(view.drawableSize.width / view.bounds.width) : 1
         let quality = min(cycler.options.quality, scale)
-        let size = SIMD2(Int(Double(view.drawableSize.width) / scale * quality), Int(Double(view.drawableSize.height) / scale * quality))
+        let size = Self.capped(SIMD2(Int(Double(view.drawableSize.width) / scale * quality), Int(Double(view.drawableSize.height) / scale * quality)))
         let audio = samples?() ?? (left: [], right: [], rate: 44100)
-        renderer.render(into: drawable.texture, buffer: buffer, size: Self.capped(size), left: audio.left, right: audio.right,
-                        sampleRate: audio.rate, now: now)
-        buffer.present(drawable)
-        buffer.commit()
+        let time = now
+        nonisolated(unsafe) let layer = metalLayer  // only `nextDrawable()`, which any thread may call
+        rendering = true
+        loop.queue.async {
+            defer { Task { @MainActor in self.rendering = false } }
+            guard let renderer = loop.renderer, let drawable = layer.nextDrawable(), let buffer = renderer.queue.makeCommandBuffer() else { return }
+            renderer.render(into: drawable.texture, buffer: buffer, size: size, left: audio.left, right: audio.right,
+                            sampleRate: audio.rate, now: time)
+            buffer.present(drawable)
+            buffer.commit()
+        }
     }
 
     public func sizeChanged(_ size: CGSize, in view: MTKView) {}
@@ -146,4 +171,11 @@ import Observation
         guard longer > 2048 else { return size }
         return SIMD2(size.x * 2048 / longer, size.y * 2048 / longer)
     }
+}
+
+/// The renderer and all its state, used only on `queue`: its CPU work (equations, meshes, encoding) would
+/// otherwise take the main thread at every frame.
+private final class RenderLoop: @unchecked Sendable {
+    let queue = DispatchQueue(label: "MilkDrop.render", qos: .userInteractive)
+    var renderer: Renderer?
 }

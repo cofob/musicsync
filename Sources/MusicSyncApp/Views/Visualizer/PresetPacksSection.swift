@@ -1,8 +1,10 @@
 import MilkDropKit
 import SwiftUI
 
-/// Downloads of the "Cream of the Crop" preset pack, by category, into `MilkDrop.downloadedFolder`.
+/// Downloads of the "Cream of the Crop" preset pack, by category, into `MilkDrop.downloadedFolder`; new presets
+/// compile ahead in the background.
 @Observable @MainActor final class PresetPacks {
+    let compiler = PresetPrecompiler(folders: MilkDrop.presetFolders, index: MilkDrop.compileIndex)
     private(set) var installed: [String: Int] = [:]
     /// Categories being downloaded and the download's progress (0…1).
     private(set) var loading: Set<String> = []
@@ -30,10 +32,14 @@ import SwiftUI
             loading = []
             task = nil
             changed()
+            compileAll()
         }
     }
 
     func cancel() { task?.cancel() }
+
+    /// Compiles every preset not compiled yet; presets that do not compile leave the visualizer's list.
+    func compileAll() { compiler.compileAll { [weak self] in self?.changed() } }
 
     func remove(_ category: String) {
         try? PresetPack.remove(category, from: MilkDrop.downloadedFolder)
@@ -72,10 +78,38 @@ struct PresetPacksSection: View {
                 if !packs.loading.isEmpty { Button("Cancel") { packs.cancel() } }
             }
             if let error = packs.error { Text(error).foregroundStyle(.red) }
+            CompileAllRow(compiler: packs.compiler) { packs.compileAll() }
         } header: {
             Text("More Presets")
         } footer: {
-            SettingsFooter("The Cream of the Crop pack from projectM, 9,795 presets sorted by theme. Each download fetches the whole pack (about 20 MB) and keeps the chosen themes.")
+            SettingsFooter("The Cream of the Crop pack from projectM, 9,795 presets sorted by theme. Each download fetches the whole pack (about 20 MB) and keeps the chosen themes. Compile All prepares every preset ahead, so it shows at once; downloaded presets compile on their own. Presets that do not compile are left out.")
+        }
+    }
+}
+
+/// "Compile All Presets" with its progress.
+private struct CompileAllRow: View {
+    let compiler: PresetPrecompiler
+    let start: () -> Void
+
+    var body: some View {
+        if compiler.isRunning {
+            LabeledContent {
+                HStack {
+                    ProgressView(value: Double(compiler.done), total: Double(max(compiler.total, 1))).frame(width: 80)
+                    Button("Stop") { compiler.cancel() }
+                }
+            } label: {
+                Text("Compiling presets")
+                Text("\(compiler.done) of \(compiler.total)").foregroundStyle(.secondary)
+            }
+        } else {
+            LabeledContent {
+                Button("Compile All Presets", action: start)
+            } label: {
+                Text("Compile ahead")
+                if compiler.total > 0 { Text("\(compiler.done) compiled, \(compiler.failed) do not compile").foregroundStyle(.secondary) }
+            }
         }
     }
 }

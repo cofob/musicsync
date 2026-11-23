@@ -12,8 +12,12 @@ extension MilkDropController {
     /// Packs downloaded in Settings > Visualizer, one folder per category.
     nonisolated static var downloadedFolder: URL { userFolder.appendingPathComponent("Downloaded", isDirectory: true) }
 
+    /// Which presets compile and which do not (`CompileIndex`).
+    nonisolated static var compileIndex: URL { Paths.caches("MilkDrop").appendingPathComponent("compiled.json") }
+    nonisolated static var presetFolders: [URL] { [downloadedFolder, userFolder] }
+
     static func app() -> MilkDropController {
-        MilkDropController(folders: [downloadedFolder, userFolder], textureFolders: [userFolder])
+        MilkDropController(folders: presetFolders, textureFolders: [userFolder], index: compileIndex)
     }
 
     /// Reads the presets folders again. Butterchurn `.json` files that an earlier version converted from a `.milk`
