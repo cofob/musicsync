@@ -17,8 +17,8 @@ final class CustomShape {
     private let instanceSlot: Int, numInstSlot: Int
     private var ring = [GeometryVertex](repeating: GeometryVertex(position: .zero, color: .zero), count: 102)
 
-    init(_ shape: Preset.Shape, globals: EELGlobals, frame: FrameGlobals) throws {
-        eq = try ElementEquations(values: shape.values, initCode: shape.initCode, globals: globals, frame: frame)
+    init(_ shape: Preset.Shape, globals: EELGlobals, frame: FrameGlobals, random: @escaping () -> Double) throws {
+        eq = try ElementEquations(values: shape.values, initCode: shape.initCode, globals: globals, frame: frame, random: random)
         let scope = eq.scope
         frameCode = try scope.compile(shape.frameCode)
         slots = Key.allCases.map { scope.slot("\($0)") }

@@ -186,9 +186,9 @@ final class PresetGeometry {
     let shapes: [CustomShape]
     let waves: [CustomWave]
 
-    init(_ preset: Preset, globals: EELGlobals, frame: FrameGlobals) throws {
-        shapes = try preset.shapes.filter(\.isEnabled).map { try CustomShape($0, globals: globals, frame: frame) }
-        waves = try preset.waves.filter(\.isEnabled).map { try CustomWave($0, globals: globals, frame: frame) }
+    init(_ preset: Preset, globals: EELGlobals, frame: FrameGlobals, random: @escaping () -> Double = { .random(in: 0..<1) }) throws {
+        shapes = try preset.shapes.filter(\.isEnabled).map { try CustomShape($0, globals: globals, frame: frame, random: random) }
+        waves = try preset.waves.filter(\.isEnabled).map { try CustomWave($0, globals: globals, frame: frame, random: random) }
     }
 
     /// Adds this frame's shapes, then waves. `eq`: this preset's equations after per-frame code.

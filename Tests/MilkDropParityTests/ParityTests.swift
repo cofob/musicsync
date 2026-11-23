@@ -114,7 +114,10 @@ import UniformTypeIdentifiers
         print(summary)
         print("report: \(Self.report.path)")
         #expect(!rows.isEmpty)
-        let first = rows.compactMap(\.diffs.first).sorted()
-        #expect(first.isEmpty || first[first.count / 2] < 20, "median difference at frame 1")
+        // Medians, so a few presets that butterchurn itself gets wrong (shaders its converter cannot compile) do not fail it.
+        for (index, limit) in [(0, 3.0), (2, 20.0)] {
+            let diffs = rows.compactMap { $0.diffs.count > index ? $0.diffs[index] : nil }.sorted()
+            #expect(diffs.isEmpty || diffs[diffs.count / 2] < limit, "median difference at frame \(Self.frames[index])")
+        }
     }
 }

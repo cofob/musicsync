@@ -14,8 +14,8 @@ final class CustomWave {
     private var left = [Double](repeating: 0, count: 512), right = [Double](repeating: 0, count: 512)
     private var points = [GeometryVertex](repeating: GeometryVertex(position: .zero, color: .zero), count: 512)
 
-    init(_ wave: Preset.Wave, globals: EELGlobals, frame: FrameGlobals) throws {
-        eq = try ElementEquations(values: wave.values, initCode: wave.initCode, globals: globals, frame: frame)
+    init(_ wave: Preset.Wave, globals: EELGlobals, frame: FrameGlobals, random: @escaping () -> Double) throws {
+        eq = try ElementEquations(values: wave.values, initCode: wave.initCode, globals: globals, frame: frame, random: random)
         frameCode = try eq.scope.compile(wave.frameCode)
         pointCode = try eq.scope.compile(wave.pointCode)
         slots = Key.allCases.map { [scope = eq.scope] in scope.slot("\($0)") }

@@ -15,6 +15,7 @@ public final class Renderer {
     private let textures: TextureLibrary
     private let title: TitleText
     private let copy: MTLRenderPipelineState
+    private let geometry: FrameGeometry
     private let wrapSampler: MTLSamplerState, clampSampler: MTLSamplerState
     private var targets: Targets?
     private var mesh = WarpMesh(size: meshSize)
@@ -27,10 +28,12 @@ public final class Renderer {
     final class Active {
         let compiled: CompiledPreset
         let equations: PresetEquations
+        let geometry: PresetGeometry
         let randPreset: SIMD4<Float>, randStart: SIMD4<Float>
-        init(_ compiled: CompiledPreset, _ equations: PresetEquations, random: () -> Double) {
+        init(_ compiled: CompiledPreset, _ equations: PresetEquations, _ geometry: PresetGeometry, random: () -> Double) {
             self.compiled = compiled
             self.equations = equations
+            self.geometry = geometry
             randStart = SIMD4((0..<4).map { _ in Float(random()) })
             randPreset = SIMD4((0..<4).map { _ in Float(random()) })
         }
@@ -51,6 +54,7 @@ public final class Renderer {
               let noise = Noise.makeTextures(device: device, queue: queue, random: random),
               let title = TitleText(device: device, library: library),
               let copy = Self.copyPipeline(device, library),
+              let geometry = FrameGeometry(device: device, library: library),
               let wrap = Self.sampler(device, .repeat), let clamp = Self.sampler(device, .clampToEdge) else { return nil }
         self.device = device
         self.queue = queue
@@ -59,6 +63,7 @@ public final class Renderer {
         self.noise = noise
         self.title = title
         self.copy = copy
+        self.geometry = geometry
         wrapSampler = wrap
         clampSampler = clamp
         self.random = random
@@ -69,11 +74,12 @@ public final class Renderer {
     /// Shows `compiled`, mixing it in over `blend` seconds. Throws when its equations do not compile.
     public func show(_ compiled: CompiledPreset, blend: Double) throws {
         var preset = compiled.preset
-        preset.values["old_wave_mode"] = current?.equations.values["wave_mode"] ?? preset.values["wave_mode"]
+        preset.values["old_wave_mode"] = current?.compiled.preset.values["wave_mode"] ?? preset.values["wave_mode"]
         let equations = try PresetEquations(preset, globals: globals, frame: frameGlobals, random: random)
+        let shapes = try PresetGeometry(preset, globals: globals, frame: frameGlobals, random: random)
         textures.reshuffle()
         previous = blend > 0 ? current : nil
-        current = Active(compiled, equations, random: random)
+        current = Active(compiled, equations, shapes, random: random)
         blendStart = time
         blendDuration = blend
         pattern = BlendPattern(width: Self.meshSize.x, height: Self.meshSize.y, aspect: SIMD2(Float(aspect.x), Float(aspect.y)), random: random)
@@ -126,6 +132,9 @@ public final class Renderer {
                         edgeDarken: Float(current.equations.values["b1ed"] ?? 0.25))
         }
         if let encoder = pass(buffer, targets.target, clear: false) {
+            geometry.encode(encoder, prev: targets.prev, current: (current.geometry, current.equations),
+                            previous: old.map { ($0.geometry, $0.equations) }, blendProgress: min(progress, 1),
+                            mixed: mixed, frame: g, audio: audio, mesh: mesh)
             if let t = title.progress(at: time), t >= 1 {
                 title.draw(encoder, progress: t, intoTarget: true, time: time, size: targets.size, invAspectY: Float(1 / aspect.y))
             }

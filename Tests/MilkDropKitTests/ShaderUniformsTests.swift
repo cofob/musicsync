@@ -22,7 +22,7 @@ import Testing
         #expect(u.texsizeNoiseLQ == SIMD4(256, 256, 1.0 / 256, 1.0 / 256) && u.texsizeNoiseVolHQ.x == 32)
         #expect(u.compA == SIMD4(0.98, 2, 2, 0) && u.compFlags == SIMD4(1, 0, 0, 0))
         #expect(u.texsizeUser.0 == SIMD4(256, 128, 1.0 / 256, 1.0 / 128) && u.texsizeUser.1 == .zero)
-        #expect(u.randFrame != ShaderUniforms(frame).randFrame)
+        #expect(u.randFrame == frame.randFrame)
     }
 
     @Test func rotationsAreStablePerPresetAndMoveWithTime() {
