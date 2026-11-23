@@ -93,7 +93,7 @@ func genreCounts(_ genre: GenreSummary) -> String {
     return genre.songCount > 0 ? "\(albums) · \(formatSongs(genre.songCount))" : albums
 }
 
-/// Two by two covers turned a little, like the artwork on Apple Music category tiles; one big cover when there are fewer than four.
+/// Two by two covers turned a little; one big cover when there are fewer than four.
 struct GenreCollage: View {
     let covers: [String]
 

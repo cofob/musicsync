@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Wide search field centered in the window toolbar, the same on every page (Apple Music style, red focus ring).
+/// Wide search field centered in the window toolbar, the same on every page (red focus ring).
 /// On the Search page it searches globally with a suggestion dropdown; elsewhere it filters the page ("Find in …").
 struct ToolbarSearchField: View {
     @Environment(AppModel.self) private var model

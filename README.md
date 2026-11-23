@@ -13,7 +13,7 @@
 
 ## Features
 
-- Browse and play your server library in an Apple Music–style window, with lyrics and a play queue.
+- Browse and play your server library in a native window, with lyrics and a play queue.
 - Gapless playback, crossfade and beat-matched AutoMix, a ten-band equalizer and ReplayGain.
 - Winamp-style visualizer: spectrum, oscilloscope and MilkDrop presets, with synced lyrics; imports `.milk` presets.
 - Save or share song files, original or converted to MP3 or AAC; share links that allow downloads.

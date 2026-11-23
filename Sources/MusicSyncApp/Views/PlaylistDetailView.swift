@@ -129,7 +129,7 @@ private struct PlaylistHeaderMenu: View {
     }
 }
 
-/// Text that turns into a field on click, as playlist titles in Apple Music. Return or leaving the field saves;
+/// Text that turns into a field on click, for playlist titles. Return or leaving the field saves;
 /// Escape keeps the old text. An empty name is refused unless `allowsEmpty`.
 struct InlineTextField: View {
     let text: String

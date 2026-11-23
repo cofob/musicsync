@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import Subsonic
 
-/// Apple Music's MiniPlayer: a small window filled by the cover, with the song and controls on hover and
+/// MiniPlayer: a small window filled by the cover, with the song and controls on hover and
 /// Up Next below on demand. Opening it hides the main window; closing it brings the main window back.
 enum MiniPlayer {
     static let id = "mini-player"

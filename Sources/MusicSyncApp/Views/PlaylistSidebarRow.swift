@@ -61,7 +61,7 @@ struct PlaylistSidebarRow: View {
     }
 }
 
-/// "Playlists" section title with a "+" for a new playlist, as in Apple Music.
+/// "Playlists" section title with a "+" for a new playlist.
 struct PlaylistsHeader: View {
     @Environment(AppModel.self) private var model
 

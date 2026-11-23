@@ -258,7 +258,7 @@ struct VisualizerView: View {
     }
 }
 
-/// Window > Visualizer, ⌘T as in Apple Music.
+/// Window > Visualizer, ⌘T.
 struct VisualizerMenuItem: View {
     @Environment(\.openWindow) private var openWindow
 

@@ -35,7 +35,7 @@ struct MadeForYouSection: View {
     }
 }
 
-/// Mix art: a collage of the first covers under the mix color, with the title, like Apple Music's mixes.
+/// Mix art: a collage of the first covers under the mix color, with the title.
 struct MixArtwork: View {
     let mix: Mix
     let songs: [Song]
@@ -97,7 +97,7 @@ extension Mix {
     }
 }
 
-/// Mix card: art with the title, then one line of description, like Apple Music. Opens the mix page.
+/// Mix card: art with the title, then one line of description. Opens the mix page.
 private struct MixCard: View {
     @Environment(AppModel.self) private var model
     let mix: Mix

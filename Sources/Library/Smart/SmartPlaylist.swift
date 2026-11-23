@@ -1,6 +1,6 @@
 import Foundation
 
-/// A playlist kept on this Mac whose songs are the library songs that match its rules, as in iTunes and Apple Music.
+/// A playlist kept on this Mac whose songs are the library songs that match its rules, as in iTunes.
 /// It is evaluated against the local library mirror only; nothing goes to the server.
 public struct SmartPlaylist: Codable, Hashable, Sendable, Identifiable {
     public static let idPrefix = "smart:"

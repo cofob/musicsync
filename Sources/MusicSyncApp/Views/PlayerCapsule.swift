@@ -1,7 +1,7 @@
 import Support
 import SwiftUI
 
-/// Floating glass capsule at the bottom of the window, as in Apple Music: small transport on the left, the song
+/// Floating glass capsule at the bottom of the window: small transport on the left, the song
 /// with its progress under it in the middle, the song menu, lyrics / queue / AirPlay / volume on the right.
 struct PlayerCapsule: View {
     @Environment(AppModel.self) private var model

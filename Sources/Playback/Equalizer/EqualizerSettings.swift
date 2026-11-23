@@ -21,7 +21,7 @@ public struct EqualizerSettings: Codable, Equatable, Sendable {
     /// Built-in presets, then the saved ones.
     public var presets: [EqualizerPreset] { EqualizerPreset.builtIn + userPresets }
 
-    /// Like a band move, a preset turns the equalizer on, as in Apple Music.
+    /// Like a band move, a preset turns the equalizer on.
     public mutating func apply(_ preset: EqualizerPreset) {
         isOn = true
         bands = preset.bands

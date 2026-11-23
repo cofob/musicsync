@@ -122,7 +122,7 @@ private extension SidebarItem {
     var playlistID: String? { if case .playlist(let id) = self { id } else { nil } }
 }
 
-/// Click selects the row; the selected row gets a neutral gray background, as in Apple Music.
+/// Click selects the row; the selected row gets a neutral gray background.
 /// Plain values, no binding: a new selection then redraws only the two rows it changes, not every playlist.
 private struct Pick: ViewModifier {
     @Environment(AppModel.self) private var model

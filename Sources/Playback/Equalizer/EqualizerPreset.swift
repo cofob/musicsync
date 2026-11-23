@@ -11,7 +11,7 @@ public struct EqualizerPreset: Codable, Equatable, Hashable, Sendable, Identifia
 
     public static let flat = EqualizerPreset(name: "Flat", bands: Array(repeating: 0, count: 10))
 
-    /// The presets of Apple Music, in its order.
+    /// The standard presets, in the usual order.
     public static let builtIn: [EqualizerPreset] = [
         .init(name: "Acoustic", bands: [5, 4.9, 3.95, 1.05, 2.15, 1.75, 3.5, 4.1, 3.55, 2.15]),
         .init(name: "Bass Booster", bands: [5.5, 4.25, 3.5, 2.5, 1.25, 0, 0, 0, 0, 0]),

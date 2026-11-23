@@ -4,7 +4,7 @@ import Sync
 
 // MARK: Selection controls
 
-/// Small status icon over an album cover, like the download arrow of Apple Music.
+/// Small status icon over an album cover, like a download arrow.
 struct SyncBadge: View {
     @Environment(AppModel.self) private var model
     let album: Album
@@ -34,7 +34,7 @@ struct SyncBadge: View {
     }
 }
 
-/// Round accent toggle for page headers (album, artist, playlist), like the Apple Music download button.
+/// Round accent toggle for page headers (album, artist, playlist), like a download button.
 struct SyncButton: View {
     @Environment(AppModel.self) private var model
     let isOn: Bool
@@ -366,7 +366,7 @@ private extension ItemStage {
 
 // MARK: Cover hover
 
-/// Apple Music cover hover: Play at the bottom left, sync to iPod at the bottom right.
+/// Cover hover: Play at the bottom left, sync to iPod at the bottom right.
 private struct CoverHoverActions: ViewModifier {
     @Environment(AppModel.self) private var model
     let play: (() -> Void)?

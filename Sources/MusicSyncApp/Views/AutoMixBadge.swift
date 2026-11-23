@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Shown while AutoMix mixes the current song into the next one, as in Apple Music. For the dark Now Playing view.
+/// Shown while AutoMix mixes the current song into the next one. For the dark Now Playing view.
 struct AutoMixBadge: View {
     var body: some View {
         Label("AutoMix", systemImage: "wand.and.stars")

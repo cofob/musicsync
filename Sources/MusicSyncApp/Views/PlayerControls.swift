@@ -172,7 +172,7 @@ struct VolumeSlider: View {
 }
 
 /// The icons in `content`, then a speaker button. Hovering or clicking the speaker turns them all into a
-/// volume slider in a capsule, as in Apple Music; it goes back when the pointer leaves.
+/// volume slider in a capsule; it goes back when the pointer leaves.
 struct VolumeButton<Content: View>: View {
     @Environment(AppModel.self) private var model
     @ViewBuilder var content: Content

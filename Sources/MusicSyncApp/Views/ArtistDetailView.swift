@@ -1,7 +1,7 @@
 import SwiftUI
 import Subsonic
 
-/// Artist page as in Apple Music: portrait and Play / Shuffle, then Top Songs, Albums, Appears On,
+/// Artist page: portrait and Play / Shuffle, then Top Songs, Albums, Appears On,
 /// Similar Artists and the biography. Sections fill in as they load; a page is kept until the server changes.
 struct ArtistDetailView: View {
     @Environment(AppModel.self) private var model

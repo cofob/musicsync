@@ -29,7 +29,7 @@ private func decode<T: Decodable>(_ json: String) throws -> T {
         #expect(AppearanceSettings.load(from: defaults) == settings)
     }
 
-    @Test func accentDefaultsToAppleMusicRed() {
+    @Test func accentDefaultsToRed() {
         #expect(AppearanceSettings().accent == .red)
         let red = AppearanceSettings.Accent.red.rgb
         #expect(red.red > 0.9 && red.green < 0.2)

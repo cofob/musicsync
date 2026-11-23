@@ -9,7 +9,7 @@ public struct AppearanceSettings: StoredSettings {
 
         public typealias RGB = (red: Double, green: Double, blue: Double)
 
-        /// sRGB components; red is the Apple Music red.
+        /// sRGB components; red is the default accent.
         public var rgb: RGB {
             switch self {
             case .red, .album: (0.98, 0.14, 0.24)

@@ -1,7 +1,7 @@
 import Playback
 import SwiftUI
 
-/// Window > Equalizer (⌥⌘E), as in Apple Music: on/off, presets, preamp and ten bands. Moving a slider turns it on.
+/// Window > Equalizer (⌥⌘E): on/off, presets, preamp and ten bands. Moving a slider turns it on.
 struct EqualizerView: View {
     static let windowID = "equalizer"
     @Environment(AppModel.self) private var model
@@ -108,7 +108,7 @@ struct EqualizerPresetPicker: View {
     }
 }
 
-/// Window > Equalizer, ⌥⌘E as in Apple Music.
+/// Window > Equalizer, ⌥⌘E.
 struct EqualizerMenuItem: View {
     @Environment(\.openWindow) private var openWindow
 

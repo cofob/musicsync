@@ -3,7 +3,7 @@ import SwiftUI
 import Subsonic
 import Support
 
-/// Search page: Browse genres (empty query), or the results of the committed query (Apple Music layout).
+/// Search page: Browse genres (empty query), or the results of the committed query.
 struct SearchResultsView: View {
     @Environment(AppModel.self) private var model
 

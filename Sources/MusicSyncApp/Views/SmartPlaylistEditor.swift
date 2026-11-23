@@ -1,7 +1,7 @@
 import Library
 import SwiftUI
 
-/// The smart playlist sheet, as in Apple Music: rule rows with − and + (and … for a nested group), a limit,
+/// The smart playlist sheet: rule rows with − and + (and … for a nested group), a limit,
 /// live updating, and the count and length of what the rules match while they change.
 struct SmartPlaylistEditor: View {
     typealias P = SmartPlaylist
@@ -194,7 +194,7 @@ private struct SmartRuleFields: View {
     }
 }
 
-/// The smart playlist symbol: a gear on gray, as Apple Music draws it.
+/// The smart playlist symbol: a gear on gray.
 struct SmartPlaylistIcon: View {
     var size: CGFloat
 

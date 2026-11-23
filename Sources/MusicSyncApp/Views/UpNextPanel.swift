@@ -3,7 +3,7 @@ import SwiftUI
 import Subsonic
 import Support
 
-/// Now Playing queue panel, as Apple Music's Up Next: History above (scroll up), the current song, then Playing Next
+/// Now Playing queue panel, Up Next: History above (scroll up), the current song, then Playing Next
 /// (added by the user), Continue Playing (the album or playlist) and AutoPlay. Drag to reorder within a section,
 /// swipe, ⌫ or the context menu to remove, double-click or Return to play; ↑ and ↓ move the selection.
 struct UpNextPanel: View {
@@ -63,7 +63,7 @@ struct UpNextPanel: View {
                 .onKeyPress(.return) { playSelected() }
                 .onChange(of: selected) { if let key = $1 { proxy.scrollTo(RowID(key: key)) } }  // only as far as needed
                 .task {
-                    // History sits above: scroll up to see it, as in Apple Music. The list lays out first.
+                    // History sits above: scroll up to see it. The list lays out first.
                     try? await Task.sleep(for: .milliseconds(500))
                     proxy.scrollTo("now", anchor: .top)
                 }
@@ -190,7 +190,7 @@ private extension PlayQueue.Slot {
     var row: RowID { RowID(key: id) }
 }
 
-/// Red capsule switch above the queue, as Apple Music's Shuffle and AutoPlay.
+/// Red capsule switch above the queue, for Shuffle and AutoPlay.
 private struct QueueToggle: View {
     let title: String
     let symbol: String

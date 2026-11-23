@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// Shared look of the media pages (modeled on Apple Music): red accent, big covers, capsule buttons.
+/// Shared look of the media pages: red accent, big covers, capsule buttons.
 extension Color {
-    /// Settings > Appearance; red by default, as in Apple Music. Views that read it draw again when it changes.
+    /// Settings > Appearance; red by default. Views that read it draw again when it changes.
     @MainActor static var musicAccent: Color { AppPreferences.shared.appearance.accent.color }
 }
 
@@ -37,7 +37,7 @@ extension View {
     }
 }
 
-/// Light gray capsule with accent content, like Apple Music's "Play" button.
+/// Light gray capsule with accent content, for the "Play" button.
 struct FilledCapsuleStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
@@ -159,7 +159,7 @@ struct TrackRow<Leading: View, MenuItems: View>: View {
     var isSelected = false
     /// Edges next to another selected row: the selection draws as one block, rounded only at its ends.
     var joined: VerticalEdge.Set = []
-    /// Small star before the time, as in Apple Music.
+    /// Small star before the time.
     var isStarred = false
     /// Small gray symbol before the time, e.g. the download state.
     var badge: String?

@@ -10,7 +10,7 @@ public enum QueueOrigin: String, Codable, Sendable {
     case autoPlay
 }
 
-/// The play queue as Apple Music keeps it: entries in play order and the current position.
+/// The play queue: entries in play order and the current position.
 /// Upcoming entries stay grouped by origin: user-added first, then the source, then AutoPlay.
 /// Shuffle mixes only the source entries; the current entry and the user-added ones keep their place.
 public struct PlayQueue<Item: Sendable>: Sendable {

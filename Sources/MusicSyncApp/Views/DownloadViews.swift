@@ -41,7 +41,7 @@ struct PinMenuItem: View {
 
 // MARK: Page header
 
-/// Download control of album and playlist pages, as in Apple Music: an arrow, a progress ring while
+/// Download control of album and playlist pages: an arrow, a progress ring while
 /// downloading, then "Downloaded". Removing asks first.
 struct DownloadButton: View {
     @Environment(AppModel.self) private var model
@@ -94,7 +94,7 @@ struct DownloadButton: View {
     }
 }
 
-/// Accent progress ring with a stop square, like a running download in Apple Music.
+/// Accent progress ring with a stop square, for a running download.
 struct DownloadRing: View {
     let fraction: Double
     var size: CGFloat = 22

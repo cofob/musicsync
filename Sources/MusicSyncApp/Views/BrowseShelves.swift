@@ -59,7 +59,7 @@ struct ArtistShelf: View {
     }
 }
 
-/// Songs in two columns with small covers, as "Top Songs" on Apple Music artist pages. Double-click plays from the row.
+/// Songs in two columns with small covers, as "Top Songs" on artist pages. Double-click plays from the row.
 struct TopSongsGrid: View {
     @Environment(AppModel.self) private var model
     let songs: [Song]
