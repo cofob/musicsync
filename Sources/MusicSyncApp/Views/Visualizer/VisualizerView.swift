@@ -58,7 +58,9 @@ struct VisualizerView: View {
             }
         }
         .overlay(alignment: .bottom) { if hovering, !compact { controls.transition(.opacity) } }
-        .onContinuousHover { phase in if case .active = phase { show() } else { hovering = false } }
+        // Leaving does not hide at once: Now Playing's own buttons lie over this view, and hiding them under the mouse
+        // would make them flicker and miss clicks. The idle timer in `show` hides everything.
+        .onContinuousHover { phase in if case .active = phase { show() } }
         .foregroundStyle(.white)
         .environment(\.colorScheme, .dark)
         .ignoresSafeArea()
@@ -108,7 +110,7 @@ struct VisualizerView: View {
             visualizerButtons
         }
         .padding(.horizontal, 18).padding(.vertical, 12)
-        .frame(maxWidth: 560)
+        .frame(maxWidth: 640)
         // Dark, not glass: glass takes the colors of the bars under it.
         .background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(.white.opacity(0.12)))
@@ -122,31 +124,40 @@ struct VisualizerView: View {
                 .pickerStyle(.segmented).labelsHidden().fixedSize().controlSize(.small)
             Spacer(minLength: 8)
             if mode == .milkdrop {
-                Button("Previous Preset", systemImage: "chevron.left") { milkDrop.step(-1) }
-                Menu("Presets", systemImage: "sparkles") {
-                    ForEach(milkDrop.presets, id: \.self) { name in Button(name) { milkDrop.select(name) } }
-                    Divider()
-                    if !milkDrop.failed.isEmpty { Text("Not converted: \(milkDrop.failed.joined(separator: ", "))") }
-                    Button("Import Presets…") { if VisualizerSettings.importPresets() > 0 { milkDrop.loadUserPresets() } }
-                    Button("Show Presets Folder") { NSWorkspace.shared.open(MilkDrop.userFolder) }
-                    SettingsLink { Text("Visualizer Settings…") }
-                }
-                .menuIndicator(.hidden).fixedSize()
-                .help("Presets; import MilkDrop .milk files here")
-                Button("Next Preset", systemImage: "chevron.right") { milkDrop.step(1) }
-                Button("Random Preset", systemImage: "shuffle") { milkDrop.random() }
-                Toggle("Change Presets", systemImage: "timer", isOn: $cycles).toggleStyle(.button)
-                    .help("Change the preset every \(Int(cycleSeconds)) seconds")
-                Toggle("Announce Songs", systemImage: "textformat", isOn: $announces).toggleStyle(.button)
-                    .help("Show the artist and title when a song starts")
+                Button("Previous Preset", systemImage: "chevron.left") { milkDrop.step(-1) }.help("Previous preset")
+                presetsMenu
+                Button("Next Preset", systemImage: "chevron.right") { milkDrop.step(1) }.help("Next preset")
             }
-            Toggle("Lyrics", systemImage: "quote.bubble", isOn: $showsLyrics).toggleStyle(.button)
-                .help("Show synced lyrics")
-            Button("Full Screen", systemImage: "arrow.up.left.and.arrow.down.right") { toggleFullScreen() }
+            Button { showsLyrics.toggle() } label: { Label("Lyrics", systemImage: "quote.bubble").labelStyle(.titleAndIcon) }
+                .buttonStyle(VisualizerButtonStyle(isOn: showsLyrics, wide: true))
+                .help("Show synced lyrics over the visualizer")
+                .accessibilityValue(showsLyrics ? "On" : "Off")
+            Button("Full Screen", systemImage: "arrow.up.left.and.arrow.down.right") { toggleFullScreen() }.help("Full screen")
         }
         .labelStyle(.iconOnly)
-        .buttonStyle(HitAreaButtonStyle(width: 28, height: 26))
+        .buttonStyle(VisualizerButtonStyle())
         .font(.system(size: 13, weight: .semibold))
+    }
+
+    /// Every MilkDrop option with its name: the bar keeps only previous, this menu and next.
+    private var presetsMenu: some View {
+        Menu {
+            Button("Random Preset") { milkDrop.random() }
+            Menu("Choose Preset") { ForEach(milkDrop.presets, id: \.self) { name in Button(name) { milkDrop.select(name) } } }
+            Divider()
+            Toggle("Change Presets Every \(Int(cycleSeconds)) Seconds", isOn: $cycles)
+            Toggle("Announce Songs", isOn: $announces)
+            Divider()
+            if !milkDrop.failed.isEmpty { Text("Not converted: \(milkDrop.failed.joined(separator: ", "))") }
+            Button("Import Presets…") { if VisualizerSettings.importPresets() > 0 { milkDrop.loadUserPresets() } }
+            Button("Show Presets Folder") { NSWorkspace.shared.open(MilkDrop.userFolder) }
+            SettingsLink { Text("Visualizer Settings…") }
+        } label: {
+            Label("Presets", systemImage: "sparkles").labelStyle(.titleAndIcon)
+        }
+        .menuStyle(.button).menuIndicator(.hidden).fixedSize()
+        .buttonStyle(VisualizerButtonStyle(wide: true))
+        .help("Preset options; import MilkDrop .milk files here")
     }
 
     /// Options for the MilkDrop page, see `ms.configure` in `Resources/Visualizer/index.html`.
@@ -181,5 +192,29 @@ struct VisualizerMenuItem: View {
     var body: some View {
         Button("Visualizer") { openWindow(id: VisualizerView.windowID) }
             .keyboardShortcut("t")
+    }
+}
+
+
+/// Round icon buttons of the visualizer: a light circle under the mouse, darker while pressed, white while on.
+struct VisualizerButtonStyle: ButtonStyle {
+    var isOn = false
+    /// Room for a title next to the icon.
+    var wide = false
+    @State private var hovering = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        let fill: Color = isOn ? .white.opacity(configuration.isPressed ? 0.7 : 0.9)
+            : .white.opacity(configuration.isPressed ? 0.3 : hovering ? 0.15 : 0)
+        configuration.label
+            .foregroundStyle(isOn ? Color.black : .white)
+            .lineLimit(1).fixedSize()
+            .padding(.horizontal, wide ? 10 : 0)
+            .frame(minWidth: 28, minHeight: 26)
+            .background(fill, in: Capsule())
+            .contentShape(Capsule())
+            .onHover { hovering = $0 }
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .animation(.easeOut(duration: 0.12), value: hovering)
     }
 }
