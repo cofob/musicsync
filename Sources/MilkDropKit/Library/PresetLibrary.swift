@@ -7,7 +7,11 @@ public struct PresetLibrary: Sendable {
         public var name: String
         public var url: URL
         public var isBuiltIn: Bool
+        /// "Built-in", "My Presets" for files at the top of a folder, else the name of the folder they are in.
+        public var category: String
     }
+
+    public static let builtInCategory = "Built-in", ownCategory = "My Presets"
 
     public private(set) var entries: [String: Entry] = [:]
 
@@ -24,6 +28,13 @@ public struct PresetLibrary: Sendable {
         return shown.map(\.name).filter { !failed.contains($0) }.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 
+    /// Categories with presets: built-in, the user's own, then the others by name.
+    public var categories: [String] {
+        let all = Set(entries.values.map(\.category))
+        let fixed = [Self.builtInCategory, Self.ownCategory].filter(all.contains)
+        return fixed + all.subtracting(fixed).sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+
     public func load(_ name: String) throws -> Preset {
         guard let entry = entries[name] else { throw CocoaError(.fileNoSuchFile) }
         return try PresetFile.load(entry.url)
@@ -33,16 +44,18 @@ public struct PresetLibrary: Sendable {
         let fm = FileManager.default
         for url in (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.isDirectoryKey])) ?? [] {
             if (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
-                for file in (try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? [] { add(file: file, isBuiltIn) }
+                for file in (try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? [] {
+                    add(file: file, isBuiltIn, category: isBuiltIn ? Self.builtInCategory : url.lastPathComponent)
+                }
             } else {
-                add(file: url, isBuiltIn)
+                add(file: url, isBuiltIn, category: isBuiltIn ? Self.builtInCategory : Self.ownCategory)
             }
         }
     }
 
-    private mutating func add(file: URL, _ isBuiltIn: Bool) {
+    private mutating func add(file: URL, _ isBuiltIn: Bool, category: String) {
         guard file.pathExtension.lowercased() == "milk" else { return }
         let name = file.deletingPathExtension().lastPathComponent
-        entries[name] = Entry(name: name, url: file, isBuiltIn: isBuiltIn)
+        entries[name] = Entry(name: name, url: file, isBuiltIn: isBuiltIn, category: category)
     }
 }

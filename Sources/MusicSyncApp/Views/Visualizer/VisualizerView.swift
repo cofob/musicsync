@@ -45,6 +45,8 @@ struct VisualizerView: View {
     @State private var hovering = false
     @State private var hideTask: Task<Void, Never>?
     @State private var overControls = false
+    /// The preset browser is open: the controls it hangs from stay.
+    @State private var browsing = false
     /// The window this view put in full screen; it leaves full screen when the view goes (Now Playing closes).
     #if os(macOS)
     @State private var fullScreenWindow: NSWindow?
@@ -217,8 +219,8 @@ struct VisualizerView: View {
     /// Every MilkDrop option with its name: the bar keeps only previous, this menu and next.
     private var presetsMenu: some View {
         Menu {
+            Button("Browse Presets…") { browsing = true }
             Button("Random Preset") { milkDrop.random() }
-            Menu("Choose Preset") { ForEach(milkDrop.presets, id: \.self) { name in Button(name) { milkDrop.select(name) } } }
             Divider()
             Picker("Change Presets", selection: VisualizerChange.binding(cycle: $cycles, parts: $followsSections)) {
                 ForEach(VisualizerChange.allCases) { Text($0.title(every: cycleSeconds)).tag($0) }
@@ -242,6 +244,8 @@ struct VisualizerView: View {
         #endif
         .buttonStyle(VisualizerButtonStyle(wide: true))
         .help("Preset options; import MilkDrop .milk files here")
+        .popover(isPresented: $browsing, arrowEdge: .top) { PresetBrowser(milkDrop: milkDrop, player: model.player) }
+        .onChange(of: browsing) { if !browsing { show() } }
     }
 
     /// Options of the MilkDrop presets.
@@ -273,7 +277,7 @@ struct VisualizerView: View {
         hideTask?.cancel()
         hideTask = Task {
             try? await Task.sleep(for: .seconds(2))
-            guard !Task.isCancelled, !overControls, !(inNowPlaying && model.visualizerHold) else { return }
+            guard !Task.isCancelled, !overControls, !browsing, !(inNowPlaying && model.visualizerHold) else { return }
             withAnimation(.easeOut(duration: 0.3)) { hovering = false }
             #if os(macOS)
             if !compact { NSCursor.setHiddenUntilMouseMoves(true) }

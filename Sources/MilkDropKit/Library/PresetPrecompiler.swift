@@ -12,19 +12,25 @@ import Observation
     @ObservationIgnored private var task: Task<Void, Never>?
     @ObservationIgnored private let folders: [URL]
     @ObservationIgnored private let index: CompileIndex
+    @ObservationIgnored private let thumbnails: PresetThumbnails?
 
-    public init(folders: [URL], index: URL) {
+    /// `thumbnails`: where to keep a picture of each preset on the demo track, made as it compiles.
+    public init(folders: [URL], index: URL, thumbnails: URL? = nil) {
         self.folders = folders
         self.index = CompileIndex.at(index)
+        self.thumbnails = thumbnails.map(PresetThumbnails.init)
     }
 
     /// Compiles every preset of the folders and the bundle not compiled yet, or only those named in `only`.
     /// `finished` runs on the main actor when it ends (also when cancelled).
     public func compileAll(only: Set<String>? = nil, finished: @escaping @MainActor () -> Void = {}) {
-        guard task == nil, let device = MTLCreateSystemDefaultDevice() else { return }
+        guard task == nil, let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else { return }
+        let noise = Noise.makeTextures(device: device, queue: queue), thumbnails = self.thumbnails
         let library = PresetLibrary(folders: folders)
         let index = self.index
-        let entries = library.entries.values.filter { (only?.contains($0.name) ?? true) && index.status($0) == nil }
+        let entries = library.entries.values.filter { entry in
+            (only?.contains(entry.name) ?? true) && (index.status(entry) == nil || (index.status(entry) == true && thumbnails?.cached(entry) == nil))
+        }
         (done, total, failed, isRunning) = (0, entries.count, 0, true)
         task = Task {
             // A few at a time: the Metal compiler runs in its own processes, one per request.
@@ -33,7 +39,7 @@ import Observation
                 var next = entries.makeIterator()
                 func add() -> Bool {
                     guard let entry = next.next() else { return false }
-                    group.addTask(priority: .utility) { await Self.compile(entry, device: device, index: index) }
+                    group.addTask(priority: .utility) { await Self.compile(entry, device: device, index: index, thumbnails: thumbnails, noise: noise) }
                     return true
                 }
                 for _ in 0..<width where add() {}
@@ -54,14 +60,16 @@ import Observation
 
     public func cancel() { task?.cancel() }
 
-    private nonisolated static func compile(_ entry: PresetLibrary.Entry, device: MTLDevice, index: CompileIndex) async -> Bool {
+    private nonisolated static func compile(_ entry: PresetLibrary.Entry, device: MTLDevice, index: CompileIndex,
+                                            thumbnails: PresetThumbnails?, noise: Noise.Textures?) async -> Bool {
         do {
             let preset = try PresetFile.load(entry.url)
             // Equations too: a preset whose code does not compile cannot show either.
             _ = try PresetEquations(preset, globals: EELGlobals(), frame: FrameGlobals())
             _ = try PresetGeometry(preset, globals: EELGlobals(), frame: FrameGlobals())
-            _ = try await CompiledPreset.compile(preset, device: device, screenFormat: MilkDropController.screenFormat)
+            let compiled = try await CompiledPreset.compile(preset, device: device, screenFormat: MilkDropController.screenFormat)
             index.record(entry, ok: true)
+            if let thumbnails, thumbnails.cached(entry) == nil { try thumbnails.make(compiled, entry: entry, device: device, noise: noise) }
             return true
         } catch {
             index.record(entry, ok: false, error: String(describing: error).prefix(200).description)

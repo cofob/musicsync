@@ -50,11 +50,13 @@ public final class Renderer {
     private var lastNow: Double?
     private var timeHistory = [0.0]
 
-    public init?(device: MTLDevice, textureFolders: [URL] = [], random: @escaping () -> Double = { .random(in: 0..<1) }) {
+    /// `noise`: textures made earlier (`Noise.makeTextures`), to save making them again for each renderer.
+    public init?(device: MTLDevice, textureFolders: [URL] = [], random: @escaping () -> Double = { .random(in: 0..<1) },
+                 noise: Noise.Textures? = nil) {
         guard let queue = device.makeCommandQueue(),
               let library = try? FixedShaders.library(device: device, extra: []),
               let blur = Blur(device: device, library: library, size: SIMD2(16, 16)),
-              let noise = Noise.makeTextures(device: device, queue: queue, random: random),
+              let noise = noise ?? Noise.makeTextures(device: device, queue: queue, random: random),
               let title = TitleText(device: device, library: library),
               let copy = Self.copyPipeline(device, library),
               let geometry = FrameGeometry(device: device, library: library),

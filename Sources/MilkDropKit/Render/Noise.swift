@@ -2,7 +2,7 @@ import Metal
 
 /// The noise textures shaders sample (`sampler_noise_lq` …), made as butterchurn makes them: random RGBA bytes,
 /// smoothed with cubic interpolation between points `zoom` apart.
-enum Noise {
+public enum Noise {
     /// RGBA bytes of a `size`×`size` texture.
     static func plane(size: Int, zoom: Int, random: () -> Double = { .random(in: 0..<1) }) -> [UInt8] {
         var r = randomBytes(size * size, zoom: zoom, random: random)
@@ -73,11 +73,11 @@ enum Noise {
     }
 
     /// noise_lq, noise_mq, noise_hq (256², with mipmaps) and noisevol_lq, noisevol_hq (32³).
-    struct Textures {
+    public struct Textures: @unchecked Sendable {
         let lq, mq, hq, volumeLQ, volumeHQ: MTLTexture
     }
 
-    static func makeTextures(device: MTLDevice, queue: MTLCommandQueue, random: () -> Double) -> Textures? {
+    public static func makeTextures(device: MTLDevice, queue: MTLCommandQueue, random: () -> Double = { .random(in: 0..<1) }) -> Textures? {
         guard let lq = texture(device, plane(size: 256, zoom: 1, random: random), size: 256),
               let mq = texture(device, plane(size: 256, zoom: 4, random: random), size: 256),
               let hq = texture(device, plane(size: 256, zoom: 8, random: random), size: 256),

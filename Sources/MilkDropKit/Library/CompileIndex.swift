@@ -50,7 +50,7 @@ public final class CompileIndex: Sendable {
         try? data?.write(to: url, options: .atomic)
     }
 
-    private static func stamp(_ url: URL) -> String {
+    static func stamp(_ url: URL) -> String {
         let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey])
         return "\(values?.fileSize ?? 0)-\(values?.contentModificationDate?.timeIntervalSince1970 ?? 0)"
     }

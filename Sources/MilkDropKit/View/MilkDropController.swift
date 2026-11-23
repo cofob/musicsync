@@ -6,6 +6,8 @@ import Observation
 /// and one frame per draw. Presets that do not parse or compile leave the list (`failed`).
 @Observable @MainActor public final class MilkDropController: MilkDropDrawing {
     public private(set) var presets: [String] = []
+    /// The presets of `presets`, with their files and categories, for the preset browser.
+    public private(set) var entries: [PresetLibrary.Entry] = []
     public private(set) var current: String?
     public private(set) var failed: [String] = []
     /// The samples that play now and their rate; silence when nil.
@@ -69,6 +71,7 @@ import Observation
     private func updateNames() {
         cycler.setNames(library.names(includingBuiltIn: cycler.options.builtIn, excluding: Set(failed)))
         presets = cycler.names
+        entries = presets.compactMap { library.entries[$0] }
         prepare(cycler.upcoming)
     }
 
@@ -123,6 +126,7 @@ import Observation
         compiled[name] = nil
         let next = cycler.drop(name, now: now)
         presets = cycler.names
+        entries.removeAll { $0.name == name }
         if waiting?.name == name { waiting = nil }
         apply(next)
         prepare(cycler.upcoming)
