@@ -6,10 +6,17 @@
 
 ![MusicSync main window](docs/screenshot.webp)
 
+<p>
+  <img src="docs/nowplaying.webp" width="49%" alt="MusicSync Now Playing">
+  <img src="docs/visualizer.webp" width="49%" alt="MusicSync visualizer">
+</p>
+
 ## Features
 
 - Browse and play your server library in an Apple Music–style window, with lyrics and a play queue.
 - Gapless playback, crossfade and beat-matched AutoMix, a ten-band equalizer and ReplayGain.
+- Winamp-style visualizer: spectrum, oscilloscope and MilkDrop presets, with synced lyrics; imports `.milk` presets.
+- Save or share song files, original or converted to MP3 or AAC; share links that allow downloads.
 - Made for You mixes, stations and AutoPlay from a local recommendation engine; listening stats.
 - Smart playlists, podcasts, and offline downloads with smart download rules.
 - Play on the server's jukebox, or control playback from iPhone, iPad and Apple Watch in a browser.
