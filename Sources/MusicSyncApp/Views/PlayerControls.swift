@@ -95,6 +95,33 @@ struct BarMouseArea: NSViewRepresentable {
     }
 }
 
+/// The window does not move while the mouse is here. In the title bar area (Now Playing) the window server moves it
+/// on a drag, and it does not see the SwiftUI controls there: clicks and drags on them would move the window.
+struct WindowStill: NSViewRepresentable {
+    func makeNSView(context: Context) -> StillView { StillView() }
+    func updateNSView(_ view: StillView, context: Context) {}
+
+    final class StillView: NSView {
+        private var held: NSWindow?
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+            trackingAreas.forEach(removeTrackingArea)
+            addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+        }
+        override func mouseEntered(with event: NSEvent) { hold(window) }
+        override func mouseExited(with event: NSEvent) { hold(nil) }
+        override func viewWillMove(toWindow newWindow: NSWindow?) { hold(nil) }
+
+        private func hold(_ window: NSWindow?) {
+            held?.isMovable = true
+            held = window
+            window?.isMovable = false
+        }
+    }
+}
+
 /// Song progress with elapsed and remaining time; seeks on release. The VoiceOver step is 10 s, the whole bar for short
 /// or unknown lengths: a zero step traps in `Slider`.
 struct ScrubBar: View {

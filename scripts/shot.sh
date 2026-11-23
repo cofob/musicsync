@@ -9,7 +9,7 @@ cd "$(dirname "$0")/.."
 swift build -c "${CONFIG:-debug}" --product MusicSyncApp >&2
 BIN="$(swift build -c "${CONFIG:-debug}" --show-bin-path)"
 # A copy stamped with the real SDK version, so AppKit uses the current look (see bundle.sh).
-vtool -set-build-version macos 15.0 "$(xcrun --show-sdk-version)" -replace -output "$BIN/MusicSyncApp-shot" "$BIN/MusicSyncApp" 2>/dev/null
+vtool -set-build-version macos 15.0 "$(xcrun --sdk macosx --show-sdk-version)" -replace -output "$BIN/MusicSyncApp-shot" "$BIN/MusicSyncApp" 2>/dev/null
 codesign --force --sign - "$BIN/MusicSyncApp-shot" 2>/dev/null
 rm -f "$OUT"
 MUSICSYNC_DEMO=1 MUSICSYNC_MUTE=1 MUSICSYNC_SHOT="$OUT" MUSICSYNC_SCENE="$1" "$BIN/MusicSyncApp-shot" &

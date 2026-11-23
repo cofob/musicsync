@@ -143,6 +143,7 @@ struct NowPlayingVolume: View {
         }
         .padding(.horizontal, 14).frame(height: 36)
         .glass(in: Capsule())
+        .background(WindowStill())
         .holdsVisualizerControls(model)  // on the capsule only: the frame below fills the window
         .foregroundStyle(.white)
         .environment(\.colorScheme, .dark)

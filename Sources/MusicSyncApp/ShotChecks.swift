@@ -341,6 +341,13 @@ import SwiftUI
         mouse(.leftMouseDown, volume.convert(NSPoint(x: volume.bounds.width * 0.2, y: y), to: nil), window).map(window.sendEvent)
         check(await wait { abs(model.player.volume - 0.8) < 0.02 }, "the drag sets the volume: \(model.player.volume)")
         check(window.frame == before, "the window stays: \(before) → \(window.frame)")
+        // The window server moves the window on a drag in the title bar area: over the capsule, the window does not move.
+        guard let still = views(content, of: WindowStill.StillView.self).first else { return check(false, "WindowStill view") }
+        still.mouseEntered(with: mouse(.mouseMoved, .zero, window)!)
+        try? await Task.sleep(for: .seconds(0.5))
+        check(!window.isMovable, "over the capsule the window does not move")
+        still.mouseExited(with: mouse(.mouseMoved, .zero, window)!)
+        check(window.isMovable, "off the capsule the window moves again")
     }
 
     /// Up Next with three albums queued: ↓ to the last upcoming row scrolls it into view, ↑ goes back and Return
