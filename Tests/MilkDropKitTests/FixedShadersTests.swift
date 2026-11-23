@@ -29,6 +29,6 @@ import Testing
 
     @Test func blendPatternSharesAreInRange() {
         let pattern = BlendPattern(width: 8, height: 6, aspect: SIMD2(1, 0.75))
-        #expect((0..<63).allSatisfy { (0...1).contains(pattern.oldShare($0, progress: 0.5)) })
+        #expect((0..<63).allSatisfy { (0...1).contains(pattern.newShare($0, progress: 0.5)) })
     }
 }

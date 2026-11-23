@@ -1,6 +1,6 @@
 import Foundation
 
-/// How a new preset replaces the old one across the screen while they blend: per mesh vertex, the old preset's
+/// How a new preset replaces the old one across the screen while they blend: per mesh vertex, the new preset's
 /// share is `clamp(a * progress + c, 0, 1)`. One of butterchurn's patterns: a sweep, plasma, or a circle in or out.
 struct BlendPattern {
     private(set) var a: [Float], c: [Float]
@@ -42,7 +42,7 @@ struct BlendPattern {
         }
     }
 
-    func oldShare(_ vertex: Int, progress: Float) -> Float { min(max(a[vertex] * progress + c[vertex], 0), 1) }
+    func newShare(_ vertex: Int, progress: Float) -> Float { min(max(a[vertex] * progress + c[vertex], 0), 1) }
 
     /// Calls `value(x, y)` (0…1 across the mesh) for each vertex, rows first.
     private mutating func fill(_ value: (Double, Double) -> (Double, Double)) {
