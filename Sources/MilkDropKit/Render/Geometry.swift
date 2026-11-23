@@ -94,12 +94,10 @@ final class GeometryPipelines {
     private struct Params { var offset: SIMD2<Float>; var pointSize: Float }
 
     /// Encodes the batch into an encoder whose attachment is the frame target; textured shapes sample `prev`.
-    func encode(_ batch: GeometryBatch, into encoder: MTLRenderCommandEncoder, prev: MTLTexture) {
+    func encode(_ batch: GeometryBatch, into encoder: MTLRenderCommandEncoder, arena: FrameArenas, prev: MTLTexture) {
         let vertices = batch.vertices
-        guard !batch.draws.isEmpty, let buffer = vertices.withUnsafeBytes({
-            device.makeBuffer(bytes: $0.baseAddress!, length: $0.count, options: .storageModeShared)
-        }) else { return }
-        encoder.setVertexBuffer(buffer, offset: 0, index: 0)
+        guard !batch.draws.isEmpty, let (buffer, offset) = vertices.withUnsafeBytes({ arena.append($0) }) else { return }
+        encoder.setVertexBuffer(buffer, offset: offset, index: 0)
         var current = -1
         for d in batch.draws {
             let index = (d.additive ? 1 : 0) + (d.sampling == .none ? 0 : 2)
@@ -218,7 +216,7 @@ final class FrameGeometry {
     /// linear share. `mixed`: butterchurn's `mixFrameEquations` of the two (or `current.equations.values`).
     /// `mesh`: this frame's warp mesh (blended uvs). `encoder` draws into the frame target; `prev` is the frame
     /// warped from (textured shapes sample it, with mipmaps).
-    func encode(_ encoder: MTLRenderCommandEncoder, prev: MTLTexture, current: Part, previous: Part?, blendProgress: Double,
+    func encode(_ encoder: MTLRenderCommandEncoder, arena: FrameArenas, prev: MTLTexture, current: Part, previous: Part?, blendProgress: Double,
                 mixed: [String: Double], frame: FrameGlobals, audio: AudioLevels, mesh: WarpMesh) {
         batch.reset()
         MotionVectors.add(to: batch, values: mixed, mesh: mesh, frame: frame)
@@ -228,7 +226,7 @@ final class FrameGeometry {
         }
         basicWave.add(to: batch, values: mixed, blendProgress: previous == nil ? nil : blendProgress, frame: frame, audio: audio)
         Borders.add(to: batch, values: mixed, frame: frame)
-        pipelines.encode(batch, into: encoder, prev: prev)
+        pipelines.encode(batch, into: encoder, arena: arena, prev: prev)
     }
 }
 

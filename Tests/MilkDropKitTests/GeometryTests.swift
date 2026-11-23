@@ -121,6 +121,7 @@ import Testing
         let globals = EELGlobals(), levels = audio()
         var mesh = WarpMesh(size: SIMD2(48, 36))
         var previous: FrameGeometry.Part?
+        let arenas = FrameArenas(device: device)
         var cpu = 0.0, slowest = (0.0, "")
         for file in files.sorted(by: { $0.path < $1.path }) {
             var preset = try PresetFile.load(file)
@@ -136,8 +137,9 @@ import Testing
             pass.colorAttachments[0].loadAction = .clear
             pass.colorAttachments[0].storeAction = .store
             let encoder = try #require(buffer.makeRenderCommandEncoder(descriptor: pass))
+            arenas.begin(buffer)
             let start = Date()
-            geometry.encode(encoder, prev: targets.prev, current: part, previous: previous, blendProgress: 0.4,
+            geometry.encode(encoder, arena: arenas, prev: targets.prev, current: part, previous: previous, blendProgress: 0.4,
                             mixed: eq.values, frame: frame, audio: levels, mesh: mesh)
             let took = Date().timeIntervalSince(start)
             cpu += took

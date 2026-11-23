@@ -18,6 +18,7 @@ public final class Renderer {
     /// Triangles of the warp mesh and of the comp grid, made once.
     private let warpIndices: MTLBuffer, compIndices: MTLBuffer
     private let geometry: FrameGeometry
+    private let arenas: FrameArenas
     private let wrapSampler: MTLSamplerState, clampSampler: MTLSamplerState
     private var targets: Targets?
     private var mesh = WarpMesh(size: meshSize)
@@ -65,6 +66,7 @@ public final class Renderer {
         self.noise = noise
         self.title = title
         self.copy = copy
+        arenas = FrameArenas(device: device)
         guard let wi = Self.indexBuffer(device, Self.meshSize), let ci = Self.indexBuffer(device, Self.compSize) else { return nil }
         warpIndices = wi
         compIndices = ci
@@ -102,6 +104,7 @@ public final class Renderer {
                        left: [Float], right: [Float], sampleRate: Double, now: Double) {
         resize(size, buffer)
         guard let current, var targets = self.targets else { return }
+        arenas.begin(buffer)
         advanceTime(now)
         audio.update(left: left, right: right, sampleRate: sampleRate, fps: fps, frame: frame)
         let g = frameGlobals
@@ -138,7 +141,7 @@ public final class Renderer {
                         edgeDarken: Float(current.equations.values["b1ed"] ?? 0.25))
         }
         if let encoder = pass(buffer, targets.target, clear: false) {
-            geometry.encode(encoder, prev: targets.prev, current: (current.geometry, current.equations),
+            geometry.encode(encoder, arena: arenas, prev: targets.prev, current: (current.geometry, current.equations),
                             previous: old.map { ($0.geometry, $0.equations) }, blendProgress: min(progress, 1),
                             mixed: mixed, frame: g, audio: audio, mesh: mesh)
             if let t = title.progress(at: time), t >= 1 {
@@ -182,8 +185,8 @@ public final class Renderer {
                       values: [String: Double], main: MTLTexture, mins: SIMD3<Float>, maxs: SIMD3<Float>) {
         let user = shader.userTextures.map { textures.texture($0.name) }
         var uniforms = ShaderUniforms(shaderFrame(values, active, mins: mins, maxs: maxs, user: user))
-        let buffer = device.makeBuffer(bytes: vertices, length: vertices.count * 4)
-        encoder.setVertexBuffer(buffer, offset: 0, index: 0)
+        guard let (buffer, offset) = vertices.withUnsafeBytes({ arenas.append($0) }) else { return }
+        encoder.setVertexBuffer(buffer, offset: offset, index: 0)
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<ShaderUniforms>.stride, index: 1)
         let fixed: [MTLTexture?] = [main] + blur.textures + [noise.lq, noise.mq, noise.hq, noise.volumeLQ, noise.volumeHQ]
         for (i, t) in (fixed + user).enumerated() { encoder.setFragmentTexture(t ?? noise.lq, index: i) }
