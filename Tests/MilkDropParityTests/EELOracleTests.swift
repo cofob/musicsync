@@ -6,8 +6,7 @@ import Testing
 /// Runs the presets that butterchurnPresets.min.js holds as compiled JavaScript next to the same bundled .milk files,
 /// with fixed inputs and random, and compares every variable.
 @Suite struct EELOracleTests {
-    private static let visualizer = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-        .deletingLastPathComponent().appending(path: "Sources/MusicSyncApp/Resources/Visualizer")
+    private static let visualizer = Bundle.module.url(forResource: "Reference", withExtension: nil)!
     /// Its .milk has the typo `wave_mysyery`; butterchurn's copy does not.
     private static let knownDifferences: Set = ["Idiot - Star Of Annon"]
 

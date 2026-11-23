@@ -1,4 +1,5 @@
 import AppKit
+import MilkDropKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -19,27 +20,30 @@ enum VisualizerSettings {
     static let segmented = "visualizerSegmented"
     static let falloff = "visualizerFalloff"
 
-    /// Copies .milk and .json presets into the presets folder, replacing files of the same name. Returns how many it copied.
+    /// Posted when presets were imported, downloaded or removed, so an open visualizer reads its folders again.
+    static let presetsChanged = Notification.Name("visualizerPresetsChanged")
+
+    /// Copies .milk presets into the presets folder, replacing files of the same name. Returns how many it copied.
     @MainActor static func importPresets() -> Int {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
-        panel.allowedContentTypes = [UTType(filenameExtension: "milk") ?? .data, .json]
-        panel.message = "Choose MilkDrop (.milk) or butterchurn (.json) presets"
+        panel.allowedContentTypes = [UTType(filenameExtension: "milk") ?? .data]
+        panel.message = "Choose MilkDrop (.milk) presets"
         guard panel.runModal() == .OK else { return 0 }
         let folder = MilkDrop.userFolder
-        return panel.urls.filter { url in
+        let count = panel.urls.filter { url in
             let target = folder.appendingPathComponent(url.lastPathComponent)
             try? FileManager.default.removeItem(at: target)
-            // A new .milk file gets converted again.
-            if url.pathExtension == "milk" { try? FileManager.default.removeItem(at: target.deletingPathExtension().appendingPathExtension("json")) }
             return (try? FileManager.default.copyItem(at: url, to: target)) != nil
         }.count
+        NotificationCenter.default.post(name: presetsChanged, object: nil)
+        return count
     }
 
-    /// Names of the presets in the folder, a .milk file and its converted .json counted once.
+    /// Names of the .milk presets in the user's folder.
     static func userPresets() -> [String] {
         let files = (try? FileManager.default.contentsOfDirectory(at: MilkDrop.userFolder, includingPropertiesForKeys: nil)) ?? []
-        return Set(files.filter { ["milk", "json"].contains($0.pathExtension) }.map { $0.deletingPathExtension().lastPathComponent }).sorted()
+        return files.filter { $0.pathExtension == "milk" }.map { $0.deletingPathExtension().lastPathComponent }.sorted()
     }
 }
 
@@ -91,6 +95,7 @@ struct VisualizerSettingsView: View {
     @AppStorage(VisualizerSettings.falloff, store: .app) private var falloff = 1.6
     @Environment(\.openWindow) private var openWindow
     @State private var presets = VisualizerSettings.userPresets()
+    @State private var packs = PresetPacks()
 
     var body: some View {
         let change = VisualizerChange.binding(cycle: $cycle, parts: $sections)
@@ -145,7 +150,7 @@ struct VisualizerSettingsView: View {
             }
             Section {
                 Toggle("Include built-in presets", isOn: $builtIn)
-                    .disabled(presets.isEmpty)
+                    .disabled(presets.isEmpty && packs.installed.isEmpty)
                 LabeledContent("Your presets", value: presets.isEmpty ? "None" : "\(presets.count)")
                 HStack {
                     Button("Import Presets…") { _ = VisualizerSettings.importPresets(); presets = VisualizerSettings.userPresets() }
@@ -154,10 +159,11 @@ struct VisualizerSettingsView: View {
             } header: {
                 Text("Presets")
             } footer: {
-                SettingsFooter("MilkDrop (.milk) presets from Winamp, and butterchurn (.json) presets. A .milk preset is converted the first time MilkDrop shows; some shaders do not convert and the preset is skipped.")
+                SettingsFooter("MilkDrop (.milk) presets from Winamp. A preset whose shaders do not compile is skipped.")
             }
+            PresetPacksSection(packs: packs)
         }
         .formStyle(.grouped)
-        .onAppear { presets = VisualizerSettings.userPresets() }
+        .onAppear { presets = VisualizerSettings.userPresets(); packs.refresh() }
     }
 }
