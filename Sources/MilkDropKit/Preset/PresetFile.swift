@@ -29,10 +29,10 @@ public enum PresetFile {
                 values[PresetKeys.names[key] ?? key] = n
             }
         }
+        /// Equation lines join with nothing between them, as MilkDrop does: old editors wrapped lines inside names.
         func code(_ block: String, shader: Bool = false) -> String {
-            (blocks[block] ?? []).sorted { $0.0 < $1.0 }.map { line in
-                shader ? String(line.1.drop { $0 == "`" }) : line.1
-            }.joined(separator: "\n")
+            let lines = (blocks[block] ?? []).sorted { $0.0 < $1.0 }.map(\.1)
+            return shader ? lines.map { String($0.drop { $0 == "`" }) }.joined(separator: "\n") : EELScope.joinCodeLines(lines)
         }
         var preset = Preset(name: name, version: version, values: values.merging(PresetKeys.preset) { file, _ in file })
         preset.initCode = code("per_frame_init")

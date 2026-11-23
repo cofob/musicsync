@@ -33,7 +33,7 @@ import Testing
         #expect(p.values["wrap"] == 0)
         #expect(p.values["mv_x"] == 12)
         #expect(p.values["zoom"] == 1)  // default
-        #expect(p.frameCode == "a = 1;\nb = 2;")
+        #expect(p.frameCode == "a = 1;b = 2;")
         #expect(p.initCode == "q1 = 3;")
         #expect(p.pixelCode == "zoom = zoom + rad*0.1;")
         #expect(p.waves[1].isEnabled && p.waves[1].values["spectrum"] == 1 && p.waves[1].values["samples"] == 512)
