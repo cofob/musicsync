@@ -61,6 +61,7 @@ window.renderPreset = async (milk, width, height, frames, keep) => {
   const hlsl = milk.split('\n').filter((l) => /^(warp|comp)_\d+=/.test(l)).join('\n');
   if (ops(preset.warp || '') + ops(preset.comp || '') > ops(hlsl)) failures.push('converter turns a + b + c into (a + b) && c');
   if (/sampler_rand\d\d/i.test(hlsl)) failures.push('butterchurn has no random textures: sampler_randNN gets clouds2');
+  if (/sampler_[fp][wc]_(?!main|noise)/i.test(hlsl)) failures.push('butterchurn reads sampler_fc_name as an image "fc_name": clouds2');
   const sizes = hlsl.match(/texsize_(?!noise)\w+/g) || [];
   if (sizes.length > new Set(sizes).size) failures.push('butterchurn leaves texsize_<texture> at 0');
   // The converter leaves keys a preset lacks as undefined, which hide butterchurn's defaults: a preset without
