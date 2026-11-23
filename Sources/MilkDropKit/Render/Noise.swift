@@ -77,12 +77,12 @@ enum Noise {
         let lq, mq, hq, volumeLQ, volumeHQ: MTLTexture
     }
 
-    static func makeTextures(device: MTLDevice, queue: MTLCommandQueue) -> Textures? {
-        guard let lq = texture(device, plane(size: 256, zoom: 1), size: 256),
-              let mq = texture(device, plane(size: 256, zoom: 4), size: 256),
-              let hq = texture(device, plane(size: 256, zoom: 8), size: 256),
-              let vlq = texture(device, volume(size: 32, zoom: 1), size: 32, depth: 32),
-              let vhq = texture(device, volume(size: 32, zoom: 4), size: 32, depth: 32) else { return nil }
+    static func makeTextures(device: MTLDevice, queue: MTLCommandQueue, random: () -> Double) -> Textures? {
+        guard let lq = texture(device, plane(size: 256, zoom: 1, random: random), size: 256),
+              let mq = texture(device, plane(size: 256, zoom: 4, random: random), size: 256),
+              let hq = texture(device, plane(size: 256, zoom: 8, random: random), size: 256),
+              let vlq = texture(device, volume(size: 32, zoom: 1, random: random), size: 32, depth: 32),
+              let vhq = texture(device, volume(size: 32, zoom: 4, random: random), size: 32, depth: 32) else { return nil }
         if let buffer = queue.makeCommandBuffer(), let blit = buffer.makeBlitCommandEncoder() {
             for t in [lq, mq, hq, vlq, vhq] { blit.generateMipmaps(for: t) }
             blit.endEncoding()

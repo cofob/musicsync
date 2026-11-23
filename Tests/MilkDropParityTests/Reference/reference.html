@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// Repeatable butterchurn: every random value is 0.5, as the native renderer gets in the parity tests.
+Math.random = () => 0.5;
+</script>
+<script src="butterchurn.min.js"></script>
+<script src="milkdrop-preset-converter.min.js"></script>
+<script>
+const lib = window.butterchurn.default || window.butterchurn;
+let viz;
+
+// The test audio: frame `f` gets 1024 bytes of a sine, the same bytes the Swift side turns into floats.
+function audio(f) {
+  const a = new Uint8Array(1024);
+  for (let i = 0; i < 1024; i++) a[i] = Math.max(0, Math.min(255, Math.floor(128 + 100 * Math.sin((f * 1024 + i) * 0.05))));
+  return a;
+}
+
+// Renders `frames` frames of the .milk text at width × height; returns the PNG data URL of each frame in `keep`.
+window.renderPreset = async (milk, width, height, frames, keep) => {
+  const canvas = document.getElementById('c');
+  canvas.width = width; canvas.height = height;
+  viz = lib.createVisualizer(new AudioContext(), canvas, { width, height, pixelRatio: 1, textureRatio: 1 });
+  const preset = await window.milkdropPresetConverter.convertPreset(milk);
+  viz.loadPreset(preset, 0);
+  const out = {};
+  for (let f = 0; f < frames; f++) {
+    const a = audio(f);
+    viz.render({ audioLevels: { timeByteArray: a, timeByteArrayL: a, timeByteArrayR: a }, elapsedTime: 1 / 60 });
+    if (keep.includes(f + 1)) out[f + 1] = viz.toDataURL();
+  }
+  return out;
+};
+</script>
+</body>
+</html>

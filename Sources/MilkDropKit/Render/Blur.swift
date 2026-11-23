@@ -10,6 +10,7 @@ final class Blur {
 
     /// Results of the vertical passes: blur1, blur2, blur3.
     var textures: [MTLTexture] { levels.map(\.v) }
+    var horizontalTextures: [MTLTexture] { levels.map(\.h) }
 
     init?(device: MTLDevice, library: MTLLibrary, size: SIMD2<Int>) {
         guard let h = Self.pipeline(device, library, "md_blur_h"), let v = Self.pipeline(device, library, "md_blur_v") else { return nil }

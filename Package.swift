@@ -35,5 +35,6 @@ let package = Package(
         .testTarget(name: "PlaybackTests", dependencies: ["Playback"]),
         .testTarget(name: "PreferencesTests", dependencies: ["Preferences"]),
         .testTarget(name: "MilkDropKitTests", dependencies: ["MilkDropKit"]),
+        .testTarget(name: "MilkDropParityTests", dependencies: ["MilkDropKit"], resources: [.copy("Reference")]),
     ]
 )

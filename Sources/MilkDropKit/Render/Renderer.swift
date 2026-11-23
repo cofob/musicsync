@@ -20,14 +20,20 @@ public final class Renderer {
     private var mesh = WarpMesh(size: meshSize)
     private let audio = AudioLevels()
     let globals = EELGlobals()
+    /// Every random value comes from here, so tests can make frames repeatable.
+    private let random: () -> Double
 
     /// A preset on screen: compiled shaders, its equations and its random values.
     final class Active {
         let compiled: CompiledPreset
         let equations: PresetEquations
-        let randPreset = SIMD4<Float>((0..<4).map { _ in Float.random(in: 0..<1) })
-        let randStart = SIMD4<Float>((0..<4).map { _ in Float.random(in: 0..<1) })
-        init(_ compiled: CompiledPreset, _ equations: PresetEquations) { self.compiled = compiled; self.equations = equations }
+        let randPreset: SIMD4<Float>, randStart: SIMD4<Float>
+        init(_ compiled: CompiledPreset, _ equations: PresetEquations, random: () -> Double) {
+            self.compiled = compiled
+            self.equations = equations
+            randStart = SIMD4((0..<4).map { _ in Float(random()) })
+            randPreset = SIMD4((0..<4).map { _ in Float(random()) })
+        }
     }
 
     private(set) var current: Active?
@@ -36,12 +42,13 @@ public final class Renderer {
     private var blendStart = 0.0, blendDuration = 0.0
     private(set) var time = 0.0, fps = 30.0, frame = 0
     private var lastNow: Double?
+    private var timeHistory = [0.0]
 
-    public init?(device: MTLDevice, textureFolders: [URL] = []) {
+    public init?(device: MTLDevice, textureFolders: [URL] = [], random: @escaping () -> Double = { .random(in: 0..<1) }) {
         guard let queue = device.makeCommandQueue(),
               let library = try? FixedShaders.library(device: device, extra: []),
               let blur = Blur(device: device, library: library, size: SIMD2(16, 16)),
-              let noise = Noise.makeTextures(device: device, queue: queue),
+              let noise = Noise.makeTextures(device: device, queue: queue, random: random),
               let title = TitleText(device: device, library: library),
               let copy = Self.copyPipeline(device, library),
               let wrap = Self.sampler(device, .repeat), let clamp = Self.sampler(device, .clampToEdge) else { return nil }
@@ -54,21 +61,22 @@ public final class Renderer {
         self.copy = copy
         wrapSampler = wrap
         clampSampler = clamp
-        textures = TextureLibrary(device: device, folders: [MilkDropResources.textures].compactMap { $0 } + textureFolders)
-        pattern = BlendPattern(width: Self.meshSize.x, height: Self.meshSize.y, aspect: SIMD2(1, 1))
+        self.random = random
+        textures = TextureLibrary(device: device, folders: [MilkDropResources.textures].compactMap { $0 } + textureFolders, random: random)
+        pattern = BlendPattern(width: Self.meshSize.x, height: Self.meshSize.y, aspect: SIMD2(1, 1), random: random)
     }
 
     /// Shows `compiled`, mixing it in over `blend` seconds. Throws when its equations do not compile.
     public func show(_ compiled: CompiledPreset, blend: Double) throws {
         var preset = compiled.preset
         preset.values["old_wave_mode"] = current?.equations.values["wave_mode"] ?? preset.values["wave_mode"]
-        let equations = try PresetEquations(preset, globals: globals, frame: frameGlobals)
+        let equations = try PresetEquations(preset, globals: globals, frame: frameGlobals, random: random)
         textures.reshuffle()
         previous = blend > 0 ? current : nil
-        current = Active(compiled, equations)
+        current = Active(compiled, equations, random: random)
         blendStart = time
         blendDuration = blend
-        pattern = BlendPattern(width: Self.meshSize.x, height: Self.meshSize.y, aspect: SIMD2(Float(aspect.x), Float(aspect.y)))
+        pattern = BlendPattern(width: Self.meshSize.x, height: Self.meshSize.y, aspect: SIMD2(Float(aspect.x), Float(aspect.y)), random: random)
     }
 
     /// MilkDrop's song title animation, shown for `seconds`.
@@ -180,6 +188,7 @@ public final class Renderer {
         f.volAtt = (f.bassAtt + f.midAtt + f.trebAtt) / 3
         f.q = active.equations.q.map(Float.init)
         f.randPreset = active.randPreset
+        f.randFrame = SIMD4((0..<4).map { _ in Float(random()) })
         let n = { (key: String, fallback: Double) in Float(v[key] ?? fallback) }
         (f.decay, f.gammaAdj, f.echoZoom) = (n("decay", 0.98), n("gammaadj", 2), n("echo_zoom", 2))
         (f.echoAlpha, f.echoOrient, f.fShader) = (n("echo_alpha", 0), n("echo_orient", 0), n("fshader", 0))
@@ -254,14 +263,17 @@ public final class Renderer {
                      meshSize: Self.meshSize, aspect: aspect, pixels: targets?.size ?? SIMD2(1, 1))
     }
 
-    /// Butterchurn's clock: time moves by 1/fps; fps follows the real frame times smoothly.
+    /// Butterchurn's `calcTimeAndFPS`: time moves by 1/fps, fps follows the frame times of the last 120 frames.
     private func advanceTime(_ now: Double) {
-        var dt = lastNow.map { now - $0 } ?? 1.0 / 30
-        if dt > 1 || dt <= 0 || frame < 2 { dt = 1.0 / 30 }
+        var dt = lastNow.map { now - $0 } ?? 1.0 / 60
+        if dt > 1 || dt < 0 { dt = 1.0 / 30 }
         lastNow = now
-        frame += 1
         time += 1 / fps
-        fps = 0.93 * fps + 0.07 * min(max(1 / dt, 15), 144)
+        let sum = (timeHistory.last ?? 0) + dt
+        timeHistory.append(sum)
+        if timeHistory.count > 120 { timeHistory.removeFirst() }
+        fps = 0.93 * fps + 0.07 * Double(timeHistory.count) / (sum - timeHistory[0])
+        frame += 1
     }
 
     /// Butterchurn's `mixFrameEquations`: numbers ease across, switches flip halfway.
@@ -295,14 +307,19 @@ public final class Renderer {
     private func resize(_ size: SIMD2<Int>, _ buffer: MTLCommandBuffer) {
         let size = SIMD2(max(size.x, 16), max(size.y, 16))
         guard targets?.size != size, let fresh = Targets(device: device, size: size) else { return }
-        if let old = targets, let encoder = pass(buffer, fresh.target, clear: true) {
+        let old = targets
+        targets = fresh
+        blur.resize(device: device, size: size)
+        // New textures hold garbage; butterchurn's start black.
+        for texture in [fresh.prev, fresh.target] + blur.textures + blur.horizontalTextures {
+            pass(buffer, texture, clear: true)?.endEncoding()
+        }
+        if let old, let encoder = pass(buffer, fresh.target, clear: true) {
             encoder.setRenderPipelineState(copy)
             encoder.setFragmentTexture(old.target, index: 0)
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
             encoder.endEncoding()
         }
-        targets = fresh
-        blur.resize(device: device, size: size)
     }
 
     private static func copyPipeline(_ device: MTLDevice, _ library: MTLLibrary) -> MTLRenderPipelineState? {

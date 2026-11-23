@@ -13,6 +13,8 @@ public struct ShaderFrame: Sendable {
     /// q1...q32; missing values read as 0.
     public var q = [Float](repeating: 0, count: 32)
     public var randPreset = SIMD4<Float>(0, 0, 0, 0)
+    /// New random values each frame.
+    public var randFrame = SIMD4<Float>(.random(in: 0..<1), .random(in: 0..<1), .random(in: 0..<1), .random(in: 0..<1))
     public var decay: Float = 0.98, gammaAdj: Float = 2, echoZoom: Float = 2, echoAlpha: Float = 0, echoOrient: Float = 0, fShader: Float = 0
     public var invert = false, brighten = false, darken = false, solarize = false
     /// Already clamped by the renderer as MilkDrop does.
@@ -70,7 +72,7 @@ public struct ShaderUniforms: Sendable {
         audioAtt = SIMD4(f.bassAtt, f.midAtt, f.trebAtt, f.volAtt)
         (qa, qb, qc, qd, qe, qf, qg, qh) = (qv[0], qv[1], qv[2], qv[3], qv[4], qv[5], qv[6], qv[7])
         randPreset = f.randPreset
-        randFrame = SIMD4(.random(in: 0..<1), .random(in: 0..<1), .random(in: 0..<1), .random(in: 0..<1))
+        randFrame = f.randFrame
         roamCos = roam(cos, fast)
         roamSin = roam(sin, fast)
         slowRoamCos = roam(cos, slow)

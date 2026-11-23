@@ -1,0 +1,119 @@
+import Foundation
+import ImageIO
+import Metal
+@testable import MilkDropKit
+import Testing
+import UniformTypeIdentifiers
+
+/// Renders bundled presets with butterchurn and with MilkDropKit from the same input (audio bytes, 1/60 s steps,
+/// every random value 0.5) and compares the pictures. Images of both and a summary go to `report`.
+@MainActor @Suite(.serialized) struct ParityTests {
+    static let size = (w: 256, h: 192)
+    static let frames = [1, 10, 30]
+    static let report = FileManager.default.temporaryDirectory.appendingPathComponent("MilkDropParity", isDirectory: true)
+
+    /// Mean absolute difference 0…255 of the RGB channels, after both are averaged in 4×4 blocks (small shifts count less).
+    static func difference(_ a: [UInt8], _ b: [UInt8], width: Int, height: Int) -> Double {
+        var sum = 0.0, count = 0
+        for by in stride(from: 0, to: height - 3, by: 4) {
+            for bx in stride(from: 0, to: width - 3, by: 4) {
+                for c in 0..<3 {
+                    var sa = 0, sb = 0
+                    for y in by..<by + 4 { for x in bx..<bx + 4 { let i = (y * width + x) * 4 + c; sa += Int(a[i]); sb += Int(b[i]) } }
+                    sum += abs(Double(sa - sb)) / 16
+                    count += 1
+                }
+            }
+        }
+        return sum / Double(max(count, 1))
+    }
+
+    /// The test audio of frame `f`, as `audio(f)` in reference.html, as floats that give back the same bytes.
+    static func audio(_ f: Int) -> [Float] {
+        (0..<1024).map { i in
+            let b = min(max((128 + 100 * sin(Double(f * 1024 + i) * 0.05)).rounded(.down), 0), 255)
+            return Float((b - 128) / 128)
+        }
+    }
+
+    /// RGBA bytes, rows top first, of the frames in `keep` rendered natively.
+    static func native(_ preset: Preset, device: MTLDevice, keep: [Int]) async throws -> [Int: [UInt8]] {
+        let renderer = try #require(Renderer(device: device, random: { 0.5 }))
+        let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm, width: size.w, height: size.h, mipmapped: false)
+        d.usage = [.renderTarget, .shaderRead]
+        d.storageMode = .shared
+        let screen = try #require(device.makeTexture(descriptor: d))
+        try renderer.show(try await CompiledPreset.compile(preset, device: device, screenFormat: .rgba8Unorm), blend: 0)
+        var out: [Int: [UInt8]] = [:]
+        for f in 0..<(keep.max() ?? 0) {
+            let buffer = try #require(renderer.queue.makeCommandBuffer())
+            let a = audio(f)
+            renderer.render(into: screen, buffer: buffer, size: SIMD2(size.w, size.h), left: a, right: a, sampleRate: 44100, now: Double(f) / 60)
+            Self.finish(buffer)
+            if keep.contains(f + 1) {
+                var bytes = [UInt8](repeating: 0, count: size.w * size.h * 4)
+                screen.getBytes(&bytes, bytesPerRow: size.w * 4, from: MTLRegionMake2D(0, 0, size.w, size.h), mipmapLevel: 0)
+                out[f + 1] = bytes
+            }
+        }
+        return out
+    }
+
+    /// Waits for the GPU; a plain call, as the async wait cannot take a command buffer across actors.
+    static func finish(_ buffer: MTLCommandBuffer) {
+        buffer.commit()
+        buffer.waitUntilCompleted()
+    }
+
+    static func savePNG(_ bytes: [UInt8], to url: URL) {
+        let data = CFDataCreate(nil, bytes, bytes.count)!
+        guard let provider = CGDataProvider(data: data),
+              let image = CGImage(width: size.w, height: size.h, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: size.w * 4,
+                                  space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue),
+                                  provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent),
+              let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil) else { return }
+        CGImageDestinationAddImage(dest, image, nil)
+        CGImageDestinationFinalize(dest)
+    }
+
+    /// Presets to compare: `MILKDROP_PARITY=all` for every bundled one, else every 10th.
+    static func presets() throws -> [URL] {
+        let folder = try #require(MilkDropResources.presets)
+        let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "milk" }.sorted { $0.path < $1.path }
+        return ProcessInfo.processInfo.environment["MILKDROP_PARITY"] == "all" ? files : stride(from: 0, to: files.count, by: 10).map { files[$0] }
+    }
+
+    @Test func matchesButterchurn() async throws {
+        guard let device = MTLCreateSystemDefaultDevice() else { return }
+        try? FileManager.default.removeItem(at: Self.report)
+        try FileManager.default.createDirectory(at: Self.report, withIntermediateDirectories: true)
+        let reference = Butterchurn()
+        try await reference.load()
+        var rows: [(name: String, diffs: [Double])] = []
+        for file in try Self.presets() {
+            let preset = try PresetFile.load(file)
+            let milk = try String(contentsOf: file, encoding: .utf8)
+            guard let theirs = try? await reference.render(milk, width: Self.size.w, height: Self.size.h, frames: Self.frames.max()!, keep: Self.frames),
+                  let ours = try? await Self.native(preset, device: device, keep: Self.frames) else { continue }
+            var diffs: [Double] = []
+            for f in Self.frames {
+                guard let a = theirs[f], let b = ours[f] else { continue }
+                diffs.append(Self.difference(a, b, width: Self.size.w, height: Self.size.h))
+                let base = Self.report.appendingPathComponent("\(preset.name.prefix(60))-\(f)")
+                Self.savePNG(a, to: base.appendingPathExtension("butterchurn.png"))
+                Self.savePNG(b, to: base.appendingPathExtension("native.png"))
+            }
+            rows.append((preset.name, diffs))
+        }
+        rows.sort { ($0.diffs.first ?? 0) > ($1.diffs.first ?? 0) }
+        let lines = rows.map { "\($0.diffs.map { String(format: "%6.1f", $0) }.joined(separator: " "))  \($0.name)" }
+        let summary = "difference 0…255 at frames \(Self.frames), worst first\n" + lines.joined(separator: "\n")
+        try summary.write(to: Self.report.appendingPathComponent("summary.txt"), atomically: true, encoding: .utf8)
+        print(summary)
+        print("report: \(Self.report.path)")
+        #expect(!rows.isEmpty)
+        let first = rows.compactMap(\.diffs.first).sorted()
+        #expect(first.isEmpty || first[first.count / 2] < 20, "median difference at frame 1")
+    }
+}
