@@ -11,6 +11,8 @@ import UniformTypeIdentifiers
     static let size = (w: 256, h: 192)
     static let frames = [1, 10, 30]
     static let report = FileManager.default.temporaryDirectory.appendingPathComponent("MilkDropParity", isDirectory: true)
+    /// Presets butterchurn gets wrong in ways reference.html cannot see, with why. They do not count for the medians.
+    static let knownReferenceFailures: [String: String] = [:]
 
     /// Mean absolute difference 0…255 of the RGB channels, after both are averaged in 4×4 blocks (small shifts count less).
     static func difference(_ a: [UInt8], _ b: [UInt8], width: Int, height: Int) -> Double {
@@ -76,12 +78,21 @@ import UniformTypeIdentifiers
         CGImageDestinationFinalize(dest)
     }
 
-    /// Presets to compare: `MILKDROP_PARITY=all` for every bundled one, else every 10th.
+    /// Presets to compare: `MILKDROP_PARITY=all` for every bundled one, `MILKDROP_PARITY=name|name` for those, else every 10th.
     static func presets() throws -> [URL] {
         let folder = try #require(MilkDropResources.presets)
         let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
             .filter { $0.pathExtension == "milk" }.sorted { $0.path < $1.path }
-        return ProcessInfo.processInfo.environment["MILKDROP_PARITY"] == "all" ? files : stride(from: 0, to: files.count, by: 10).map { files[$0] }
+        switch ProcessInfo.processInfo.environment["MILKDROP_PARITY"] {
+        case "all": return files
+        case let names?: return files.filter { names.split(separator: "|").contains(Substring($0.deletingPathExtension().lastPathComponent)) }
+        case nil: return stride(from: 0, to: files.count, by: 10).map { files[$0] }
+        }
+    }
+
+    struct Row {
+        let name: String, diffs: [Double], failure: String?
+        var line: String { "\(diffs.map { String(format: "%6.1f", $0) }.joined(separator: " "))  \(name)\(failure.map { "  (\($0))" } ?? "")" }
     }
 
     @Test func matchesButterchurn() async throws {
@@ -91,12 +102,12 @@ import UniformTypeIdentifiers
         let reference = Butterchurn()
         try await reference.load()
         try await reference.setImages(try #require(MilkDropResources.textures))
-        var rows: [(name: String, diffs: [Double])] = []
+        var rows: [Row] = [], skipped: [String] = []
         for file in try Self.presets() {
             let preset = try PresetFile.load(file)
             let milk = try String(contentsOf: file, encoding: .utf8)
             guard let theirs = try? await reference.render(milk, width: Self.size.w, height: Self.size.h, frames: Self.frames.max()!, keep: Self.frames),
-                  let ours = try? await Self.native(preset, device: device, keep: Self.frames) else { continue }
+                  let ours = try? await Self.native(preset, device: device, keep: Self.frames) else { skipped.append(preset.name); continue }
             var diffs: [Double] = []
             for f in Self.frames {
                 guard let a = theirs[f], let b = ours[f] else { continue }
@@ -105,16 +116,19 @@ import UniformTypeIdentifiers
                 Self.savePNG(a, to: base.appendingPathExtension("butterchurn.png"))
                 Self.savePNG(b, to: base.appendingPathExtension("native.png"))
             }
-            rows.append((preset.name, diffs))
+            rows.append(Row(name: preset.name, diffs: diffs, failure: reference.failure ?? Self.knownReferenceFailures[preset.name]))
         }
-        rows.sort { ($0.diffs.first ?? 0) > ($1.diffs.first ?? 0) }
-        let lines = rows.map { "\($0.diffs.map { String(format: "%6.1f", $0) }.joined(separator: " "))  \($0.name)" }
-        let summary = "difference 0…255 at frames \(Self.frames), worst first\n" + lines.joined(separator: "\n")
+        rows.sort { ($0.diffs.max() ?? 0) > ($1.diffs.max() ?? 0) }
+        let failed = rows.filter { $0.failure != nil }
+        rows.removeAll { $0.failure != nil }
+        let summary = "difference 0…255 at frames \(Self.frames), worst first\n" + rows.map(\.line).joined(separator: "\n")
+            + "\n\n\(failed.count) presets butterchurn gets wrong, not counted:\n" + failed.map(\.line).joined(separator: "\n")
+            + "\n\n\(skipped.count) presets one side cannot render:\n" + skipped.joined(separator: "\n")
         try summary.write(to: Self.report.appendingPathComponent("summary.txt"), atomically: true, encoding: .utf8)
         print(summary)
         print("report: \(Self.report.path)")
-        #expect(!rows.isEmpty)
-        // Medians, so a few presets that butterchurn itself gets wrong (shaders its converter cannot compile) do not fail it.
+        #expect(!rows.isEmpty || !failed.isEmpty)
+        // Medians, so a few differences that butterchurn's own quirks cause do not fail it.
         for (index, limit) in [(0, 3.0), (2, 20.0)] {
             let diffs = rows.compactMap { $0.diffs.count > index ? $0.diffs[index] : nil }.sorted()
             #expect(diffs.isEmpty || diffs[diffs.count / 2] < limit, "median difference at frame \(Self.frames[index])")

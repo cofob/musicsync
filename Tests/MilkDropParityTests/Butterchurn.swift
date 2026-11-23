@@ -32,12 +32,16 @@ import WebKit
         _ = try await view.callAsyncJavaScript("return await setImages(urls)", arguments: ["urls": urls], contentWorld: .page)
     }
 
+    /// Why butterchurn got the last `render` wrong (a shader it cannot link or the converter broke), nil when it did not.
+    private(set) var failure: String?
+
     /// RGBA bytes, rows top first, of the frames in `keep` (1-based).
     func render(_ milk: String, width: Int, height: Int, frames: Int, keep: [Int]) async throws -> [Int: [UInt8]] {
         let result = try await view.callAsyncJavaScript(
             "return await renderPreset(milk, width, height, frames, keep)",
             arguments: ["milk": milk, "width": width, "height": height, "frames": frames, "keep": keep], contentWorld: .page)
         guard let urls = result as? [String: String] else { throw ParityError("no frames from butterchurn") }
+        failure = urls["failure"]
         var out: [Int: [UInt8]] = [:]
         for (key, url) in urls {
             guard let frame = Int(key), let comma = url.firstIndex(of: ","), let data = Data(base64Encoded: String(url[url.index(after: comma)...])),

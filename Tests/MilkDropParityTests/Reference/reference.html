@@ -6,6 +6,14 @@
 <script>
 // Repeatable butterchurn: every random value is 0.5, as the native renderer gets in the parity tests.
 Math.random = () => 0.5;
+// Why butterchurn cannot be the reference for the current preset: programs it fails to link (it never checks).
+let failures = [];
+const link = WebGL2RenderingContext.prototype.linkProgram;
+WebGL2RenderingContext.prototype.linkProgram = function (p) {
+  link.call(this, p);
+  if (!this.getProgramParameter(p, this.LINK_STATUS))
+    failures.push('butterchurn cannot link: ' + this.getAttachedShaders(p).map((s) => this.getShaderInfoLog(s).split('\n')[0]).join(' ').trim());
+};
 </script>
 <script src="butterchurn.min.js"></script>
 <script src="milkdrop-preset-converter.min.js"></script>
@@ -32,15 +40,22 @@ window.setImages = async (urls) => {
   return Object.keys(images).length;
 };
 
-// Renders `frames` frames of the .milk text at width × height; returns the PNG data URL of each frame in `keep`.
+// Renders `frames` frames of the .milk text at width × height; returns the PNG data URL of each frame in `keep`,
+// and in `failure` why butterchurn got it wrong, if it did.
 window.renderPreset = async (milk, width, height, frames, keep) => {
   const canvas = document.getElementById('c');
   canvas.width = width; canvas.height = height;
   viz = lib.createVisualizer(new AudioContext(), canvas, { width, height, pixelRatio: 1, textureRatio: 1 });
   viz.loadExtraImages(images);
   const samplers = viz.renderer.image.samplers;
-  for (let i = 0; i < 200 && Object.keys(images).some((n) => !samplers[n]); i++) await new Promise((r) => setTimeout(r, 5));
+  const missing = () => Object.keys(images).filter((n) => !samplers[n]);
+  for (let i = 0; i < 200 && missing().length; i++) await new Promise((r) => setTimeout(r, 5));
+  failures = missing().length ? ['images not loaded: ' + missing().join(' ')] : [];
   const preset = await window.milkdropPresetConverter.convertPreset(milk);
+  // The converter's HLSL parser loses the second operator of a chain: a + b + c comes out as (a + b) && c.
+  const ops = (s) => (s.match(/&&|\|\|/g) || []).length;
+  const hlsl = milk.split('\n').filter((l) => /^(warp|comp)_\d+=/.test(l)).join('\n');
+  if (ops(preset.warp || '') + ops(preset.comp || '') > ops(hlsl)) failures.push('converter turns a + b + c into (a + b) && c');
   viz.loadPreset(preset, 0);
   const out = {};
   for (let f = 0; f < frames; f++) {
@@ -48,6 +63,7 @@ window.renderPreset = async (milk, width, height, frames, keep) => {
     viz.render({ audioLevels: { timeByteArray: a, timeByteArrayL: a, timeByteArrayR: a }, elapsedTime: 1 / 60 });
     if (keep.includes(f + 1)) out[f + 1] = viz.toDataURL();
   }
+  if (failures.length) out.failure = failures[0];
   return out;
 };
 </script>
