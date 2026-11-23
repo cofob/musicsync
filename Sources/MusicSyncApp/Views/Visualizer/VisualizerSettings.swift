@@ -43,6 +43,37 @@ enum VisualizerSettings {
     }
 }
 
+/// When the visualizer changes on its own: MilkDrop shows another preset; with song parts the spectrum and the
+/// oscilloscope also take new colors. One choice, so a timer and song parts cannot both seem to be on.
+enum VisualizerChange: String, CaseIterable, Identifiable {
+    case never, timer, parts
+    var id: Self { self }
+
+    func title(every seconds: Double) -> String {
+        switch self {
+        case .never: "Never"
+        case .timer: "Every \(Int(seconds)) Seconds"
+        case .parts: "With Song Parts"
+        }
+    }
+
+    /// In Settings, where the interval has its own row.
+    var settingsTitle: String {
+        switch self {
+        case .never: "Never"
+        case .timer: "On a timer"
+        case .parts: "With song parts"
+        }
+    }
+
+    /// Kept in the two older switches, so earlier settings keep their meaning. Song parts use the timer
+    /// while the song is not analyzed yet or has no clear parts.
+    static func binding(cycle: Binding<Bool>, parts: Binding<Bool>) -> Binding<VisualizerChange> {
+        Binding(get: { parts.wrappedValue ? .parts : cycle.wrappedValue ? .timer : .never },
+                set: { cycle.wrappedValue = $0 != .never; parts.wrappedValue = $0 == .parts })
+    }
+}
+
 /// Settings > Visualizer.
 struct VisualizerSettingsView: View {
     @AppStorage(VisualizerSettings.mode, store: .app) private var mode = VisualizerMode.spectrum
@@ -62,15 +93,29 @@ struct VisualizerSettingsView: View {
     @State private var presets = VisualizerSettings.userPresets()
 
     var body: some View {
+        let change = VisualizerChange.binding(cycle: $cycle, parts: $sections)
         Form {
             Section {
                 Picker("Style", selection: $mode) { ForEach(VisualizerMode.allCases) { Text($0.title).tag($0) } }
                 Toggle("Show synced lyrics", isOn: $lyrics)
                 Toggle("Announce songs", isOn: $announce)
-                Toggle("Change with song parts", isOn: $sections)
                 Button("Show Visualizer") { openWindow(id: VisualizerView.windowID) }
             } footer: {
-                SettingsFooter("Window > Visualizer (⌘T), or the waveform button in Now Playing and the MiniPlayer. Announce Songs shows the artist and title when a song starts. Change With Song Parts analyzes each song to find where its parts start (verse, chorus…): there MilkDrop changes the preset and the spectrum and oscilloscope their colors. Streamed songs are downloaded once more for this; the results are kept.")
+                SettingsFooter("Window > Visualizer (⌘T), or the waveform button in Now Playing and the MiniPlayer. Announce Songs shows the artist and title when a song starts.")
+            }
+            Section {
+                Picker("Change", selection: change) {
+                    ForEach(VisualizerChange.allCases) { Text($0.settingsTitle).tag($0) }
+                }
+                if change.wrappedValue != .never {
+                    Picker(change.wrappedValue == .parts ? "Until a song is analyzed, every" : "Every", selection: $cycleSeconds) {
+                        ForEach([10.0, 20, 30, 60, 120], id: \.self) { Text("\(Int($0)) seconds").tag($0) }
+                    }
+                }
+            } header: {
+                Text("Changes")
+            } footer: {
+                SettingsFooter("MilkDrop shows another preset. With Song Parts each song is analyzed to find where its parts start (verse, chorus…); there MilkDrop changes the preset and the spectrum and oscilloscope their colors. Streamed songs are downloaded once more for this; the results are kept.")
             }
             Section("Spectrum") {
                 Toggle("Peak caps", isOn: $peaks)
@@ -80,16 +125,10 @@ struct VisualizerSettingsView: View {
                 }
             }
             Section {
-                Toggle("Change presets automatically", isOn: $cycle)
-                Picker("Change every", selection: $cycleSeconds) {
-                    ForEach([10.0, 20, 30, 60, 120], id: \.self) { Text("\(Int($0)) seconds").tag($0) }
-                }
-                .disabled(!cycle)
-                Picker("Order", selection: $shuffle) {
+                Picker("Next preset", selection: $shuffle) {
                     Text("Random").tag(true)
                     Text("Alphabetical").tag(false)
                 }
-                .disabled(!cycle)
                 LabeledContent("Blend time") {
                     Slider(value: $blend, in: 0...10, step: 0.5) { EmptyView() } minimumValueLabel: { Text("Cut").foregroundStyle(.secondary) } maximumValueLabel: { Text("10 s").foregroundStyle(.secondary) }
                 }
@@ -102,7 +141,7 @@ struct VisualizerSettingsView: View {
             } header: {
                 Text("MilkDrop")
             } footer: {
-                SettingsFooter("With Change With Song Parts, the timer only works until the song is analyzed, or when it has no clear parts. Blend time is how long two presets mix when the preset changes. Retina quality renders every screen pixel and uses more GPU.")
+                SettingsFooter("Next Preset is used by the changes above and the Next button. Blend time is how long two presets mix when the preset changes. Retina quality renders every screen pixel and uses more GPU.")
             }
             Section {
                 Toggle("Include built-in presets", isOn: $builtIn)

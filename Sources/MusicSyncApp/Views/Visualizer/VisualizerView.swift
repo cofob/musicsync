@@ -209,8 +209,9 @@ struct VisualizerView: View {
             Button("Random Preset") { milkDrop.random() }
             Menu("Choose Preset") { ForEach(milkDrop.presets, id: \.self) { name in Button(name) { milkDrop.select(name) } } }
             Divider()
-            Toggle("Change Presets Every \(Int(cycleSeconds)) Seconds", isOn: $cycles)
-            Toggle("Change at Song Parts", isOn: $followsSections)
+            Picker("Change Presets", selection: VisualizerChange.binding(cycle: $cycles, parts: $followsSections)) {
+                ForEach(VisualizerChange.allCases) { Text($0.title(every: cycleSeconds)).tag($0) }
+            }
             Toggle("Announce Songs", isOn: $announces)
             Divider()
             if !milkDrop.failed.isEmpty { Text("Not converted: \(milkDrop.failed.joined(separator: ", "))") }
