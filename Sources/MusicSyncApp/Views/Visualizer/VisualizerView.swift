@@ -28,7 +28,7 @@ struct VisualizerView: View {
     var insets = EdgeInsets()
 
     @Environment(AppModel.self) private var model
-    @AppStorage(VisualizerSettings.mode, store: .app) private var mode = VisualizerMode.spectrum
+    @AppStorage(VisualizerSettings.mode, store: .app) private var mode = VisualizerMode.milkdrop
     @AppStorage(VisualizerSettings.cycle, store: .app) private var cycles = true
     @AppStorage(VisualizerSettings.lyrics, store: .app) private var showsLyrics = true
     @AppStorage(VisualizerSettings.announce, store: .app) private var announces = true

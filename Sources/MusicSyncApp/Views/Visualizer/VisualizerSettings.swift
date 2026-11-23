@@ -98,7 +98,7 @@ enum VisualizerChange: String, CaseIterable, Identifiable {
 
 /// Settings > Visualizer.
 struct VisualizerSettingsView: View {
-    @AppStorage(VisualizerSettings.mode, store: .app) private var mode = VisualizerMode.spectrum
+    @AppStorage(VisualizerSettings.mode, store: .app) private var mode = VisualizerMode.milkdrop
     @AppStorage(VisualizerSettings.lyrics, store: .app) private var lyrics = true
     @AppStorage(VisualizerSettings.announce, store: .app) private var announce = true
     @AppStorage(VisualizerSettings.sections, store: .app) private var sections = false
