@@ -149,7 +149,7 @@ import UniformTypeIdentifiers
         print("report: \(Self.report.path)")
         #expect(!rows.isEmpty || !failed.isEmpty)
         // Medians, so a few differences that butterchurn's own quirks cause do not fail it.
-        for (index, limit) in [(0, 3.0), (2, 20.0)] {
+        for (index, limit) in [(0, 0.5), (2, 1.0)] {
             let diffs = rows.compactMap { $0.diffs.count > index ? $0.diffs[index] : nil }.sorted()
             #expect(diffs.isEmpty || diffs[diffs.count / 2] < limit, "median difference at frame \(Self.frames[index])")
         }
