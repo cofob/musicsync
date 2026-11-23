@@ -68,12 +68,10 @@ window.renderPreset = async (milk, width, height, frames, keep) => {
   // custom waves would get four (`enabled` undefined is not 0). MilkDrop takes the defaults.
   for (const o of [preset, ...preset.waves, ...preset.shapes])
     for (const k of Object.keys(o.baseVals)) if (o.baseVals[k] === undefined) delete o.baseVals[k];
-  // butterchurn hands waves and shapes q1…q32, reg00…reg99 and t1…t8 even when nothing set them (undefined: NaN in
+  // butterchurn hands waves and shapes q1…q32 and reg00…reg99 even when the preset never set them (undefined: NaN in
   // their math). MilkDrop starts them at 0.
-  const zero = (o, names) => names.forEach((n) => { o.baseVals[n] ??= 0; });
   const names = (prefix, from, to, digits) => Array.from({ length: to - from + 1 }, (_, i) => prefix + String(from + i).padStart(digits, '0'));
-  zero(preset, [...names('q', 1, 32, 1), ...names('reg', 0, 99, 2)]);
-  for (const o of [...preset.waves, ...preset.shapes]) zero(o, names('t', 1, 8, 1));
+  for (const n of [...names('q', 1, 32, 1), ...names('reg', 0, 99, 2)]) preset.baseVals[n] ??= 0;
   // butterchurn works out rad, ang (and in the comp uv_orig) in main(), out of reach of the preset's shader function.
   const head = 'vec4 main_shader_sentinel(vec2 uv) {';
   const declare = (glsl, defs) => glsl && glsl.replace(head, head + defs
