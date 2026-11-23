@@ -45,6 +45,12 @@ swift test
 
 `bundle.sh` makes a release build at `build/MusicSync.app` with an ad-hoc signature. `ARCHS="arm64 x86_64" ./scripts/bundle.sh` makes a universal app.
 
+The iPad app (iPadOS 26, a player without iPod sync) builds from the same sources: open `iPad/MusicSync.xcodeproj` (not `Package.swift`), pick the `MusicSync` scheme, set your team under Signing & Capabilities, and run. From the terminal:
+
+```sh
+xcodebuild -project iPad/MusicSync.xcodeproj -scheme MusicSync -destination 'generic/platform=iOS Simulator' -derivedDataPath build/ipad build
+```
+
 ## Install
 
 Install or update to the latest release from the terminal. The app is not notarized; a file downloaded with `curl` gets no quarantine flag, so Gatekeeper does not block it. A running copy quits first:

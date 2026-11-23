@@ -1,3 +1,4 @@
+import CoreTransferable
 import Foundation
 import OSLog
 import Support
@@ -19,23 +20,39 @@ enum Diagnostics {
         try write(settings(), "settings.json", in: folder)
         try write(log(), "log.txt", in: folder)
         try? FileManager.default.removeItem(at: zip)
+        #if os(macOS)
         let ditto = Process()
         ditto.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
         ditto.arguments = ["-c", "-k", "--keepParent", folder.path, zip.path]
         try ditto.run()
         ditto.waitUntilExit()
         guard ditto.terminationStatus == 0 else { throw CocoaError(.fileWriteUnknown) }
+        #else
+        // Reading a folder "for uploading" gives a zip of it.
+        var failure: Error?
+        var coordinatorError: NSError?
+        NSFileCoordinator().coordinate(readingItemAt: folder, options: .forUploading, error: &coordinatorError) { url in
+            do { try FileManager.default.copyItem(at: url, to: zip) } catch { failure = error }
+        }
+        if let error = coordinatorError ?? failure { throw error }
+        #endif
     }
 
     private static func write(_ text: String, _ name: String, in folder: URL) throws {
         try Redact.secrets(in: text).write(to: folder.appendingPathComponent(name), atomically: true, encoding: .utf8)
     }
 
+    #if os(macOS)
+    private static let platform = "macOS"
+    #else
+    private static let platform = "iPadOS"
+    #endif
+
     private static func info(server: URL?) -> String {
         let bundle = Bundle.main.infoDictionary ?? [:]
         return """
             MusicSync \(bundle["CFBundleShortVersionString"] as? String ?? "development build") (\(bundle["CFBundleVersion"] as? String ?? "-"))
-            macOS \(ProcessInfo.processInfo.operatingSystemVersionString)
+            \(platform) \(ProcessInfo.processInfo.operatingSystemVersionString)
             Server: \(server?.host ?? "none")
             Demo: \(Paths.isDemo)
             """
@@ -63,3 +80,18 @@ enum Diagnostics {
         return lines.isEmpty ? "No messages." : lines.joined(separator: "\n")
     }
 }
+
+#if os(iOS)
+/// The diagnostics zip for the share sheet; made only when a target is picked.
+struct DiagnosticsFile: Transferable {
+    let server: URL?
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .zip) { (file: DiagnosticsFile) in
+            let zip = FileManager.default.temporaryDirectory.appendingPathComponent("MusicSync Diagnostics.zip")
+            try await Task.detached(priority: .userInitiated) { try Diagnostics.export(to: zip, server: file.server) }.value
+            return SentTransferredFile(zip)
+        }
+    }
+}
+#endif

@@ -1,4 +1,4 @@
-import AppKit
+import SwiftUI
 import Artwork
 import ImageIO
 

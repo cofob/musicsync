@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>UIBackgroundModes</key><array><string>audio</string></array>
+	<key>UIApplicationSceneManifest</key>
+	<dict><key>UIApplicationSupportsMultipleScenes</key><true/></dict>
+	<key>NSAppTransportSecurity</key>
+	<dict><key>NSAllowsArbitraryLoads</key><true/></dict>
+	<key>NSLocalNetworkUsageDescription</key><string>MusicSync connects to your Navidrome server on the local network and lets your iPhone control playback.</string>
+	<key>NSBonjourServices</key><array><string>_musicsync._tcp</string><string>_http._tcp</string></array>
+	<key>CFBundleURLTypes</key>
+	<array><dict>
+		<key>CFBundleURLName</key><string>dev.cofob.musicsync</string>
+		<key>CFBundleURLSchemes</key><array><string>musicsync</string></array>
+	</dict></array>
+	<key>NSUserActivityTypes</key>
+	<array><string>dev.cofob.musicsync.browse</string></array>
+	<key>ITSAppUsesNonExemptEncryption</key><false/>
+</dict>
+</plist>

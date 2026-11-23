@@ -2,6 +2,11 @@ import CoreSpotlight
 import Integration
 import SwiftUI
 
+enum MainWindow {
+    /// The `WindowGroup` id; SwiftUI starts its window identifiers with it.
+    static let id = "main"
+}
+
 /// The main window takes `musicsync://` links, Spotlight results and Handoff activities, and offers its page
 /// (or the playing song) as the current activity.
 struct SystemEvents: ViewModifier {

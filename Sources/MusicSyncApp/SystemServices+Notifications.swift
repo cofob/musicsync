@@ -1,4 +1,4 @@
-import AppKit
+import SwiftUI
 import Support
 import UserNotifications
 
@@ -13,7 +13,7 @@ extension SystemServices {
     }
 
     func trackChanged() {
-        guard notifiesTrackChange, Self.mayNotify, !NSApp.isActive, let item = app.player.current else { return }
+        guard notifiesTrackChange, Self.mayNotify, !appIsActive, let item = app.player.current else { return }
         let content = UNMutableNotificationContent()
         content.title = item.title
         content.body = byline(item.artist, item.album)
@@ -31,8 +31,7 @@ extension SystemServices {
 
     private nonisolated static func writeJPEG(_ image: NSImage) async -> URL? {
         await Task.detached(priority: .utility) {
-            guard let tiff = image.tiffRepresentation, let jpeg = NSBitmapImageRep(data: tiff)?.representation(using: .jpeg, properties: [:])
-            else { return nil }
+            guard let jpeg = image.jpegData(compressionQuality: 0.9) else { return nil }
             let url = FileManager.default.temporaryDirectory.appendingPathComponent("musicsync-cover-\(UUID().uuidString).jpg")
             return (try? jpeg.write(to: url)) != nil ? url : nil
         }.value

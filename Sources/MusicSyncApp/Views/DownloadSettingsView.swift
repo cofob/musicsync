@@ -1,4 +1,3 @@
-import AppKit
 import Library
 import SwiftUI
 
@@ -32,7 +31,9 @@ struct DownloadSettingsView: View {
                 }
                 LabeledContent("Used", value: "\(formatBytes(downloads.usedBytes)) · \(formatSongs(downloads.entries.values.count { $0.state == .done }))")
                 HStack {
+                    #if os(macOS)
                     Button("Show in Finder") { reveal() }.disabled(downloads.manager == nil)
+                    #endif
                     Spacer()
                     Button("Remove All Downloads…", role: .destructive) { confirmClear = true }
                         .disabled(downloads.entries.isEmpty)
@@ -45,7 +46,7 @@ struct DownloadSettingsView: View {
             PlaybackCacheSettings()
         }
         .formStyle(.grouped)
-        .frame(width: 520, height: 680)
+        .settingsPageSize(width: 520, height: 680)
         .task { await ServerFormats.shared.probe(model.client) }
         .confirmationDialog("Remove all downloads?", isPresented: $confirmClear) {
             Button("Remove All", role: .destructive) { model.removeAllDownloads() }
@@ -54,8 +55,10 @@ struct DownloadSettingsView: View {
         }
     }
 
+    #if os(macOS)
     private func reveal() {
         guard let folder = model.downloads.manager?.filesDirectory else { return }
         NSWorkspace.shared.activateFileViewerSelecting([folder])
     }
+    #endif
 }

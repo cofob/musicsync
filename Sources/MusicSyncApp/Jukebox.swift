@@ -1,4 +1,4 @@
-import AppKit
+import SwiftUI
 import Observation
 import Subsonic
 
@@ -153,7 +153,13 @@ final class Jukebox: PlayerRemote {
     }
 
     /// A window the user can see; the menu bar item's own window cannot become key, so it does not count.
-    static var isOnScreen: Bool { !NSApp.isHidden && NSApp.windows.contains { $0.isVisible && $0.canBecomeKey } }
+    static var isOnScreen: Bool {
+        #if os(macOS)
+        !NSApp.isHidden && NSApp.windows.contains { $0.isVisible && $0.canBecomeKey }
+        #else
+        UIApplication.shared.applicationState != .background
+        #endif
+    }
 
     /// Takes the server's song, position, play state and volume: another client may have changed it.
     private func apply(_ status: JukeboxStatus) {

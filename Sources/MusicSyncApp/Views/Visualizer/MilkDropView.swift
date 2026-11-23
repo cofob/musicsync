@@ -36,6 +36,7 @@ import WebKit
         let url = Bundle.main.url(forResource: "MusicSync_MusicSyncApp", withExtension: "bundle")
             ?? Bundle.main.bundleURL.appendingPathComponent("MusicSync_MusicSyncApp.bundle")
         return Bundle(url: url)?.url(forResource: "index", withExtension: "html", subdirectory: "Visualizer")
+            ?? Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "Visualizer")  // iPad app
     }
 
     /// JSON options for `ms.configure`.
@@ -113,21 +114,29 @@ import WebKit
     }
 }
 
-struct MilkDropView: NSViewRepresentable {
+@MainActor struct MilkDropView {
     let player: Player
     let milkDrop: MilkDrop
 
-    func makeNSView(context: Context) -> WKWebView {
+    func makeView(_ coordinator: Coordinator) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.userContentController.add(milkDrop, name: "visualizer")
         let view = FullBleedWebView(frame: .zero, configuration: config)
+        #if os(macOS)
         view.setValue(false, forKey: "drawsBackground")
+        #else
+        view.isOpaque = false
+        view.backgroundColor = .clear
+        view.scrollView.backgroundColor = .clear
+        view.scrollView.isScrollEnabled = false
+        view.scrollView.contentInsetAdjustmentBehavior = .never
+        #endif
         view.navigationDelegate = milkDrop
         milkDrop.webView = view
         if let page = MilkDrop.page {
             view.loadFileURL(page, allowingReadAccessTo: page.deletingLastPathComponent())
             // Not in a window: it never draws, it only compiles.
-            let warm = WKWebView(frame: NSRect(x: 0, y: 0, width: 320, height: 200))
+            let warm = WKWebView(frame: CGRect(x: 0, y: 0, width: 320, height: 200))
             warm.navigationDelegate = milkDrop
             milkDrop.warmView = warm
             if var parts = URLComponents(url: page, resolvingAgainstBaseURL: false) {
@@ -135,16 +144,14 @@ struct MilkDropView: NSViewRepresentable {
                 if let url = parts.url { warm.loadFileURL(url, allowingReadAccessTo: page.deletingLastPathComponent()) }
             }
         }
-        context.coordinator.start { [player, milkDrop] in
+        coordinator.start { [player, milkDrop] in
             let samples = player.mixer.equalizer.samples.latest(1024, at: player.mixer.time)
             milkDrop.feed(samples.left, samples.right)
         }
         return view
     }
 
-    func updateNSView(_ view: WKWebView, context: Context) {}
-
-    static func dismantleNSView(_ view: WKWebView, coordinator: Coordinator) {
+    static func dismantle(_ view: WKWebView, _ coordinator: Coordinator) {
         coordinator.timer?.invalidate()
         (view.navigationDelegate as? MilkDrop)?.warmView = nil
         view.configuration.userContentController.removeScriptMessageHandler(forName: "visualizer")
@@ -162,7 +169,25 @@ struct MilkDropView: NSViewRepresentable {
     }
 }
 
+#if os(macOS)
+extension MilkDropView: NSViewRepresentable {
+    func makeNSView(context: Context) -> WKWebView { makeView(context.coordinator) }
+    func updateNSView(_ view: WKWebView, context: Context) {}
+    static func dismantleNSView(_ view: WKWebView, coordinator: Coordinator) { dismantle(view, coordinator) }
+}
+#else
+extension MilkDropView: UIViewRepresentable {
+    func makeUIView(context: Context) -> WKWebView { makeView(context.coordinator) }
+    func updateUIView(_ view: WKWebView, context: Context) {}
+    static func dismantleUIView(_ view: WKWebView, coordinator: Coordinator) { dismantle(view, coordinator) }
+}
+#endif
+
 /// Draws under the title bar too: a plain web view insets its page by the window's safe area (a dark band on top in Now Playing).
 final class FullBleedWebView: WKWebView {
+    #if os(macOS)
     override var safeAreaInsets: NSEdgeInsets { NSEdgeInsetsZero }
+    #else
+    override var safeAreaInsets: UIEdgeInsets { .zero }
+    #endif
 }

@@ -1,4 +1,4 @@
-import AppKit
+import Foundation
 import Observation
 import Playback
 import Subsonic
@@ -26,7 +26,7 @@ final class BookmarkKeeper {
 
     init(app: AppModel) {
         self.app = app
-        observer = NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) {
+        observer = NotificationCenter.default.addObserver(forName: .appWillQuit, object: nil, queue: .main) {
             [weak self] _ in MainActor.assumeIsolated { self?.saveNow() }
         }
         // Every second while playing; otherwise until the song or the play state changes.

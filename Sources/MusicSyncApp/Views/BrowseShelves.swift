@@ -75,7 +75,7 @@ struct TopSongsGrid: View {
                     SongMenuItems(song: song)
                 }
                 .overlay(alignment: .bottom) { Divider().padding(.leading, 64).padding(.trailing, 10) }
-                .onTapGesture(count: 2) { model.player.play(songs, startAt: index) }
+                .onPlayTap { model.player.play(songs, startAt: index) }
             }
         }
         .padding(.horizontal, -10)

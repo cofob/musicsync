@@ -3,7 +3,12 @@ import PackageDescription
 
 let package = Package(
     name: "MusicSync",
-    platforms: [.macOS(.v15)],
+    platforms: [.macOS(.v15), .iOS(.v18)],
+    products: [
+        // The modules of the iPad app (iPad/MusicSync.xcodeproj); the Mac app is the MusicSyncApp executable.
+        .library(name: "MusicSyncKit", targets: ["Support", "Subsonic", "ITunesDB", "Artwork", "Transcode", "Device", "Sync",
+                                                 "Library", "Recommend", "Integration", "Remote", "Playback", "Preferences"]),
+    ],
     targets: [
         .target(name: "Support"),
         .target(name: "Subsonic", dependencies: ["Support"]),

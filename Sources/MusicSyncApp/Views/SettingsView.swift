@@ -13,7 +13,7 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        let pages = SettingsPage.allCases.filter { ($0 != .sharing || model.system.sharesSupported) && $0.matches(query) }
+        let pages = SettingsPage.allCases.filter { ($0 != .sharing || model.system.sharesSupported) && $0.isAvailable && $0.matches(query) }
         NavigationSplitView {
             List {
                 ForEach(pages) { item in
@@ -32,13 +32,24 @@ struct SettingsView: View {
             .navigationSplitViewColumnWidth(200)
             .toolbar(removing: .sidebarToggle)
         } detail: {
-            ScrollView { Self.content(page).frame(maxWidth: .infinity) }
+            Group {
+                #if os(macOS)
+                ScrollView { Self.content(page).frame(maxWidth: .infinity) }
+                #else
+                Self.content(page)  // an iPad form scrolls itself
+                #endif
+            }
                 .navigationTitle(page.title)
                 .id(page)
         }
         .onChange(of: query) { if let first = pages.first, !pages.contains(page) { page = first } }
+        #if os(macOS)
         .frame(width: 720, height: 600)
+        #endif
         .tint(Color.musicAccent)
+        #if os(iOS)
+        .overlay(alignment: .topTrailing) { SettingsDoneButton() }
+        #endif
     }
 
     /// The page alone; also used by the screenshot scenes.
@@ -52,7 +63,11 @@ struct SettingsView: View {
         case .library: LibrarySettingsView()
         case .downloads: DownloadSettingsView()
         case .sync: SyncSettingsView()
+        #if os(macOS)
         case .shortcuts: ShortcutsSettingsView()
+        #else
+        case .shortcuts: EmptyView()
+        #endif
         case .remote: RemoteSettingsView()
         case .sharing: SharesSettingsView()
         case .advanced: AdvancedSettingsView()
@@ -60,7 +75,7 @@ struct SettingsView: View {
     }
 }
 
-private struct ServerSettingsView: View {
+struct ServerSettingsView: View {
     @Environment(AppModel.self) private var model
     @State private var url = ""
     @State private var username = ""
@@ -77,20 +92,35 @@ private struct ServerSettingsView: View {
             Section("Navidrome Server") {
                 TextField("Server URL", text: $url, prompt: Text("https://music.example.com"))
                     .textContentType(.URL).autocorrectionDisabled()
+                    #if os(iOS)
+                    .textInputAutocapitalization(.never).keyboardType(.URL)
+                    #endif
                 TextField("Username", text: $username).autocorrectionDisabled()
+                    #if os(iOS)
+                    .textInputAutocapitalization(.never)
+                    #endif
+                #if os(macOS)
                 SecureField("Password", text: $password, prompt: Text(hasStoredPassword ? "Stored in Keychain" : ""))
+                #else
+                SecureField("Password", text: $password, prompt: Text(hasStoredPassword ? "Stored in Keychain" : "Password"))
+                #endif
             }
             Section {
+                #if os(macOS)
                 HStack {
                     Button("Test Connection") { Task { await test() } }.disabled(config == nil)
                     Button("Save") { Task { await save() } }.disabled(config == nil).keyboardShortcut(.defaultAction)
                     statusView
                 }
+                #else  // rows, as in iPad Settings
+                Button("Save") { Task { await save() } }.disabled(config == nil).bold()
+                Button("Test Connection") { Task { await test() } }.disabled(config == nil)
+                statusView
+                #endif
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480)
-        .fixedSize(horizontal: false, vertical: true)
+        .settingsPageSize(width: 480)
         .onAppear {
             url = model.config?.baseURL.absoluteString ?? ""
             username = model.config?.username ?? ""

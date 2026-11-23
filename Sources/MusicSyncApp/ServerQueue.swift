@@ -1,4 +1,4 @@
-import AppKit
+import Foundation
 import Observation
 import Playback
 import Subsonic
@@ -45,10 +45,10 @@ final class ServerQueue {
         self.app = app
         let center = NotificationCenter.default
         observers = [
-            center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            center.addObserver(forName: .appDidResignActive, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.inactiveSince = Date() }
             },
-            center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            center.addObserver(forName: .appDidBecomeActive, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.becameActive() }
             },
         ]

@@ -1,4 +1,4 @@
-import AppKit
+import Foundation
 import Library
 import Observation
 import Subsonic
@@ -155,12 +155,14 @@ final class AppModel {
         downloads.attach(to: player)
         _ = mixes  // starts the play history
         _ = smartDownloads
+        #if os(macOS)
         ipod.start()
         spaceMonitor = SpaceKeyMonitor.install { [weak self] in
             guard let player = self?.player, !player.queue.isEmpty else { return false }
             player.toggle()
             return true
         }
+        #endif
         Task { await connect() }
     }
 
@@ -276,8 +278,7 @@ final class AppModel {
     }
 
     func copy(_ song: Song) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(byline(song.title, song.artistName, song.album), forType: .string)
+        copyToPasteboard(byline(song.title, song.artistName, song.album))
     }
 
     // MARK: Home and songs

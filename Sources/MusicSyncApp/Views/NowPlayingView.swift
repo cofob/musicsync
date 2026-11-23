@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 import Subsonic
 import Support
@@ -7,6 +6,13 @@ enum NowPlayingPanel: String { case none, lyrics, queue }
 
 /// Full-window player over a gradient sampled from the cover, with a lyrics or queue panel.
 struct NowPlayingView: View {
+    /// Room above the corner controls: none in a Mac window, the status bar on iPad.
+    #if os(macOS)
+    static let barInset: CGFloat = 0
+    #else
+    static let barInset: CGFloat = 24
+    #endif
+
     @Environment(AppModel.self) private var model
     @State private var lyrics: Lyrics?
     /// False when the song has no lyrics: the player moves to the middle.
@@ -28,7 +34,7 @@ struct NowPlayingView: View {
                 if panel != .none {
                     panelView(panel)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .padding(.top, 70).padding(.bottom, 70).padding(.horizontal, 24)
+                        .padding(.top, 70 + Self.barInset).padding(.bottom, 70).padding(.horizontal, 24)
                         .frame(width: Self.panelWidth)
                         .background(.black.opacity(0.85))
                         .holdsVisualizerControls(model)
@@ -40,11 +46,16 @@ struct NowPlayingView: View {
                 ArtworkBackground(image: background == .plain ? nil : player.artwork, animated: background == .animated)
                 HStack(spacing: 40) {
                     PlayerColumn().frame(maxWidth: 440)
+                        #if os(iOS)
+                        .gesture(DragGesture(minimumDistance: 30).onEnded { drag in  // swipe down closes, as in iPad Music
+                            if drag.translation.height > 120, abs(drag.translation.width) < drag.translation.height { model.showNowPlaying = false }
+                        })
+                        #endif
                     if panel != .none {
                         panelView(panel).frame(maxWidth: .infinity, maxHeight: .infinity).transition(.opacity)
                     }
                 }
-                .padding(.horizontal, 60).padding(.top, 70).padding(.bottom, 40)
+                .padding(.horizontal, 60).padding(.top, 70 + Self.barInset).padding(.bottom, 40)
                 .transition(.opacity)
             }
         }
@@ -54,7 +65,7 @@ struct NowPlayingView: View {
                 .labelStyle(.iconOnly).buttonStyle(HitAreaButtonStyle(width: 44, height: 32)).font(.system(size: 15, weight: .semibold))
                 .glass(in: Capsule(), interactive: true)
                 // The window buttons hide with the toolbar, so the close button takes their corner.
-                .padding(.leading, 16).padding(.top, 12)
+                .padding(.leading, 16).padding(.top, 12 + Self.barInset)
                 .holdsVisualizerControls(model)
                 .idleHidden(model.visualizerIdle)
         }
@@ -147,7 +158,7 @@ struct NowPlayingVolume: View {
         .holdsVisualizerControls(model)  // on the capsule only: the frame below fills the window
         .foregroundStyle(.white)
         .environment(\.colorScheme, .dark)
-        .padding(.trailing, 16).padding(.top, 10)
+        .padding(.trailing, 16).padding(.top, 10 + NowPlayingView.barInset)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
         .ignoresSafeArea()
     }

@@ -1,7 +1,10 @@
+#if os(macOS)
 import AppKit
+#endif
 import Support
 import SwiftUI
 
+#if os(macOS)  // the iPad delegate is in iPad/MusicSync/AppDelegate.swift
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = AppModel()
     private var sigterm: DispatchSourceSignal?
@@ -40,21 +43,34 @@ import SwiftUI
 
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? { DockMenu.make(model.player) }
 }
+#endif
 
 @main
 struct MusicSyncApp: App {
+    #if os(macOS)
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
-    private var model: AppModel { delegate.model }
     @AppStorage(MenuBarPlayer.shownKey, store: .app) private var showsMenuBarItem = true
+    #else
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
+    #endif
+    private var model: AppModel { delegate.model }
 
     var body: some Scene {
         WindowGroup("MusicSync", id: MainWindow.id) {
-            RootView().modifier(SystemEvents()).environment(model)
+            RootView().modifier(SystemEvents())
+                #if os(iOS)
+                .modifier(PadWindow())
+                #endif
+                .environment(model)
                 .onDisappear { model.covers?.purge() }
         }
         .commands {
             SidebarCommands()
+            #if os(macOS)
             MiniPlayerCommands()
+            #else
+            SettingsCommands()
+            #endif
             CommandGroup(replacing: .newItem) {
                 Button("New Playlist") { model.playlistPrompt = .create(songIds: []) }
                     .keyboardShortcut("n")
@@ -63,12 +79,16 @@ struct MusicSyncApp: App {
                     .keyboardShortcut("n", modifiers: [.command, .option])
                     .disabled(model.library == nil)
             }
+            #if os(macOS)  // the guide is about the iPod
             CommandGroup(replacing: .help) {
                 Button("Getting Started") { model.showGuide = true }
             }
+            #endif
             CommandGroup(after: .textEditing) {
                 Button("Search") { model.searchFocusRequest += 1 }
-                    .keyboardShortcut("f")
+                    #if os(macOS)
+                    .keyboardShortcut("f")  // on iPad ⌘F is Edit > Find, see AppDelegate.find(_:)
+                    #endif
             }
             CommandMenu("Playback") {
                 Button(model.player.isPlaying ? "Pause" : "Play") { model.player.toggle() }
@@ -105,6 +125,7 @@ struct MusicSyncApp: App {
                     .keyboardShortcut("r", modifiers: [.command, .option])
                     .disabled(model.library == nil || model.isMirrorRunning)
             }
+            #if os(macOS)
             CommandGroup(before: .windowList) { EqualizerMenuItem(); VisualizerMenuItem() }
             CommandMenu("Device") {
                 Button("Sync Now") { model.sync.dismissRun(); model.sync.showSheet = true }
@@ -118,8 +139,12 @@ struct MusicSyncApp: App {
                     .keyboardShortcut("r", modifiers: [.command, .shift])
                     .disabled(model.ipod.current == nil)
             }
+            #else
+            CommandGroup(before: .windowArrangement) { EqualizerMenuItem(); VisualizerMenuItem() }
+            #endif
         }
 
+        #if os(macOS)
         Window("MiniPlayer", id: MiniPlayer.id) {
             MiniPlayerView().environment(model).tint(Color.musicAccent)
         }
@@ -149,5 +174,6 @@ struct MusicSyncApp: App {
             MenuBarLabel(player: model.player)
         }
         .menuBarExtraStyle(.window)
+        #endif  // iPad shows the Equalizer and Visualizer over the window (`PadWindow`)
     }
 }

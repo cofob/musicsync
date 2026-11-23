@@ -49,6 +49,7 @@ struct FilledCapsuleStyle: ButtonStyle {
             .animation(.press) { $0.background(Color.primary.opacity(configuration.isPressed ? 0.14 : 0.07), in: Capsule()) }
             .opacity(isEnabled ? 1 : 0.4)
             .contentShape(Capsule())
+            .pointerHover()
     }
 }
 
@@ -66,6 +67,7 @@ struct CircleIconStyle: ButtonStyle {
             .animation(.press) { $0.background(Color.primary.opacity(configuration.isPressed ? 0.14 : 0.07), in: Circle()) }
             .opacity(isEnabled ? 1 : 0.4)
             .contentShape(Circle())
+            .pointerHover()
     }
 }
 
@@ -358,6 +360,7 @@ struct HitAreaButtonStyle: ButtonStyle {
             .contentShape(Rectangle())
             .animation(.press) { $0.opacity(configuration.isPressed ? 0.6 : 1) }
             .opacity(isEnabled ? 1 : 0.4)
+            .pointerHover()
     }
 }
 

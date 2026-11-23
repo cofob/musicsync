@@ -1,4 +1,4 @@
-import AppKit
+import SwiftUI
 import Library
 import Subsonic
 

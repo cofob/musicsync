@@ -83,7 +83,7 @@ private struct StationRow: View {
         }
         .padding(.horizontal, 10).frame(height: 66)
         .contentShape(Rectangle())
-        .onTapGesture(count: 2) { model.radio.play(station) }
+        .onPlayTap { model.radio.play(station) }
         .contextMenu { menu }
     }
 

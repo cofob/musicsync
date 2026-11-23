@@ -1,3 +1,4 @@
+#if os(macOS)
 import Carbon.HIToolbox
 
 /// System-wide shortcuts through Carbon `RegisterEventHotKey`; they work in the background and need no
@@ -67,3 +68,4 @@ import Carbon.HIToolbox
         if let action = actions[id] { handler(action) }
     }
 }
+#endif

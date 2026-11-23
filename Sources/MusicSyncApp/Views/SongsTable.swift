@@ -1,4 +1,3 @@
-import AppKit
 import Library
 import Observation
 import Preferences
@@ -7,6 +6,7 @@ import Subsonic
 
 /// A row of `TrackTable`: a library song or an iPod track.
 @MainActor protocol TrackTableItem: Sendable {
+    associatedtype MenuItems: View
     /// Shows the iPod column settings, not the library ones.
     static var isDevice: Bool { get }
     /// Columns of the header menu.
@@ -23,7 +23,7 @@ import Subsonic
     func isStarred(_ model: AppModel) -> Bool
     var dragText: String? { get }
     /// Context menu of `items`; `play` plays from the first row.
-    static func menu(_ items: [Self], _ model: AppModel, play: @escaping () -> Void) -> NSMenu?
+    @ViewBuilder static func menuItems(_ items: [Self], _ model: AppModel, play: @escaping () -> Void) -> MenuItems
 }
 
 extension TrackTableItem {
@@ -36,6 +36,13 @@ extension TrackTableItem {
 }
 
 typealias SongsTable = TrackTable<Song>
+
+#if os(macOS)  // the iPad table is in iPad/MusicSync/TrackTable.swift
+extension TrackTableItem {
+    static func menu(_ items: [Self], _ model: AppModel, play: @escaping () -> Void) -> NSMenu? {
+        items.isEmpty ? nil : NSHostingMenu(rootView: menuItems(items, model, play: play).environment(model))
+    }
+}
 
 /// The Songs page table, in AppKit: a SwiftUI `Table` stalls for seconds each time tens of thousands of rows
 /// come or go. Rows are the items of `list`; a cell redraws when its page loads or what it shows changes.
@@ -299,6 +306,7 @@ struct TrackTable<Item: TrackTableItem>: NSViewRepresentable {
         }
     }
 }
+#endif
 
 extension Song: TrackTableItem {
     static var isDevice: Bool { false }
@@ -330,16 +338,16 @@ extension Song: TrackTableItem {
     func isStarred(_ model: AppModel) -> Bool { model.isStarred(self) }
     var dragText: String? { DragPayload.songs([id], index: nil).text }
 
-    static func menu(_ songs: [Song], _ model: AppModel, play: @escaping () -> Void) -> NSMenu? {
-        guard let first = songs.first else { return nil }
-        let items = Group { if songs.count == 1 { SongMenuItems(song: first) } else { SongsMenuItems(songs: songs) } }
-        return NSHostingMenu(rootView: items.environment(model))
+    static func menuItems(_ songs: [Song], _ model: AppModel, play: @escaping () -> Void) -> some View {
+        if songs.count == 1, let first = songs.first { SongMenuItems(song: first) } else { SongsMenuItems(songs: songs) }
     }
 }
 
+#if os(macOS)
 private extension SongsTable.Column {
     var cellID: NSUserInterfaceItemIdentifier { NSUserInterfaceItemIdentifier("cell-" + rawValue) }
 }
+#endif
 
 /// A sortable column names its database order.
 extension SongsTable.Column {
@@ -357,11 +365,14 @@ extension SongsTable.Column {
     }
 
     /// Name in the header menu.
-    @MainActor var title: String { self == .star ? "Favorite" : tableColumn.title }
+    var title: String { self == .star ? "Favorite" : layout.title }
 
-    @MainActor var tableColumn: NSTableColumn {
-        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(rawValue))
-        let (title, min, ideal, max): (String, CGFloat, CGFloat, CGFloat) = switch self {
+    /// The text columns share the width that is left.
+    var isFlexible: Bool { [.title, .artist, .album, .genre].contains(self) }
+
+    /// Header title, and the minimum, first and maximum widths.
+    var layout: (title: String, min: CGFloat, ideal: CGFloat, max: CGFloat) {
+        switch self {
         case .title: ("Title", 180, 280, 10_000)
         case .time: ("Time", 44, 52, 70)
         case .artist: ("Artist", 100, 180, 10_000)
@@ -376,11 +387,18 @@ extension SongsTable.Column {
         case .bitRate: ("Bit Rate", 60, 72, 100)
         case .size: ("Size", 60, 80, 100)
         }
+    }
+
+    #if os(macOS)
+    @MainActor var tableColumn: NSTableColumn {
+        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(rawValue))
+        let (title, min, ideal, max) = layout
         column.title = title
         column.minWidth = min
         column.width = ideal
         column.maxWidth = max
-        column.resizingMask = [.title, .artist, .album, .genre].contains(self) ? [.autoresizingMask, .userResizingMask] : .userResizingMask
+        column.resizingMask = isFlexible ? [.autoresizingMask, .userResizingMask] : .userResizingMask
         return column
     }
+    #endif
 }

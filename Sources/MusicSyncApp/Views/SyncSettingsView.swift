@@ -118,8 +118,7 @@ struct SyncSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480)
-        .fixedSize(horizontal: false, vertical: true)
+        .settingsPageSize(width: 480)
         .task(id: "\(model.syncSettings.ffmpegPath ?? "")|\(preset.id)") { await checkFFmpeg(preset) }
     }
 

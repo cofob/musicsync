@@ -1,4 +1,3 @@
-import AppKit
 import Observation
 import Preferences
 import SwiftUI
@@ -23,7 +22,7 @@ final class CoverAccent {
 
 /// The image averaged into a 3×3 grid of sRGB colors, row by row.
 @MainActor func coverSamples(_ image: NSImage) -> [AppearanceSettings.Accent.RGB]? {
-    guard let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil), let space = CGColorSpace(name: CGColorSpace.sRGB),
+    guard let cg = image.cgImage, let space = CGColorSpace(name: CGColorSpace.sRGB),
           let ctx = CGContext(data: nil, width: 3, height: 3, bitsPerComponent: 8, bytesPerRow: 12,
                               space: space, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue),
           let data = ctx.data else { return nil }

@@ -91,6 +91,11 @@ struct Sidebar: View {
             if model.client != nil { VStack(spacing: 6) { OfflineBanner(); SmartDownloadStatus(); LibraryStatusView() }.padding(.horizontal, 10).padding(.bottom, 8) }
         }
         .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 300)
+        #if os(iOS)  // the Mac has Settings in the app menu
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) { SettingsLink { Label("Settings", systemImage: "gearshape") } }
+        }
+        #endif
         .task(id: model.client?.baseURL) { async let radio: Void = model.radio.load(); await model.podcasts.load(); await radio }
     }
 

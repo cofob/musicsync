@@ -1,4 +1,3 @@
-import AppKit
 import Preferences
 import SwiftUI
 
@@ -38,7 +37,12 @@ struct AdvancedSettingsView: View {
             }
             Section {
                 HStack {
+                    #if os(macOS)
                     Button("Export Diagnostics…") { export() }.disabled(exporting)
+                    #else
+                    ShareLink("Export Diagnostics…", item: DiagnosticsFile(server: model.config?.baseURL),
+                              preview: SharePreview("MusicSync Diagnostics.zip"))
+                    #endif
                     if exporting { ProgressView().controlSize(.small) }
                 }
             } header: {
@@ -53,8 +57,7 @@ struct AdvancedSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480)
-        .fixedSize(horizontal: false, vertical: true)
+        .settingsPageSize(width: 480)
         .task { await measure() }
         .onChange(of: prefs.advanced.coverCacheMB) {
             model.trimCoverCache()
@@ -69,6 +72,7 @@ struct AdvancedSettingsView: View {
 
     private func measure() async { cacheSize = await model.coverCacheSize() }
 
+    #if os(macOS)
     private func export() {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "MusicSync Diagnostics.zip"
@@ -81,4 +85,5 @@ struct AdvancedSettingsView: View {
             exporting = false
         }
     }
+    #endif
 }

@@ -34,11 +34,13 @@ struct SongFileMenus: View {
     let songs: [Song]
 
     var body: some View {
+        #if os(macOS)  // iPad saves through Share File > Save to Files
         Menu("Save to Folder", systemImage: "folder") {
             ForEach(SongFileVersion.allCases, id: \.self) { version in
                 Button(version.title) { model.saveToFolder(songs, version) }
             }
         }
+        #endif
         Menu("Share File", systemImage: "square.and.arrow.up.on.square") {
             ForEach(SongFileVersion.allCases, id: \.self) { version in
                 ShareLink(items: songs.map { SharedSongFile(song: $0, version: version, model: model) },

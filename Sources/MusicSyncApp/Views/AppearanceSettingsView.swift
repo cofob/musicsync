@@ -69,8 +69,7 @@ struct AppearanceSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 480)
-        .fixedSize(horizontal: false, vertical: true)
+        .settingsPageSize(width: 480)
     }
 }
 

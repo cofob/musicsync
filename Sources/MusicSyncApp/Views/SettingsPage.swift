@@ -1,11 +1,43 @@
 import Preferences
 import SwiftUI
 
+extension View {
+    /// The Mac window fits the page: its width, and its height or the height of its content.
+    /// An iPad page fills the sheet.
+    @ViewBuilder func settingsPageSize(width: CGFloat, height: CGFloat? = nil) -> some View {
+        #if os(macOS)
+        if let height { frame(width: width, height: height) } else { frame(width: width).fixedSize(horizontal: false, vertical: true) }
+        #else
+        self
+        #endif
+    }
+}
+
+#if os(iOS)
+/// Closes the Settings sheet.
+struct SettingsDoneButton: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        Button("Done") { dismiss() }.buttonStyle(.borderedProminent).tint(Color.musicAccent).padding(16)
+    }
+}
+#endif
+
 /// A page of the Settings window, with its sidebar icon and the words the search finds it by.
 enum SettingsPage: String, CaseIterable, Identifiable {
     case general, appearance, playback, visualizer, server, library, downloads, sync, shortcuts, remote, sharing, advanced
 
     var id: Self { self }
+
+    /// iPad has no iPod sync and no global shortcuts.
+    var isAvailable: Bool {
+        #if os(macOS)
+        true
+        #else
+        self != .sync && self != .shortcuts
+        #endif
+    }
 
     var title: String {
         switch self {

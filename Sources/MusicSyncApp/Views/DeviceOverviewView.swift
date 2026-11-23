@@ -84,7 +84,10 @@ struct DeviceOverviewView: View {
         } else {
             HStack {
                 Label("Not found", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-                SettingsLink { Text("Set in Settings > Sync") }.buttonStyle(.link)
+                SettingsLink { Text("Set in Settings > Sync") }
+                    #if os(macOS)
+                    .buttonStyle(.link)
+                    #endif
             }
         }
     }

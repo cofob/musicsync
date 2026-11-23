@@ -1,4 +1,3 @@
-import AppKit
 import CoreImage.CIFilterBuiltins
 import Remote
 import SwiftUI
@@ -33,8 +32,7 @@ struct RemoteSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 520)
-        .fixedSize(horizontal: false, vertical: true)
+        .settingsPageSize(width: 520)
         .tint(Color.musicAccent)
         .onDisappear { model.remote.closePairing(); newToken = nil }
     }
@@ -140,8 +138,7 @@ private struct CopyText: View {
         HStack(spacing: 6) {
             Text(shown ?? text).font(.system(.callout, design: .monospaced)).textSelection(.enabled).lineLimit(1).truncationMode(.middle)
             Button("Copy", systemImage: "doc.on.doc") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(text, forType: .string)
+                copyToPasteboard(text)
             }
             .labelStyle(.iconOnly).buttonStyle(.borderless).help("Copy")
         }

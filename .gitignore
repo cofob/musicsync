@@ -3,5 +3,6 @@
 build/
 .swiftpm/
 *.xcodeproj/
+!iPad/MusicSync.xcodeproj/
 xcuserdata/
 .DS_Store

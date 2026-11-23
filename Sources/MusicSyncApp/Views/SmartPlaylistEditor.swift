@@ -48,9 +48,13 @@ struct SmartPlaylistEditor: View {
                 Button(isNew ? "Create" : "OK") { save() }.keyboardShortcut(.defaultAction).disabled(isSaving)
             }
         }
+        #if os(macOS)
         .toggleStyle(.checkbox)
+        #endif
         .padding(20)
+        #if os(macOS)
         .frame(width: 720)
+        #endif
         .tint(Color.musicAccent)
         .task(id: draft) {
             try? await Task.sleep(for: .milliseconds(200))
@@ -190,7 +194,11 @@ private struct SmartRuleFields: View {
     private func date(_ value: Binding<Double>) -> some View {
         DatePicker("Date", selection: Binding(get: { Date(timeIntervalSince1970: value.wrappedValue) }, set: { value.wrappedValue = $0.timeIntervalSince1970 }),
                    displayedComponents: .date)
-            .labelsHidden().datePickerStyle(.field).fixedSize()
+            .labelsHidden()
+            #if os(macOS)
+            .datePickerStyle(.field)
+            #endif
+            .fixedSize()
     }
 }
 

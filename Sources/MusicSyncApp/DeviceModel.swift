@@ -1,4 +1,4 @@
-import AppKit
+import Foundation
 import Device
 import ITunesDB
 import Observation

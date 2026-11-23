@@ -36,7 +36,7 @@ struct UpNextPanel: View {
                         header("History")
                         ForEach(Array(history.enumerated()), id: \.offset) { _, item in
                             QueueRow(item: item) { historyMenu(item) }.opacity(0.6)
-                                .onTapGesture(count: 2) { player.playAgain(item) }
+                                .onPlayTap { player.playAgain(item) }
                                 .contextMenu { historyMenu(item) }
                         }
                     }
@@ -57,7 +57,7 @@ struct UpNextPanel: View {
                 .scrollContentBackground(.hidden)
                 .listStyle(.plain)
                 .focusable().focusEffectDisabled()
-                .onDeleteCommand { removeSelected() }
+                .onDeleteKey { removeSelected() }
                 .onKeyPress(.downArrow) { move(1, in: (user + source + auto).map(\.id)) }
                 .onKeyPress(.upArrow) { move(-1, in: (user + source + auto).map(\.id)) }
                 .onKeyPress(.return) { playSelected() }
@@ -81,7 +81,7 @@ struct UpNextPanel: View {
         // The ForEach id is the scroll id: an `.id` on the row makes the list build every row to collect the ids.
         ForEach(slots.filter { queue.indices.contains($0.index) }.map { ($0, queue[$0.index]) }, id: \.0.row) { slot, item in
             QueueRow(item: item, selected: selected == slot.id) { menu(slot, item) }
-                .onTapGesture(count: 2) { player.play(at: slot.index) }
+                .onPlayTap { player.play(at: slot.index) }
                 .onTapGesture { selected = slot.id }
                 .contextMenu { menu(slot, item) }
                 .swipeActions { Button("Remove", systemImage: "minus.circle", role: .destructive) { player.remove(at: [slot.index]) } }

@@ -1,4 +1,7 @@
+#if os(macOS)
 import AppKit
+#endif
+import Foundation
 import Observation
 import Support
 
@@ -14,6 +17,7 @@ public final class DeviceMonitor {
     public func start() {
         guard tasks.isEmpty else { return }
         rescan()
+        #if os(macOS)
         let center = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.didMountNotification, NSWorkspace.didUnmountNotification,
                      NSWorkspace.didRenameVolumeNotification] {
@@ -21,6 +25,7 @@ public final class DeviceMonitor {
                 for await _ in center.notifications(named: name).map({ _ in () }) { self?.rescan() }
             })
         }
+        #endif
     }
 
     public func stop() {

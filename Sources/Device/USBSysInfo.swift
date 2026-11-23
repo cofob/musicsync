@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import IOKit
 import IOUSBHost
@@ -42,3 +43,10 @@ extension SysInfoExtended {
         return nil
     }
 }
+#else
+import Foundation
+
+extension SysInfoExtended {
+    public static func readOverUSB(serial: String) -> SysInfoExtended? { nil }
+}
+#endif

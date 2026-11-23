@@ -110,7 +110,7 @@ struct EqualizerPresetPicker: View {
 
 /// Window > Equalizer, ⌥⌘E.
 struct EqualizerMenuItem: View {
-    @Environment(\.openWindow) private var openWindow
+    private var openWindow = OpenToolWindow()
 
     var body: some View {
         Button("Equalizer") { openWindow(id: EqualizerView.windowID) }
@@ -121,7 +121,7 @@ struct EqualizerMenuItem: View {
 /// Settings > Playback: the equalizer switch and preset, and the way to its window.
 struct EqualizerSettingsSection: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.openWindow) private var openWindow
+    private var openWindow = OpenToolWindow()
 
     var body: some View {
         @Bindable var player = model.player

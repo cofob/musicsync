@@ -147,7 +147,7 @@ struct InlineTextField: View {
             .onAppear { draft = text }
             .onChange(of: text) { if !focused { draft = text } }
             .onSubmit { focused = false }
-            .onExitCommand { draft = text; focused = false }
+            .onEscape { draft = text; focused = false }
             .onChange(of: focused) { if !focused { commit() } }
     }
 

@@ -148,7 +148,7 @@ struct DeviceTrackList: View {
         .padding(.vertical, 6).padding(.horizontal, 8)
         .background(selected?.index == index && selected?.id == track.id ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear), in: RoundedRectangle(cornerRadius: 6))
         .contentShape(Rectangle())
-        .onTapGesture(count: 2) { play(index) }
+        .onPlayTap { play(index) }
         .onTapGesture { selected = (index, track.id) }
         .contextMenu { menu(track, index) }
     }

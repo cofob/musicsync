@@ -1,4 +1,4 @@
-import AppKit
+import Foundation
 import CoreSpotlight
 import Integration
 import Subsonic

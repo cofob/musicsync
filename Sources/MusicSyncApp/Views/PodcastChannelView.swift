@@ -115,7 +115,7 @@ private struct EpisodeRow: View {
         }
         .padding(.vertical, 14)
         .contentShape(Rectangle())
-        .onTapGesture(count: 2) { model.podcasts.play(episode, in: episodes) }
+        .onPlayTap { model.podcasts.play(episode, in: episodes) }
         .contextMenu { EpisodeMenuItems(episode: episode, episodes: episodes, changed: changed) }
     }
 }

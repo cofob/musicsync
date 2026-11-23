@@ -1,4 +1,3 @@
-import AppKit
 import Subsonic
 import SwiftUI
 
@@ -28,7 +27,7 @@ struct SharesSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 520, height: 460)
+        .settingsPageSize(width: 520, height: 460)
         .task(id: model.store.map(ObjectIdentifier.init)) { await load() }
         .confirmationDialog("Delete this link?", isPresented: Binding(get: { toDelete != nil }, set: { if !$0 { toDelete = nil } })) {
             Button("Delete Link", role: .destructive) { if let toDelete { delete(toDelete) } }
@@ -45,8 +44,7 @@ struct SharesSettingsView: View {
             }
             Spacer()
             Button("Copy Link", systemImage: "link") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(share.url, forType: .string)
+                copyToPasteboard(share.url)
             }
             .labelStyle(.iconOnly).buttonStyle(.borderless).help("Copy Link")
             Button("Delete", systemImage: "trash") { toDelete = share }

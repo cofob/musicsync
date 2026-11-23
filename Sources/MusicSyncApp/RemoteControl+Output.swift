@@ -1,4 +1,8 @@
+#if os(macOS)
 import CoreAudio
+#else
+import AVFoundation
+#endif
 import Remote
 
 extension RemoteControl {
@@ -12,6 +16,9 @@ extension RemoteControl {
 
     /// Name of the default output device; a quick read of the audio system's own state.
     static func outputDeviceName() -> String? {
+        #if os(iOS)
+        return AVAudioSession.sharedInstance().currentRoute.outputs.first?.portName
+        #else
         var device = AudioObjectID(kAudioObjectUnknown)
         var size = UInt32(MemoryLayout<AudioObjectID>.size)
         var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice,
@@ -23,5 +30,6 @@ extension RemoteControl {
         address.mSelector = kAudioObjectPropertyName
         guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &name) == noErr, let name else { return nil }
         return name.takeRetainedValue() as String
+        #endif
     }
 }

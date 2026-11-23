@@ -1,6 +1,8 @@
-import DiskArbitration
 import Foundation
+#if os(macOS)
+import DiskArbitration
 import IOKit
+#endif
 
 public enum FirewireGuid {
     /// Resolves the GUID: manual override, SysInfoExtended, SysInfo, then IOKit USB serial.
@@ -47,6 +49,7 @@ public enum FirewireGuid {
         appleUSBProperty(forVolume: url, "idProduct") as? Int
     }
 
+    #if os(macOS)
     private static func appleUSBProperty(forVolume url: URL, _ key: String) -> Any? {
         guard let session = DASessionCreate(kCFAllocatorDefault),
               let disk = DADiskCreateFromVolumePath(kCFAllocatorDefault, session, url as CFURL),
@@ -80,4 +83,7 @@ public enum FirewireGuid {
         }
         return nil
     }
+    #else
+    private static func appleUSBProperty(forVolume url: URL, _ key: String) -> Any? { nil }
+    #endif
 }

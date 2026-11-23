@@ -1,9 +1,8 @@
-import AppKit
+import Foundation
 import Observation
 import Remote
 import Subsonic
 import Support
-import SystemConfiguration
 
 /// Settings > Remote: a web remote for iPhone, iPad and Apple Watch on the local network. Off by default.
 /// It follows the player through Observation and sends commands through the same player calls as the UI.
@@ -55,7 +54,7 @@ final class RemoteControl {
 
     /// Called once at launch; the server stops when the app quits.
     func start() {
-        quitObserver = NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) {
+        quitObserver = NotificationCenter.default.addObserver(forName: .appWillTerminate, object: nil, queue: .main) {
             [weak self] _ in MainActor.assumeIsolated { self?.server?.stop() }
         }
         restart()
@@ -63,7 +62,7 @@ final class RemoteControl {
 
     /// `http://<name>.local:<port>`, the address to open on the phone.
     var address: String {
-        let host = (SCDynamicStoreCopyLocalHostName(nil) as String?).map { $0 + ".local" } ?? "localhost"
+        let host = LocalHost.address ?? "localhost"
         return "http://\(host):\(port)"
     }
 
@@ -73,7 +72,7 @@ final class RemoteControl {
         watchers = []
         failure = nil
         guard isEnabled else { return access.gate.close() }
-        let name = "MusicSync on " + ((SCDynamicStoreCopyComputerName(nil, nil) as String?) ?? "Mac")
+        let name = "MusicSync on " + LocalHost.name
         let server = RemoteServer(port: UInt16(port), name: name) { [weak self] request in
             await self?.handle(request) ?? .response(.error(.unavailable))
         }

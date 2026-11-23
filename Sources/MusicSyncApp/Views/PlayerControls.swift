@@ -66,6 +66,7 @@ struct LevelBar: View {
     }
 }
 
+#if os(macOS)  // the iPad versions are in iPad/MusicSync/PlayerControls+iOS.swift
 /// Clicks and drags on a `LevelBar`, as fractions of its width. An AppKit view, because a SwiftUI drag
 /// in the title bar area (Now Playing) or in a window movable by its background (MiniPlayer) moves the window.
 struct BarMouseArea: NSViewRepresentable {
@@ -122,6 +123,8 @@ struct WindowStill: NSViewRepresentable {
     }
 }
 
+#endif
+
 /// Song progress with elapsed and remaining time; seeks on release. The VoiceOver step is 10 s, the whole bar for short
 /// or unknown lengths: a zero step traps in `Slider`.
 struct ScrubBar: View {
@@ -162,6 +165,7 @@ struct ScrubBar: View {
     }
 }
 
+#if os(macOS)
 /// AirPlay route picker. It has no player and so routes the system output: the player plays on two decks
 /// during a crossfade, and a picker bound to one `AVPlayer` would move only that one.
 struct AirPlayButton: NSViewRepresentable {
@@ -179,6 +183,8 @@ struct AirPlayButton: NSViewRepresentable {
         view.setRoutePickerButtonColor(NSColor(Color.musicAccent), for: .active)
     }
 }
+
+#endif
 
 /// Speaker symbol for a volume level.
 func volumeSymbol(_ volume: Double) -> String {
@@ -218,6 +224,7 @@ struct VolumeButton<Content: View>: View {
                 HStack(spacing: 8) {
                     VolumeSlider()
                     Image(systemName: symbol).frame(width: 24)
+                        .onTapGesture { expand(false) }  // no hover to leave on a touch screen
                 }
                 .padding(.leading, 14).padding(.trailing, 6)
                 .frame(height: 40)

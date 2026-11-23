@@ -83,11 +83,6 @@ struct MenuBarPlayer: View {
     }
 }
 
-enum MainWindow {
-    /// The `WindowGroup` id; SwiftUI starts its window identifiers with it.
-    static let id = "main"
-}
-
 /// The next few queue entries; a click plays one.
 private struct UpNextPeek: View {
     @Environment(AppModel.self) private var model

@@ -2,15 +2,19 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    #if os(macOS)  // Edit > Select All and Delete; iPad lists have no such commands
     @FocusedValue(\.songListCommands) private var songList
+    #endif
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// A narrow iPad window shows one column; a sidebar tap goes on to the page.
+    @State private var compactColumn = NavigationSplitViewColumn.detail
 
     var body: some View {
         @Bindable var model = model
         @Bindable var sync = model.sync
         let selection = model.selection ?? .home
         ZStack {
-            NavigationSplitView {
+            NavigationSplitView(preferredCompactColumn: $compactColumn) {
                 // The List writes nil when a click clears its selection; ignoring it keeps the current page.
                 Sidebar(selection: Binding(get: { model.selection }, set: { if let item = $0 { model.selection = item } }))
             } detail: {
@@ -22,6 +26,10 @@ struct RootView: View {
                             NavigationStack(path: $model.path) {
                                 content(for: selection)
                                     .playerInset()
+                                    #if os(iOS)
+                                    .modifier(PadSearchField(prompt: prompt(selection)))
+                                    .refreshable { await model.refresh() }  // pull down: Refresh Library
+                                    #endif
                                     .navigationDestination(for: Route.self) { destination(for: $0).playerInset() }
                             }
                             // Hiding the window toolbar for Now Playing can leave the root page drawn over
@@ -37,6 +45,7 @@ struct RootView: View {
                 .animation(.easeInOut(duration: 0.2), value: selection)
                 .overlay(alignment: .top) { suggestions(selection) }
                 .toolbar {
+                    #if os(macOS)
                     // macOS 26 wraps toolbar items in a glass capsule; the field draws its own, so hide that one.
                     if #available(macOS 26, *) {
                         ToolbarItem(placement: .principal) { ToolbarSearchField(prompt: prompt(selection)) }
@@ -44,13 +53,16 @@ struct RootView: View {
                     } else {
                         ToolbarItem(placement: .principal) { ToolbarSearchField(prompt: prompt(selection)) }
                     }
+                    #endif
                     if selection == .search && model.ipod.current != nil {
                         ToolbarItem(placement: .primaryAction) { SearchScopePicker() }
                     }
                 }
                 // Only the detail sets a minimum: one on the whole split view, wider than the window
                 // minus the opening sidebar, makes the sidebar animation overflow and snap back.
+                #if os(macOS)
                 .frame(minWidth: 680, minHeight: 560)
+                #endif
             }
             .accessibilityHidden(model.showNowPlaying)  // VoiceOver reads only Now Playing over it
             if model.showNowPlaying {
@@ -59,11 +71,18 @@ struct RootView: View {
             }
         }
         .animation(.smooth(duration: 0.35), value: model.showNowPlaying)
+        .onChange(of: model.selection) { compactColumn = .detail }
+        #if os(macOS)
         .toolbar(model.showNowPlaying ? .hidden : .automatic, for: .windowToolbar)
+        #else
+        .toolbar(model.showNowPlaying ? .hidden : .automatic, for: .navigationBar)
+        #endif
         .tint(Color.musicAccent)
         // Only for a list on the visible root page: a pushed page or Now Playing hides it.
-        .onCommand(#selector(NSResponder.selectAll(_:))) { if rootShown { songList?.selectAll() } }
-        .onDeleteCommand { if rootShown { songList?.delete() } }
+        #if os(macOS)
+        .onSelectAll { if rootShown { songList?.selectAll() } }
+        .onDeleteKey { if rootShown { songList?.delete() } }
+        #endif
         .task(id: model.searchText) {
             guard selection == .search else { return }
             let search = model.search
@@ -94,8 +113,13 @@ struct RootView: View {
         .sheet(item: $model.infoSong) { SongInfoView(song: $0) }
         .modifier(PlaylistDialogs())
         .modifier(SmartPlaylistDialogs())
+        #if os(macOS)
         .sheet(isPresented: $model.showGuide) { GuideView() }
         .task { if !model.demo, !UserDefaults.app.bool(forKey: GuideView.shownKey) { model.showGuide = true } }
+        #else
+        // The Mac guide is about the iPod; on iPad the first screen asks for the server, until one is saved.
+        .fullScreenCover(isPresented: .constant(model.config == nil)) { PadOnboarding().environment(model) }
+        #endif
         .sheet(isPresented: $sync.showSheet) { SyncSheet() }
         .alert("Already on This iPod", isPresented: Binding(get: { model.sync.foreignAlbum != nil },
                                                             set: { if !$0 { model.sync.foreignAlbum = nil } })) {
@@ -179,9 +203,9 @@ struct RootView: View {
     private func suggestions(_ selection: SidebarItem) -> some View {
         let search = model.search
         if selection == .search, search.showsSuggestions, !model.searchText.isEmpty, search.suggestions.count > 0 {
-            ZStack(alignment: .top) {
+            ZStack(alignment: isTouchUI ? .topTrailing : .top) {  // under the iPad field, which is on the right
                 Color.clear.contentShape(Rectangle()).onTapGesture { search.showsSuggestions = false }
-                SearchSuggestionsView().padding(.top, 6)
+                SearchSuggestionsView().padding(.top, 6).padding(.trailing, isTouchUI ? 12 : 0)
             }
         }
     }

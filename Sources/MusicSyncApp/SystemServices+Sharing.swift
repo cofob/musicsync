@@ -1,4 +1,3 @@
-import AppKit
 import CoreTransferable
 import Foundation
 import Integration
@@ -37,8 +36,7 @@ extension SystemServices {
         Task {
             do {
                 let url = try await link(for: target, downloadable: downloadable)
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(url.absoluteString, forType: .string)
+                copyToPasteboard(url.absoluteString)
             } catch { app.report(error) }
         }
     }

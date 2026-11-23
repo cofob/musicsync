@@ -1,4 +1,4 @@
-import AppKit
+import SwiftUI
 import Integration
 import Remote
 import Subsonic
@@ -97,6 +97,15 @@ extension RemoteControl {
 
     /// The app icon at 180 px, for the home screen.
     private static let icon: Data = {
+        #if os(iOS)
+        let name = ((Bundle.main.infoDictionary?["CFBundleIcons~ipad"] as? [String: Any])?["CFBundlePrimaryIcon"] as? [String: Any])?["CFBundleIconFiles"] as? [String]
+        guard let image = name?.last.flatMap({ UIImage(named: $0) }) else { return Data() }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: CGSize(width: 180, height: 180), format: format).pngData { context in
+            image.draw(in: context.format.bounds)
+        }
+        #else
         let size = NSSize(width: 180, height: 180)
         let image = NSImage(size: size, flipped: false) { rect in
             NSApp.applicationIconImage.draw(in: rect)
@@ -104,6 +113,7 @@ extension RemoteControl {
         }
         guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return Data() }
         return rep.representation(using: .png, properties: [:]) ?? Data()
+        #endif
     }()
 }
 

@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 import Carbon.HIToolbox
 
@@ -76,3 +77,4 @@ public struct HotKeySettings: Codable, Equatable, Sendable {
         return previous
     }
 }
+#endif

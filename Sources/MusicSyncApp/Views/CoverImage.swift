@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 /// Rounded square that shows `image`, or a symbol placeholder.

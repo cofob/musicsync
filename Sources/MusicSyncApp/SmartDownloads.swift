@@ -1,5 +1,9 @@
 import Foundation
+#if os(macOS)
 import IOKit.ps
+#else
+import UIKit
+#endif
 import Library
 import Network
 import Observation
@@ -101,6 +105,15 @@ final class SmartDownloads {
 
     /// Reads the power source again when it changes.
     private func watchPower() {
+        #if os(iOS)
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        _ = NotificationCenter.default.addObserver(forName: UIDevice.batteryStateDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                let power = SmartDownloads.onPower
+                if let self, self.conditions.onPower != power { self.conditions.onPower = power }
+            }
+        }
+        #else
         powerSource = IOPSNotificationCreateRunLoopSource({ context in
             guard let context else { return }
             MainActor.assumeIsolated {
@@ -110,6 +123,7 @@ final class SmartDownloads {
             }
         }, Unmanaged.passUnretained(self).toOpaque())?.takeRetainedValue()
         if let powerSource { CFRunLoopAddSource(CFRunLoopGetMain(), powerSource, .commonModes) }
+        #endif
     }
 
     /// Every 30 minutes: new plays change the most played songs and the mixes.
@@ -132,8 +146,12 @@ final class SmartDownloads {
 
     /// True on AC power, and on Macs without a battery.
     private static var onPower: Bool {
+        #if os(iOS)
+        return UIDevice.current.batteryState != .unplugged  // the simulator reports `.unknown`
+        #else
         guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
               let type = IOPSGetProvidingPowerSourceType(info)?.takeUnretainedValue() else { return true }
         return type as String != kIOPSBatteryPowerValue
+        #endif
     }
 }

@@ -18,7 +18,7 @@ struct ToolbarSearchField: View {
                 .onSubmit { if model.selection == .search { search.submit(model.searchText) } }
                 .onKeyPress(.downArrow) { arrow(1) }
                 .onKeyPress(.upArrow) { arrow(-1) }
-                .onExitCommand { search.showsSuggestions = false }
+                .onEscape { search.showsSuggestions = false }
             if !model.searchText.isEmpty {
                 Button("Clear", systemImage: "xmark.circle.fill") { model.searchText = "" }
                     .labelStyle(.iconOnly).buttonStyle(HitAreaButtonStyle(width: 24, height: 24)).foregroundStyle(.secondary)
@@ -47,6 +47,25 @@ struct ToolbarSearchField: View {
         return .handled
     }
 }
+
+#if os(iOS)
+/// The iPad search field: the system one in the navigation bar, with the same text, focus and submit as the Mac field.
+struct PadSearchField: ViewModifier {
+    @Environment(AppModel.self) private var model
+    let prompt: String
+    @FocusState private var focused: Bool
+
+    func body(content: Content) -> some View {
+        @Bindable var model = model
+        content
+            .searchable(text: $model.searchText, placement: .toolbar, prompt: Text(prompt))
+            .searchFocused($focused)
+            .onSubmit(of: .search) { if model.selection == .search { model.search.submit(model.searchText) } }
+            .onChange(of: focused) { model.searchFieldFocused = focused }
+            .onChange(of: model.searchFocusRequest) { focused = true }
+    }
+}
+#endif
 
 /// "Library | iPod" switch at the top right of the Search page.
 struct SearchScopePicker: View {

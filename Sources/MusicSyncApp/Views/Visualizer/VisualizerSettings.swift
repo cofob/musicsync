@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -19,15 +18,26 @@ enum VisualizerSettings {
     static let segmented = "visualizerSegmented"
     static let falloff = "visualizerFalloff"
 
-    /// Copies .milk and .json presets into the presets folder, replacing files of the same name. Returns how many it copied.
+    static let presetTypes = [UTType(filenameExtension: "milk") ?? .data, .json]
+
+    #if os(macOS)
+    /// Asks for presets, then imports them.
     @MainActor static func importPresets() -> Int {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
-        panel.allowedContentTypes = [UTType(filenameExtension: "milk") ?? .data, .json]
+        panel.allowedContentTypes = presetTypes
         panel.message = "Choose MilkDrop (.milk) or butterchurn (.json) presets"
         guard panel.runModal() == .OK else { return 0 }
+        return importPresets(panel.urls)
+    }
+    #endif
+
+    /// Copies .milk and .json presets into the presets folder, replacing files of the same name. Returns how many it copied.
+    @MainActor static func importPresets(_ urls: [URL]) -> Int {
         let folder = MilkDrop.userFolder
-        return panel.urls.filter { url in
+        return urls.filter { url in
+            let scoped = url.startAccessingSecurityScopedResource()  // a file picked in Files on iPad
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
             let target = folder.appendingPathComponent(url.lastPathComponent)
             try? FileManager.default.removeItem(at: target)
             // A new .milk file gets converted again.
@@ -40,6 +50,15 @@ enum VisualizerSettings {
     static func userPresets() -> [String] {
         let files = (try? FileManager.default.contentsOfDirectory(at: MilkDrop.userFolder, includingPropertiesForKeys: nil)) ?? []
         return Set(files.filter { ["milk", "json"].contains($0.pathExtension) }.map { $0.deletingPathExtension().lastPathComponent }).sorted()
+    }
+}
+
+extension View {
+    /// Picks presets in Files and imports them; `done` runs when any came in.
+    func presetImporter(isPresented: Binding<Bool>, done: @escaping () -> Void) -> some View {
+        fileImporter(isPresented: isPresented, allowedContentTypes: VisualizerSettings.presetTypes, allowsMultipleSelection: true) { result in
+            if case .success(let urls) = result, VisualizerSettings.importPresets(urls) > 0 { done() }
+        }
     }
 }
 
@@ -89,8 +108,9 @@ struct VisualizerSettingsView: View {
     @AppStorage(VisualizerSettings.peaks, store: .app) private var peaks = true
     @AppStorage(VisualizerSettings.segmented, store: .app) private var segmented = true
     @AppStorage(VisualizerSettings.falloff, store: .app) private var falloff = 1.6
-    @Environment(\.openWindow) private var openWindow
+    private var openWindow = OpenToolWindow()
     @State private var presets = VisualizerSettings.userPresets()
+    @State private var importing = false
 
     var body: some View {
         let change = VisualizerChange.binding(cycle: $cycle, parts: $sections)
@@ -148,8 +168,13 @@ struct VisualizerSettingsView: View {
                     .disabled(presets.isEmpty)
                 LabeledContent("Your presets", value: presets.isEmpty ? "None" : "\(presets.count)")
                 HStack {
+                    #if os(macOS)
                     Button("Import Presets…") { _ = VisualizerSettings.importPresets(); presets = VisualizerSettings.userPresets() }
                     Button("Show in Finder") { NSWorkspace.shared.open(MilkDrop.userFolder) }
+                    #else
+                    Button("Import Presets…") { importing = true }
+                        .presetImporter(isPresented: $importing) { presets = VisualizerSettings.userPresets() }
+                    #endif
                 }
             } header: {
                 Text("Presets")

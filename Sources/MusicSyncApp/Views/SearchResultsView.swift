@@ -320,7 +320,7 @@ private struct DeviceSearchResults: View {
                                     } menu: {
                                         Button("Play", systemImage: "play.fill") { model.play(result.tracks, startAt: index) }
                                     }
-                                    .onTapGesture(count: 2) { model.play(result.tracks, startAt: index) }
+                                    .onPlayTap { model.play(result.tracks, startAt: index) }
                                 }
                             }
                             .padding(.horizontal, -10)

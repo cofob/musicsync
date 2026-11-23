@@ -1,4 +1,3 @@
-import AppKit
 import Subsonic
 import SwiftUI
 
@@ -46,7 +45,11 @@ struct VisualizerView: View {
     @State private var hideTask: Task<Void, Never>?
     @State private var overControls = false
     /// The window this view put in full screen; it leaves full screen when the view goes (Now Playing closes).
+    #if os(macOS)
     @State private var fullScreenWindow: NSWindow?
+    #else
+    @State private var importing = false
+    #endif
 
     var body: some View {
         let player = model.player
@@ -68,7 +71,11 @@ struct VisualizerView: View {
             // Takes the mouse from the web view: hover, double-click and keys stay here.
             if !compact {
                 Color.clear.contentShape(Rectangle())
+                    #if os(macOS)
                     .onTapGesture(count: 2) { toggleFullScreen() }
+                    #else
+                    .onTapGesture { show() }  // no hover on a touch screen
+                    #endif
             }
         }
         .overlay(alignment: .bottom) { if hovering, !compact { controls.transition(.opacity) } }
@@ -88,7 +95,9 @@ struct VisualizerView: View {
         .onDisappear {
             if inNowPlaying { model.visualizerIdle = false; model.visualizerHold = false }
             player.visualizers -= 1
+            #if os(macOS)
             if let window = fullScreenWindow, window.styleMask.contains(.fullScreen) { window.toggleFullScreen(nil) }
+            #endif
         }
         .onChange(of: config, initial: true) { milkDrop.configure(config) }
         // MilkDrop draws the song title and the lyrics into the preset, as it announced songs in Winamp.
@@ -215,13 +224,20 @@ struct VisualizerView: View {
             Toggle("Announce Songs", isOn: $announces)
             Divider()
             if !milkDrop.failed.isEmpty { Text("Not converted: \(milkDrop.failed.joined(separator: ", "))") }
+            #if os(macOS)
             Button("Import Presets…") { if VisualizerSettings.importPresets() > 0 { milkDrop.loadUserPresets() } }
             Button("Show Presets Folder") { NSWorkspace.shared.open(MilkDrop.userFolder) }
+            #else
+            Button("Import Presets…") { importing = true }
+            #endif
             SettingsLink { Text("Visualizer Settings…") }
         } label: {
             Label("Presets", systemImage: "sparkles").labelStyle(.titleAndIcon)
         }
         .menuStyle(.button).menuIndicator(.hidden).fixedSize()
+        #if os(iOS)
+        .presetImporter(isPresented: $importing) { milkDrop.loadUserPresets() }
+        #endif
         .buttonStyle(VisualizerButtonStyle(wide: true))
         .help("Preset options; import MilkDrop .milk files here")
     }
@@ -240,9 +256,11 @@ struct VisualizerView: View {
     }
 
     private func toggleFullScreen() {
+        #if os(macOS)
         guard let window = NSApp.keyWindow else { return }
         fullScreenWindow = window.styleMask.contains(.fullScreen) ? nil : window
         window.toggleFullScreen(nil)
+        #endif
     }
 
     /// Shows the controls; they and the cursor go away after 2 s without mouse moves.
@@ -253,14 +271,16 @@ struct VisualizerView: View {
             try? await Task.sleep(for: .seconds(2))
             guard !Task.isCancelled, !overControls, !(inNowPlaying && model.visualizerHold) else { return }
             withAnimation(.easeOut(duration: 0.3)) { hovering = false }
-            if !compact { NSCursor.setHiddenUntilMouseMoves(true) }  // the cursor goes with the controls
+            #if os(macOS)
+            if !compact { NSCursor.setHiddenUntilMouseMoves(true) }
+            #endif  // the cursor goes with the controls
         }
     }
 }
 
 /// Window > Visualizer, ⌘T.
 struct VisualizerMenuItem: View {
-    @Environment(\.openWindow) private var openWindow
+    private var openWindow = OpenToolWindow()
 
     var body: some View {
         Button("Visualizer") { openWindow(id: VisualizerView.windowID) }

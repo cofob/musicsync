@@ -65,8 +65,7 @@ struct PlaybackSettingsView: View {
             if model.serverQueue.supported { QueueSyncSection() }
         }
         .formStyle(.grouped)
-        .frame(width: 480)
-        .fixedSize(horizontal: false, vertical: true)
+        .settingsPageSize(width: 480)
         .task { await ServerFormats.shared.probe(model.client) }
     }
 

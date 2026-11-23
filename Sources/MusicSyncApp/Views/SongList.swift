@@ -86,14 +86,16 @@ struct SongList: View {
             .onChange(of: moved) { proxy.scrollTo($1) }
         }
         .focusable().focusEffectDisabled().focused($focused)
-        .onCommand(#selector(NSResponder.selectAll(_:))) { selection.selectAll(keys) }
+        .onSelectAll { selection.selectAll(keys) }
         // Key and command handlers read the selection now: at the root of the detail stack they can outlive a render.
         .onKeyPress(.return) { play(selectedRows(keys)) }
-        .onDeleteCommand { remove(selectedRows(keys)) }
+        .onDeleteKey { remove(selectedRows(keys)) }
         .onKeyPress(.escape) { if selection.isEmpty { return .ignored }; selection.clear(); return .handled }
         .onKeyPress(.downArrow) { move(1, keys) }
         .onKeyPress(.upArrow) { move(-1, keys) }
+        #if os(macOS)  // a new value each render re-renders RootView, which renders this list again on iPad
         .focusedSceneValue(\.songListCommands, SongListCommands(selectAll: { selection.selectAll(keys); focused = true }, delete: { remove(selectedRows(keys)) }))
+        #endif
     }
 
     private func selectedRows(_ keys: [RowKey]) -> [Int] { keys.indices.filter { selection.contains(keys[$0]) } }
@@ -132,7 +134,7 @@ struct SongList: View {
             }
         }
         .opacity(model.downloads.isAvailable(song) ? 1 : 0.4)
-        .onTapGesture(count: 2) { onPlay(index) }
+        .onPlayTap { onPlay(index) }
         .simultaneousGesture(TapGesture().onEnded { select(keys[index], in: keys) })
     }
 
@@ -153,7 +155,11 @@ struct SongList: View {
     }
 
     private func select(_ key: RowKey, in keys: [RowKey]) {
+        #if os(macOS)
         let flags = NSApp.currentEvent?.modifierFlags ?? []
+        #else
+        let flags: UIKeyModifierFlags = []  // iPad selects with Edit and taps
+        #endif
         if flags.contains(.shift) { selection.extend(to: key, in: keys) }
         else if flags.contains(.command) { selection.toggle(key) }
         else { selection.click(key) }

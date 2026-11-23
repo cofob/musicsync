@@ -18,7 +18,7 @@ struct PlaylistSidebarRow: View {
                 TextField("Name", text: Binding(get: { draft ?? "" }, set: { draft = $0 }))
                     .textFieldStyle(.plain).focused($focused)
                     .onSubmit(commit)
-                    .onExitCommand { draft = nil }
+                    .onEscape { draft = nil }
                     .onChange(of: focused) { if !focused { commit() } }
             } else {
                 Text(playlist.name).lineLimit(1).fontWeight(isSelected ? .semibold : nil)
@@ -70,10 +70,21 @@ struct PlaylistsHeader: View {
             Text("Playlists")
             Spacer()
             if model.client != nil {
+                #if os(macOS)
                 Button("New Playlist", systemImage: "plus") { model.playlistPrompt = .create(songIds: []) }
                     .labelStyle(.iconOnly).buttonStyle(.borderless)
                     .font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
                     .help("New Playlist")
+                #else  // a finger-sized button; the Mac has New Smart Playlist in the File menu
+                Menu {
+                    Button("New Playlist", systemImage: "music.note.list") { model.playlistPrompt = .create(songIds: []) }
+                    Button("New Smart Playlist", systemImage: "gearshape") { model.smartPlaylists.create() }
+                        .disabled(model.library == nil)
+                } label: {
+                    Image(systemName: "plus").font(.body.weight(.semibold)).frame(width: 44, height: 32).contentShape(Rectangle())
+                }
+                .accessibilityLabel("New Playlist")
+                #endif
             }
         }
     }

@@ -44,6 +44,7 @@ private final class Collector: @unchecked Sendable {
     }
 }
 
+#if os(macOS)
 /// Lets task cancellation terminate a process that may not have started yet.
 private final class ProcessHandle: @unchecked Sendable {
     private let lock = NSLock()
@@ -104,3 +105,10 @@ func runProcess(_ executable: URL, _ arguments: [String],
     try Task.checkCancellation()
     return output
 }
+#else
+/// iOS runs no other programs.
+func runProcess(_ executable: URL, _ arguments: [String],
+                onLine: (@Sendable (String) -> Void)? = nil) async throws -> ProcessOutput {
+    throw TranscodeError.binaryNotFound
+}
+#endif

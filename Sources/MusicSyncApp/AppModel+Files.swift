@@ -1,4 +1,4 @@
-import AppKit
+import SwiftUI
 import CoreTransferable
 import Subsonic
 import Transcode
@@ -60,6 +60,7 @@ extension AppModel {
         }
     }
 
+    #if os(macOS)
     /// Asks for a folder, then writes the files one by one. A name that is taken gets " 2", " 3"…
     func saveToFolder(_ songs: [Song], _ version: SongFileVersion) {
         let panel = NSOpenPanel()
@@ -82,6 +83,7 @@ extension AppModel {
             if !saved.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(saved) }
         }
     }
+    #endif
 
     /// "Artist - Title.ext", without the characters a file name cannot hold.
     static func fileName(_ song: Song, ext: String) -> String {

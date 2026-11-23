@@ -1,4 +1,4 @@
-import AppKit
+import Foundation
 import Integration
 import Library
 import Observation
@@ -17,6 +17,7 @@ final class SystemServices {
     /// Public links made this session, by item id; sharing an item twice reuses its link.
     @ObservationIgnored var shareLinks: [String: URL] = [:]
 
+    #if os(macOS)
     var hotKeys: HotKeySettings {
         didSet {
             UserDefaults.app.set(try? JSONEncoder().encode(hotKeys), forKey: Self.hotKeysKey)
@@ -26,6 +27,7 @@ final class SystemServices {
     /// Actions whose combo another app holds.
     var takenHotKeys: Set<HotKeyAction> = []
     @ObservationIgnored var hotKeyCenter: HotKeyCenter?
+    #endif
 
     var indexesSpotlight: Bool {
         didSet { UserDefaults.app.set(indexesSpotlight, forKey: Self.spotlightKey); updateSpotlight() }
@@ -44,8 +46,10 @@ final class SystemServices {
 
     init(app: AppModel) {
         self.app = app
+        #if os(macOS)
         hotKeys = UserDefaults.app.data(forKey: Self.hotKeysKey).flatMap { try? JSONDecoder().decode(HotKeySettings.self, from: $0) }
             ?? HotKeySettings()
+        #endif
         indexesSpotlight = UserDefaults.app.object(forKey: Self.spotlightKey) as? Bool ?? true
         notifiesTrackChange = UserDefaults.app.bool(forKey: Self.notifyKey)
         spotlight = app.demo ? nil : SpotlightIndexer(sink: SystemSpotlight(), stateURL: Paths.appSupport.appendingPathComponent("spotlight.json"))
@@ -60,7 +64,9 @@ final class SystemServices {
             // Siri learns the playlist names of the "Play <playlist>" phrase; the demo leaves the real app's alone.
             Watcher({ [app] in app.libraryVersion }) { [app] _ in if !app.demo { MusicSyncShortcuts.updateAppShortcutParameters() } },
         ]
+        #if os(macOS)
         applyHotKeys()
+        #endif
         IntentHost.system = self
     }
 

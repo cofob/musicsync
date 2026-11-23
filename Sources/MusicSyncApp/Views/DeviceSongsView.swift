@@ -1,4 +1,3 @@
-import AppKit
 import Preferences
 import SwiftUI
 
@@ -87,13 +86,9 @@ extension DeviceTrack: TrackTableItem {
 
     func shownRating(_ model: AppModel) -> Int? { rating }
 
-    static func menu(_ tracks: [DeviceTrack], _ model: AppModel, play: @escaping () -> Void) -> NSMenu? {
-        guard !tracks.isEmpty else { return nil }
-        let items = Group {
-            Button("Play", systemImage: "play.fill", action: play)
-            Divider()
-            DeleteFromIPodButton { model.sync.tracksToDelete = tracks }
-        }
-        return NSHostingMenu(rootView: items.environment(model))
+    static func menuItems(_ tracks: [DeviceTrack], _ model: AppModel, play: @escaping () -> Void) -> some View {
+        Button("Play", systemImage: "play.fill", action: play)
+        Divider()
+        DeleteFromIPodButton { model.sync.tracksToDelete = tracks }
     }
 }
