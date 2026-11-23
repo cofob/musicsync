@@ -34,6 +34,6 @@ xcrun appintentsmetadataprocessor --toolchain-dir "$(dirname "$(dirname "$(dirna
 rm -rf "$META"
 # SwiftPM stamps the deployment target as the SDK version; AppKit then uses the old look.
 EXE="$APP/Contents/MacOS/MusicSyncApp"
-vtool -set-build-version macos 15.0 "$(xcrun --show-sdk-version)" -replace -output "$EXE" "$EXE"
+vtool -set-build-version macos 15.0 "$(xcrun --sdk macosx --show-sdk-version)" -replace -output "$EXE" "$EXE"
 codesign --force --deep --sign - "$APP"
 echo "$APP"
