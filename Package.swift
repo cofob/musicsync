@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "MusicSync",
-    platforms: [.macOS(.v15)],
+    platforms: [.macOS(.v15), .iOS(.v18)],
     targets: [
         .target(name: "Support"),
         .target(name: "Subsonic", dependencies: ["Support"]),
@@ -17,8 +17,9 @@ let package = Package(
         .target(name: "Remote"),
         .target(name: "Playback", dependencies: ["Support", "Subsonic"]),
         .target(name: "Preferences", dependencies: ["Support"]),
+        .target(name: "MilkDropKit", resources: [.copy("Resources")]),
         .target(name: "Sync", dependencies: ["Support", "Subsonic", "ITunesDB", "Artwork", "Transcode", "Device"]),
-        .executableTarget(name: "MusicSyncApp", dependencies: ["Support", "Subsonic", "ITunesDB", "Artwork", "Transcode", "Device", "Sync", "Library", "Recommend", "Integration", "Remote", "Playback", "Preferences"],
+        .executableTarget(name: "MusicSyncApp", dependencies: ["Support", "Subsonic", "ITunesDB", "Artwork", "Transcode", "Device", "Sync", "Library", "Recommend", "Integration", "Remote", "Playback", "Preferences", "MilkDropKit"],
                           resources: [.copy("Resources/Visualizer")]),
         .testTarget(name: "SupportTests", dependencies: ["Support"]),
         .testTarget(name: "SubsonicTests", dependencies: ["Subsonic"]),
@@ -33,5 +34,6 @@ let package = Package(
         .testTarget(name: "RemoteTests", dependencies: ["Remote"]),
         .testTarget(name: "PlaybackTests", dependencies: ["Playback"]),
         .testTarget(name: "PreferencesTests", dependencies: ["Preferences"]),
+        .testTarget(name: "MilkDropKitTests", dependencies: ["MilkDropKit"]),
     ]
 )

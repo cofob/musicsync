@@ -1,0 +1,9 @@
+Presets: Original Milkdrop Preset Pack
+https://github.com/projectM-visualizer/presets-milkdrop-original (commit e03b83e3338d8f1ed6cbcf908c719f249ef24288)
+
+Textures: Milkdrop Texture Pack
+https://github.com/projectM-visualizer/presets-milkdrop-texture-pack (commit 6368812f27bc747b517218fbf89d21d59afce4d9)
+
+Milkdrop presets were, in almost all cases, not released under any specific license. Each preset author holds the
+copyright on their presets. They were released freely and have been used in many applications for two decades, so the
+projectM team treats them as public domain. Authors who do not want their preset included can ask for it to be removed.
