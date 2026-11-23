@@ -90,6 +90,7 @@ import UniformTypeIdentifiers
         try FileManager.default.createDirectory(at: Self.report, withIntermediateDirectories: true)
         let reference = Butterchurn()
         try await reference.load()
+        try await reference.setImages(try #require(MilkDropResources.textures))
         var rows: [(name: String, diffs: [Double])] = []
         for file in try Self.presets() {
             let preset = try PresetFile.load(file)

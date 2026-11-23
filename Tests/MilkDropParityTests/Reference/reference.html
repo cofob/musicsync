@@ -20,11 +20,26 @@ function audio(f) {
   return a;
 }
 
+// The texture pack the native renderer has, as { name: { data, width, height } }.
+let images = {};
+window.setImages = async (urls) => {
+  for (const [name, data] of Object.entries(urls)) {
+    const img = new Image();
+    img.src = data;
+    await img.decode();
+    images[name] = { data, width: img.width, height: img.height };
+  }
+  return Object.keys(images).length;
+};
+
 // Renders `frames` frames of the .milk text at width × height; returns the PNG data URL of each frame in `keep`.
 window.renderPreset = async (milk, width, height, frames, keep) => {
   const canvas = document.getElementById('c');
   canvas.width = width; canvas.height = height;
   viz = lib.createVisualizer(new AudioContext(), canvas, { width, height, pixelRatio: 1, textureRatio: 1 });
+  viz.loadExtraImages(images);
+  const samplers = viz.renderer.image.samplers;
+  for (let i = 0; i < 200 && Object.keys(images).some((n) => !samplers[n]); i++) await new Promise((r) => setTimeout(r, 5));
   const preset = await window.milkdropPresetConverter.convertPreset(milk);
   viz.loadPreset(preset, 0);
   const out = {};

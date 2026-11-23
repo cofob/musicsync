@@ -22,6 +22,16 @@ import WebKit
         }
     }
 
+    /// Gives butterchurn the images of `folder` (it ships none), so presets that name textures compare fairly.
+    func setImages(_ folder: URL) async throws {
+        var urls: [String: String] = [:]
+        for file in try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) {
+            let type = file.pathExtension.lowercased() == "png" ? "png" : "jpeg"
+            urls[file.deletingPathExtension().lastPathComponent] = "data:image/\(type);base64," + (try Data(contentsOf: file)).base64EncodedString()
+        }
+        _ = try await view.callAsyncJavaScript("return await setImages(urls)", arguments: ["urls": urls], contentWorld: .page)
+    }
+
     /// RGBA bytes, rows top first, of the frames in `keep` (1-based).
     func render(_ milk: String, width: Int, height: Int, frames: Int, keep: [Int]) async throws -> [Int: [UInt8]] {
         let result = try await view.callAsyncJavaScript(
