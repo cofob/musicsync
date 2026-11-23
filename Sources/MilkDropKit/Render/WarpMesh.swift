@@ -78,24 +78,35 @@ struct WarpMesh {
         if runs { eq.endPixels() }
     }
 
-    /// Triangle vertices for the warp pass (two per cell), clip y flipped for the offscreen target.
-    /// `alpha`: vertex alpha per vertex, or 1 everywhere.
+    /// One `MDVertex` per mesh vertex, rows first, for drawing with `Self.indices`; clip y flipped for the offscreen
+    /// target. `alpha`: the blend share per vertex, or 1 everywhere.
     func vertices(alpha: Bool) -> [Float] {
-        var out: [Float] = []
-        out.reserveCapacity(size.x * size.y * 6 * Self.floatsPerVertex)
         let stride = size.x + 1
-        func vertex(_ col: Int, _ row: Int) {
-            let i = row * stride + col
-            let px = Float(col) / Float(size.x) * 2 - 1, py = 1 - Float(row) / Float(size.y) * 2
-            // As butterchurn's warp shader: from uv_orig, without aspect, GLSL atan(x, y).
-            let x = px * 0.5, y = py * 0.5
-            out += [px, -py, uvs[i].x, uvs[i].y, x + 0.5, y + 0.5, (x * x + y * y).squareRoot(), atan2(x, y),
-                    1, 1, 1, alpha ? alphas[i] : 1]
+        return [Float](unsafeUninitializedCapacity: uvs.count * Self.floatsPerVertex) { out, count in
+            for row in 0...size.y {
+                for col in 0...size.x {
+                    let i = row * stride + col, o = i * Self.floatsPerVertex
+                    let px = Float(col) / Float(size.x) * 2 - 1, py = 1 - Float(row) / Float(size.y) * 2
+                    // As butterchurn's warp shader: from uv_orig, without aspect, GLSL atan(x, y).
+                    let x = px * 0.5, y = py * 0.5
+                    (out[o], out[o + 1], out[o + 2], out[o + 3]) = (px, -py, uvs[i].x, uvs[i].y)
+                    (out[o + 4], out[o + 5], out[o + 6], out[o + 7]) = (x + 0.5, y + 0.5, (x * x + y * y).squareRoot(), atan2(x, y))
+                    (out[o + 8], out[o + 9], out[o + 10], out[o + 11]) = (1, 1, 1, alpha ? alphas[i] : 1)
+                }
+            }
+            count = uvs.count * Self.floatsPerVertex
         }
+    }
+
+    /// Two triangles per cell of a `size` grid of (size.x + 1) × (size.y + 1) vertices, rows first.
+    static func indices(_ size: SIMD2<Int>) -> [UInt32] {
+        let stride = size.x + 1
+        var out: [UInt32] = []
+        out.reserveCapacity(size.x * size.y * 6)
         for row in 0..<size.y {
             for col in 0..<size.x {
-                vertex(col, row); vertex(col, row + 1); vertex(col + 1, row)
-                vertex(col, row + 1); vertex(col + 1, row + 1); vertex(col + 1, row)
+                let a = UInt32(row * stride + col), b = a + UInt32(stride)
+                out += [a, b, a + 1, b, b + 1, a + 1]
             }
         }
         return out

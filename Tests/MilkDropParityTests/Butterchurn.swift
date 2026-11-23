@@ -32,6 +32,15 @@ import WebKit
         _ = try await view.callAsyncJavaScript("return await setImages(urls)", arguments: ["urls": urls], contentWorld: .page)
     }
 
+    /// `benchPreset` of reference.html: timings in ms, and why butterchurn cannot render the preset (empty if it can).
+    func bench(_ milk: String, width: Int, height: Int, frames: Int) async throws -> (times: [String: Double], failure: String) {
+        let result = try await view.callAsyncJavaScript(
+            "return await benchPreset(milk, width, height, frames)",
+            arguments: ["milk": milk, "width": width, "height": height, "frames": frames], contentWorld: .page)
+        guard let r = result as? [String: Any] else { throw ParityError("no timings from butterchurn") }
+        return (r.compactMapValues { ($0 as? NSNumber)?.doubleValue }, r["failure"] as? String ?? "")
+    }
+
     /// Why butterchurn got the last `render` wrong (a shader it cannot link or the converter broke), nil when it did not.
     private(set) var failure: String?
 

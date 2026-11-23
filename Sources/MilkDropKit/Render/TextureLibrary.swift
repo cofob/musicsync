@@ -37,8 +37,12 @@ final class TextureLibrary {
         return t
     }
 
-    /// New random images for the `randNN` names (a new preset).
-    func reshuffle() { cache = cache.filter { Self.randomSuffix($0.key) == nil } }
+    /// Keeps only the images `names` need (the presets on screen): new random picks for `randNN` names, and
+    /// memory back for images no shown preset samples.
+    func keep(_ names: Set<String>) {
+        let keys = Set(names.map { $0.lowercased() })
+        cache = cache.filter { keys.contains($0.key) && Self.randomSuffix($0.key) == nil }
+    }
 
     /// For `rand05_smalltiled` the suffix `smalltiled`, for `rand05` an empty one; nil for other names.
     static func randomSuffix(_ name: String) -> String? {

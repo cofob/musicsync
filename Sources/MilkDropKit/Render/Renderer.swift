@@ -15,6 +15,8 @@ public final class Renderer {
     private let textures: TextureLibrary
     private let title: TitleText
     private let copy: MTLRenderPipelineState
+    /// Triangles of the warp mesh and of the comp grid, made once.
+    private let warpIndices: MTLBuffer, compIndices: MTLBuffer
     private let geometry: FrameGeometry
     private let wrapSampler: MTLSamplerState, clampSampler: MTLSamplerState
     private var targets: Targets?
@@ -63,6 +65,9 @@ public final class Renderer {
         self.noise = noise
         self.title = title
         self.copy = copy
+        guard let wi = Self.indexBuffer(device, Self.meshSize), let ci = Self.indexBuffer(device, Self.compSize) else { return nil }
+        warpIndices = wi
+        compIndices = ci
         self.geometry = geometry
         wrapSampler = wrap
         clampSampler = clamp
@@ -77,7 +82,8 @@ public final class Renderer {
         preset.values["old_wave_mode"] = current?.compiled.preset.values["wave_mode"] ?? preset.values["wave_mode"]
         let equations = try PresetEquations(preset, globals: globals, frame: frameGlobals, random: random)
         let shapes = try PresetGeometry(preset, globals: globals, frame: frameGlobals, random: random)
-        textures.reshuffle()
+        // Images of the old preset stay while it blends out; random picks are new for the new preset.
+        textures.keep(Set((current.map { [$0.compiled.warp, $0.compiled.comp] } ?? []).flatMap { $0.userTextures.map(\.name) }))
         previous = blend > 0 ? current : nil
         current = Active(compiled, equations, shapes, random: random)
         blendStart = time
@@ -160,7 +166,7 @@ public final class Renderer {
         guard let targets else { return }
         var vertices = mesh.vertices(alpha: blend)
         encoder.setRenderPipelineState(active.compiled.warpPipeline)
-        bind(encoder, vertices: &vertices, active, shader: active.compiled.warp, values: values, main: targets.prev, mins: mins, maxs: maxs)
+        bind(encoder, vertices: &vertices, indices: warpIndices, active, shader: active.compiled.warp, values: values, main: targets.prev, mins: mins, maxs: maxs)
     }
 
     private func drawComp(_ encoder: MTLRenderCommandEncoder, _ active: Active, values: [String: Double], blend: Bool,
@@ -168,11 +174,11 @@ public final class Renderer {
         guard let targets else { return }
         var vertices = compVertices(active, blend: blend)
         encoder.setRenderPipelineState(active.compiled.compPipeline)
-        bind(encoder, vertices: &vertices, active, shader: active.compiled.comp, values: values, main: targets.target, mins: mins, maxs: maxs)
+        bind(encoder, vertices: &vertices, indices: compIndices, active, shader: active.compiled.comp, values: values, main: targets.target, mins: mins, maxs: maxs)
     }
 
     /// Sets vertices, uniforms, textures and the `sampler_main` sampler, then draws the triangles.
-    private func bind(_ encoder: MTLRenderCommandEncoder, vertices: inout [Float], _ active: Active, shader: TranslatedShader,
+    private func bind(_ encoder: MTLRenderCommandEncoder, vertices: inout [Float], indices: MTLBuffer, _ active: Active, shader: TranslatedShader,
                       values: [String: Double], main: MTLTexture, mins: SIMD3<Float>, maxs: SIMD3<Float>) {
         let user = shader.userTextures.map { textures.texture($0.name) }
         var uniforms = ShaderUniforms(shaderFrame(values, active, mins: mins, maxs: maxs, user: user))
@@ -182,7 +188,7 @@ public final class Renderer {
         let fixed: [MTLTexture?] = [main] + blur.textures + [noise.lq, noise.mq, noise.hq, noise.volumeLQ, noise.volumeHQ]
         for (i, t) in (fixed + user).enumerated() { encoder.setFragmentTexture(t ?? noise.lq, index: i) }
         encoder.setFragmentSamplerState((values["wrap"] ?? 1) != 0 ? wrapSampler : clampSampler, index: 0)
-        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: vertices.count / WarpMesh.floatsPerVertex)
+        encoder.drawIndexedPrimitives(type: .triangle, indexCount: indices.length / 4, indexType: .uint32, indexBuffer: indices, indexBufferOffset: 0)
     }
 
     private func shaderFrame(_ v: [String: Double], _ active: Active, mins: SIMD3<Float>, maxs: SIMD3<Float>, user: [MTLTexture?]) -> ShaderFrame {
@@ -208,29 +214,26 @@ public final class Renderer {
         return f
     }
 
-    /// The comp grid as `MDVertex` triangles: uv with 0 at the top, as butterchurn's comp shader flips it,
-    /// color = hue shade of the four corners, alpha = the new preset's blend share.
+    /// The comp grid as `MDVertex`, one per grid vertex (drawn with `compIndices`): uv with 0 at the top, as
+    /// butterchurn's comp shader flips it, color = hue shade of the four corners, alpha = the new preset's blend share.
     private func compVertices(_ active: Active, blend: Bool) -> [Float] {
         let hue = hueBase(active.randStart)
-        let (w, h) = (Self.compSize.x, Self.compSize.y)
-        func vertex(_ col: Int, _ row: Int) -> [Float] {
-            let u = Float(col) / Float(w), v = Float(row) / Float(h)
-            let c = (0..<3).map { hue[$0] * u * v + hue[3 + $0] * (1 - u) * v + hue[6 + $0] * u * (1 - v) + hue[9 + $0] * (1 - u) * (1 - v) }
-            let alpha = blend ? meshAlpha(u, v) : 1
-            let x = u * 2 - 1, y = 1 - v * 2  // row 0 at the top of the screen
-            let uv = SIMD2(u, v)
-            return [x, y, uv.x, uv.y, uv.x, uv.y, simd_length(uv - 0.5), atan2(uv.x - 0.5, uv.y - 0.5), c[0], c[1], c[2], alpha]
-        }
-        var out: [Float] = []
-        out.reserveCapacity(w * h * 6 * WarpMesh.floatsPerVertex)
-        for row in 0..<h {
-            for col in 0..<w {
-                for (c, r) in [(col, row), (col, row + 1), (col + 1, row), (col, row + 1), (col + 1, row + 1), (col + 1, row)] {
-                    out += vertex(c, r)
+        let (w, h) = (Self.compSize.x, Self.compSize.y), n = WarpMesh.floatsPerVertex
+        return [Float](unsafeUninitializedCapacity: (w + 1) * (h + 1) * n) { out, count in
+            var o = 0
+            for row in 0...h {
+                for col in 0...w {
+                    let u = Float(col) / Float(w), v = Float(row) / Float(h)
+                    let c = { (k: Int) in hue[k] * u * v + hue[3 + k] * (1 - u) * v + hue[6 + k] * u * (1 - v) + hue[9 + k] * (1 - u) * (1 - v) }
+                    let du = u - 0.5, dv = v - 0.5
+                    (out[o], out[o + 1], out[o + 2], out[o + 3]) = (u * 2 - 1, 1 - v * 2, u, v)  // row 0 at the top of the screen
+                    (out[o + 4], out[o + 5], out[o + 6], out[o + 7]) = (u, v, (du * du + dv * dv).squareRoot(), atan2(du, dv))
+                    (out[o + 8], out[o + 9], out[o + 10], out[o + 11]) = (c(0), c(1), c(2), blend ? meshAlpha(u, v) : 1)
+                    o += n
                 }
             }
+            count = o
         }
-        return out
     }
 
     /// The warp mesh alpha at (u, v) of the comp grid, as butterchurn's `generateCompColors`.
@@ -334,6 +337,11 @@ public final class Renderer {
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
             encoder.endEncoding()
         }
+    }
+
+    private static func indexBuffer(_ device: MTLDevice, _ size: SIMD2<Int>) -> MTLBuffer? {
+        let indices = WarpMesh.indices(size)
+        return device.makeBuffer(bytes: indices, length: indices.count * 4)
     }
 
     private static func copyPipeline(_ device: MTLDevice, _ library: MTLLibrary) -> MTLRenderPipelineState? {

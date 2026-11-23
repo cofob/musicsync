@@ -40,21 +40,9 @@ window.setImages = async (urls) => {
   return Object.keys(images).length;
 };
 
-// Renders `frames` frames of the .milk text at width × height; returns the PNG data URL of each frame in `keep`,
-// and in `failure` why butterchurn got it wrong, if it did.
-window.renderPreset = async (milk, width, height, frames, keep) => {
-  const canvas = document.getElementById('c');
-  canvas.width = width; canvas.height = height;
-  viz = lib.createVisualizer(new AudioContext({ sampleRate: 44100 }), canvas, { width, height, pixelRatio: 1, textureRatio: 1 });
-  viz.loadExtraImages(images);
-  // butterchurn's first blur pass reads the frame at half size through mipmaps made two frames ago (frame 1: black);
-  // MilkDrop blurs the frame just warped, so make its mipmaps first.
-  const r = viz.renderer, blur = r.blurShader1.renderBlurTexture.bind(r.blurShader1);
-  r.blurShader1.renderBlurTexture = (t, ...rest) => { r.gl.bindTexture(r.gl.TEXTURE_2D, t); r.gl.generateMipmap(r.gl.TEXTURE_2D); blur(t, ...rest); };
-  const samplers = viz.renderer.image.samplers;
-  const missing = () => Object.keys(images).filter((n) => !samplers[n]);
-  for (let i = 0; i < 200 && missing().length; i++) await new Promise((r) => setTimeout(r, 5));
-  failures = missing().length ? ['images not loaded: ' + missing().join(' ')] : [];
+// The .milk converted for butterchurn, with its converter's and its own known faults worked around; adds to
+// `failures` what cannot be worked around.
+async function prepared(milk) {
   const preset = await window.milkdropPresetConverter.convertPreset(milk);
   // The converter's HLSL parser loses the second operator of a chain: a + b + c comes out as (a + b) && c.
   const ops = (s) => (s.match(/&&|\|\|/g) || []).length;
@@ -79,6 +67,25 @@ window.renderPreset = async (milk, width, height, frames, keep) => {
   preset.warp = declare(preset.warp, [['rad', ' float rad = length(uv_orig - 0.5);'], ['ang', ' float ang = atan(uv_orig.x - 0.5, uv_orig.y - 0.5);']]);
   preset.comp = declare(preset.comp, [['uv_orig', ' vec2 uv_orig = uv;'], ['rad', ' float rad = length(uv - 0.5);'],
     ['ang', ' float ang = atan(uv.x - 0.5, uv.y - 0.5);']]);
+  return preset;
+}
+
+// Renders `frames` frames of the .milk text at width × height; returns the PNG data URL of each frame in `keep`,
+// and in `failure` why butterchurn got it wrong, if it did.
+window.renderPreset = async (milk, width, height, frames, keep) => {
+  const canvas = document.getElementById('c');
+  canvas.width = width; canvas.height = height;
+  viz = lib.createVisualizer(new AudioContext({ sampleRate: 44100 }), canvas, { width, height, pixelRatio: 1, textureRatio: 1 });
+  viz.loadExtraImages(images);
+  // butterchurn's first blur pass reads the frame at half size through mipmaps made two frames ago (frame 1: black);
+  // MilkDrop blurs the frame just warped, so make its mipmaps first.
+  const r = viz.renderer, blur = r.blurShader1.renderBlurTexture.bind(r.blurShader1);
+  r.blurShader1.renderBlurTexture = (t, ...rest) => { r.gl.bindTexture(r.gl.TEXTURE_2D, t); r.gl.generateMipmap(r.gl.TEXTURE_2D); blur(t, ...rest); };
+  const samplers = viz.renderer.image.samplers;
+  const missing = () => Object.keys(images).filter((n) => !samplers[n]);
+  for (let i = 0; i < 200 && missing().length; i++) await new Promise((r) => setTimeout(r, 5));
+  failures = missing().length ? ['images not loaded: ' + missing().join(' ')] : [];
+  const preset = await prepared(milk);
   viz.loadPreset(preset, 0);
   const out = {};
   for (let f = 0; f < frames; f++) {
@@ -88,6 +95,40 @@ window.renderPreset = async (milk, width, height, frames, keep) => {
   }
   if (failures.length) out.failure = failures[0];
   return out;
+};
+
+// Timings in ms for the benchmark: making the visualizer, converting the .milk (what an import costs; built-in
+// presets came converted), loading the preset with its shaders new to the GPU (a unique constant defeats the shader
+// cache) and again as known, each with its first frame, and the mean frame (render, then a 1-pixel read so the GPU
+// work is done; performance.now has 1 ms steps in WebKit, so the loop is timed as a whole).
+let salt = 0;
+window.benchPreset = async (milk, width, height, frames) => {
+  const canvas = document.getElementById('c');
+  canvas.width = width; canvas.height = height;
+  let t = performance.now();
+  if (!viz || viz.width !== width) { viz = lib.createVisualizer(new AudioContext({ sampleRate: 44100 }), canvas, { width, height, pixelRatio: 1, textureRatio: 1 }); viz.width = width; viz.loadExtraImages(images); }
+  const create = performance.now() - t;
+  const gl = viz.renderer.gl, pixel = new Uint8Array(4), a0 = audio(0);
+  const frame = (a) => viz.render({ audioLevels: { timeByteArray: a, timeByteArrayL: a, timeByteArrayR: a }, elapsedTime: 1 / 60 });
+  const sync = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+  t = performance.now();
+  failures = [];
+  const preset = await prepared(milk);
+  const convert = performance.now() - t;
+  // A comment would not do: the shader translator drops it, and the GPU cache sees the same program.
+  const unique = Object.assign({}, preset), tiny = ' ret += vec3(' + (++salt + Date.now() % 1000) + 'e-30); ';
+  const salted = (glsl) => glsl && glsl.slice(0, glsl.lastIndexOf('}')) + tiny + glsl.slice(glsl.lastIndexOf('}'));
+  unique.warp = salted(unique.warp);
+  unique.comp = salted(unique.comp);
+  t = performance.now(); viz.loadPreset(unique, 0); frame(a0); sync();
+  const cold = performance.now() - t;
+  t = performance.now(); viz.loadPreset(preset, 0); frame(a0); sync();
+  const warm = performance.now() - t;
+  t = performance.now();
+  for (let f = 1; f <= frames; f++) frame(audio(f));
+  sync();
+  const mean = (performance.now() - t) / frames;
+  return { create, convert, cold, warm, mean, failure: failures[0] || '' };
 };
 </script>
 </body>
