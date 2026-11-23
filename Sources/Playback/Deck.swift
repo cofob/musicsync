@@ -14,7 +14,8 @@ import AVFoundation
 
     /// Tests and dev runs with MUSICSYNC_MUTE=1 never reach the speakers, whatever the volume is set to.
     /// Volume 0, not `isMuted`: the equalizer tap still sees the full signal, so output measures keep working.
-    static let silent = ProcessInfo.processInfo.environment["MUSICSYNC_MUTE"] == "1"
+    /// The tap also silences what it passes on (`Equalizer`): volume 0 alone was heard (a test's sweep, macOS 27).
+    nonisolated static let silent = ProcessInfo.processInfo.environment["MUSICSYNC_MUTE"] == "1"
         || ["swiftpm-testing-helper", "xctest"].contains(ProcessInfo.processInfo.processName)
 
     init() {

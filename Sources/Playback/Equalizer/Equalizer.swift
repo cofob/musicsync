@@ -94,5 +94,7 @@ private final class TapContext {
         if let recorder = equalizer.recorder, let item {
             recorder.record(list, frames: frames, item: item, tap: ObjectIdentifier(self), time: time, sampleRate: processor.sampleRate)
         }
+        // Measured and shown above; tests and muted dev runs then pass on silence.
+        if Deck.silent { for buffer in list { if let data = buffer.mData { memset(data, 0, Int(buffer.mDataByteSize)) } } }
     }
 }
