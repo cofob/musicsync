@@ -20,8 +20,12 @@ enum VisualizerMode: String, CaseIterable, Identifiable {
 struct VisualizerView: View {
     static let windowID = "visualizer"
     var compact = false
-    /// Room the player keeps free on the right, for the Now Playing panel and buttons.
-    var trailingInset: CGFloat = 0
+    /// Inside Now Playing: its buttons hide and stay with this view's controls (`AppModel.visualizerIdle`, `visualizerHold`).
+    var inNowPlaying = false
+    /// Off while Now Playing shows the lyrics in its panel: they would show twice.
+    var showsOverlayLyrics = true
+    /// Room the player keeps free at the sides, for the Now Playing panel and buttons.
+    var insets = EdgeInsets()
 
     @Environment(AppModel.self) private var model
     @AppStorage(VisualizerSettings.mode, store: .app) private var mode = VisualizerMode.spectrum
@@ -44,7 +48,7 @@ struct VisualizerView: View {
     var body: some View {
         let player = model.player
         let song: Song? = if case .server(let s)? = player.current { s } else { nil }
-        let line = showsLyrics ? lyrics?.line(at: player.elapsed) : nil
+        let line = showsLyrics && showsOverlayLyrics ? lyrics?.line(at: player.elapsed) : nil
         ZStack {
             Color.black
             switch mode {
@@ -53,6 +57,9 @@ struct VisualizerView: View {
             case .milkdrop: MilkDropView(player: player, milkDrop: milkDrop)
             }
             if mode != .milkdrop, let lyrics, let line { VisualizerLyrics(lyrics: lyrics, current: line) }
+            if model.jukebox.isActive, !compact {
+                Text("Playing on the server: there is no sound here to show.").font(.headline).foregroundStyle(.white.opacity(0.6))
+            }
             // Takes the mouse from the web view: hover, double-click and keys stay here.
             if !compact {
                 Color.clear.contentShape(Rectangle())
@@ -71,9 +78,10 @@ struct VisualizerView: View {
         .onKeyPress(.rightArrow) { milkDrop.step(1); return mode == .milkdrop ? .handled : .ignored }
         .onKeyPress("f") { toggleFullScreen(); return .handled }
         .onAppear { player.visualizers += 1 }
-        .onChange(of: hovering) { if !compact { model.visualizerIdle = !hovering } }
+        .onChange(of: hovering) { if inNowPlaying { model.visualizerIdle = !hovering } }
+        .onChange(of: model.visualizerHold) { if inNowPlaying { show() } }
         .onDisappear {
-            if !compact { model.visualizerIdle = false }
+            if inNowPlaying { model.visualizerIdle = false; model.visualizerHold = false }
             player.visualizers -= 1
             if let window = fullScreenWindow, window.styleMask.contains(.fullScreen) { window.toggleFullScreen(nil) }
         }
@@ -101,12 +109,18 @@ struct VisualizerView: View {
     private var controls: some View {
         let player = model.player
         return VStack(spacing: 10) {
-            VStack(spacing: 1) {
-                Text(player.current?.title ?? "Not Playing").font(.headline)
-                Text([player.current?.artist, mode == .milkdrop ? milkDrop.current : nil].compactMap { $0 }.joined(separator: " · "))
-                    .font(.caption).foregroundStyle(.white.opacity(0.65))
+            HStack(spacing: 8) {
+                favoriteButton
+                VStack(spacing: 1) {
+                    Text(player.current?.title ?? "Not Playing").font(.headline)
+                    Text([player.isMixing ? "AutoMix" : nil, player.current?.artist, mode == .milkdrop ? milkDrop.current : nil]
+                        .compactMap { $0 }.joined(separator: " · "))
+                        .font(.caption).foregroundStyle(.white.opacity(0.65))
+                }
+                .lineLimit(1).frame(maxWidth: .infinity)
+                songMenu
             }
-            .lineLimit(1)
+            .labelStyle(.iconOnly).buttonStyle(VisualizerButtonStyle()).font(.system(size: 13, weight: .semibold))
             ScrubBar(tint: .white)
             TransportControls(scale: 0.9, spacing: 14)
             // Narrow: the modes become a menu, then Lyrics only an icon.
@@ -122,8 +136,28 @@ struct VisualizerView: View {
         .background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(.white.opacity(0.12)))
         .padding(.horizontal, 24).padding(.bottom, 20)
-        .padding(.trailing, trailingInset)
+        .padding(.leading, insets.leading).padding(.trailing, insets.trailing)
         .onHover { overControls = $0 }
+    }
+
+    /// Star and "•••" of the song, as Now Playing has them; empty space for other items keeps the title centered.
+    @ViewBuilder private var favoriteButton: some View {
+        if case .server(let song)? = model.player.current {
+            let starred = model.isStarred(song)
+            Button(starred ? "Undo Favorite" : "Favorite", systemImage: starred ? "star.fill" : "star") { model.toggleStar(song) }
+                .accessibilityLabel("Favorite").accessibilityValue(starred ? "On" : "Off")
+        } else {
+            Color.clear.frame(width: 28, height: 26)
+        }
+    }
+
+    @ViewBuilder private var songMenu: some View {
+        if case .server(let song)? = model.player.current {
+            Menu { SongMenuItems(song: song, inQueue: false) } label: { Image(systemName: "ellipsis") }
+                .menuStyle(.button).menuIndicator(.hidden).fixedSize().help("More")
+        } else {
+            Color.clear.frame(width: 28, height: 26)
+        }
     }
 
     private func visualizerButtons(menuModes: Bool, lyricsTitle: Bool) -> some View {
@@ -147,8 +181,9 @@ struct VisualizerView: View {
             Button { showsLyrics.toggle() } label: {
                 if lyricsTitle { Label("Lyrics", systemImage: "quote.bubble").labelStyle(.titleAndIcon) } else { Label("Lyrics", systemImage: "quote.bubble") }
             }
-                .buttonStyle(VisualizerButtonStyle(isOn: showsLyrics, wide: lyricsTitle))
-                .help("Show synced lyrics over the visualizer")
+                .buttonStyle(VisualizerButtonStyle(isOn: showsLyrics && showsOverlayLyrics, wide: lyricsTitle))
+                .disabled(!showsOverlayLyrics)
+                .help(showsOverlayLyrics ? "Show synced lyrics over the visualizer" : "The lyrics show in the panel")
                 .accessibilityValue(showsLyrics ? "On" : "Off")
             Button("Full Screen", systemImage: "arrow.up.left.and.arrow.down.right") { toggleFullScreen() }.help("Full screen")
         }
@@ -196,7 +231,7 @@ struct VisualizerView: View {
         hideTask?.cancel()
         hideTask = Task {
             try? await Task.sleep(for: .seconds(2))
-            guard !Task.isCancelled, !overControls else { return }
+            guard !Task.isCancelled, !overControls, !(inNowPlaying && model.visualizerHold) else { return }
             withAnimation(.easeOut(duration: 0.3)) { hovering = false }
             if !compact { NSCursor.setHiddenUntilMouseMoves(true) }  // the cursor goes with the controls
         }
@@ -219,6 +254,7 @@ struct VisualizerButtonStyle: ButtonStyle {
     var isOn = false
     /// Room for a title next to the icon.
     var wide = false
+    @Environment(\.isEnabled) private var isEnabled
     @State private var hovering = false
 
     func makeBody(configuration: Configuration) -> some View {
@@ -230,6 +266,7 @@ struct VisualizerButtonStyle: ButtonStyle {
             .padding(.horizontal, wide ? 10 : 0)
             .frame(minWidth: 28, minHeight: 26)
             .background(fill, in: Capsule())
+            .opacity(isEnabled ? 1 : 0.4)
             .contentShape(Capsule())
             .onHover { hovering = $0 }
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)

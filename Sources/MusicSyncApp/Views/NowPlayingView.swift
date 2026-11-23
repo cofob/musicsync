@@ -17,18 +17,13 @@ struct NowPlayingView: View {
         let song: Song? = if case .server(let s)? = player.current { s } else { nil }
         let panel = model.nowPlayingPanel == .lyrics && !showLyrics ? .none : model.nowPlayingPanel
         ZStack {
-            let background = AppPreferences.shared.appearance.nowPlayingBackground
-            ArtworkBackground(image: background == .plain ? nil : player.artwork, animated: background == .animated)
-            HStack(spacing: 40) {
-                PlayerColumn().frame(maxWidth: 440)
-                if panel != .none {
-                    panelView(panel).frame(maxWidth: .infinity, maxHeight: .infinity).transition(.opacity)
-                }
-            }
-            .padding(.horizontal, 60).padding(.top, 70).padding(.bottom, 40)
             if model.nowPlayingVisualizer {
-                // The player keeps clear of the panel, else of the buttons in the bottom right corner.
-                VisualizerView(trailingInset: panel != .none ? Self.panelWidth : 150).transition(.opacity)
+                // The visualizer has the player itself: no cover, background or player column under it.
+                // Its player keeps clear of the panel, else (centered) of the buttons in the bottom right corner.
+                VisualizerView(inNowPlaying: true, showsOverlayLyrics: panel != .lyrics,
+                               insets: panel != .none ? EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: Self.panelWidth)
+                                                      : EdgeInsets(top: 0, leading: 150, bottom: 0, trailing: 150))
+                    .transition(.opacity)
                 // The panel stays usable over the visualizer: a dark column on the right.
                 if panel != .none {
                     panelView(panel)
@@ -36,9 +31,21 @@ struct NowPlayingView: View {
                         .padding(.top, 70).padding(.bottom, 70).padding(.horizontal, 24)
                         .frame(width: Self.panelWidth)
                         .background(.black.opacity(0.85))
+                        .holdsVisualizerControls(model)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                         .transition(.opacity)
                 }
+            } else {
+                let background = AppPreferences.shared.appearance.nowPlayingBackground
+                ArtworkBackground(image: background == .plain ? nil : player.artwork, animated: background == .animated)
+                HStack(spacing: 40) {
+                    PlayerColumn().frame(maxWidth: 440)
+                    if panel != .none {
+                        panelView(panel).frame(maxWidth: .infinity, maxHeight: .infinity).transition(.opacity)
+                    }
+                }
+                .padding(.horizontal, 60).padding(.top, 70).padding(.bottom, 40)
+                .transition(.opacity)
             }
         }
         .overlay(alignment: .topLeading) {
@@ -48,6 +55,7 @@ struct NowPlayingView: View {
                 .glass(in: Capsule(), interactive: true)
                 // The window buttons hide with the toolbar, so the close button takes their corner.
                 .padding(.leading, 16).padding(.top, 12)
+                .holdsVisualizerControls(model)
                 .idleHidden(model.visualizerIdle)
         }
         .overlay(alignment: .bottomTrailing) {
@@ -65,6 +73,7 @@ struct NowPlayingView: View {
                     .accessibilityValue(model.nowPlayingVisualizer ? "On" : "Off")
             }
             .padding(4).glass(in: Capsule())
+            .holdsVisualizerControls(model)
             .padding(16)
             .idleHidden(model.visualizerIdle)
         }
@@ -106,6 +115,11 @@ extension View {
     func idleHidden(_ idle: Bool) -> some View {
         opacity(idle ? 0 : 1).allowsHitTesting(!idle).animation(.easeOut(duration: 0.3), value: idle)
     }
+
+    /// The visualizer under this view does not see the mouse here: while it is here, the controls stay.
+    func holdsVisualizerControls(_ model: AppModel) -> some View {
+        onHover { model.visualizerHold = $0 }
+    }
 }
 
 /// AirPlay and volume over the top right corner of Now Playing. `RootView` shows it beside Now Playing,
@@ -129,6 +143,7 @@ struct NowPlayingVolume: View {
         }
         .padding(.horizontal, 14).frame(height: 36)
         .glass(in: Capsule())
+        .holdsVisualizerControls(model)  // on the capsule only: the frame below fills the window
         .foregroundStyle(.white)
         .environment(\.colorScheme, .dark)
         .padding(.trailing, 16).padding(.top, 10)

@@ -50,9 +50,10 @@ import SwiftUI
         case "artist":
             await select(.artists, model)
             if let artist = await first({ model.artists.first }) { model.show(.artist(artist.id)) }
-        case "nowplaying", "nowplaying-visualizer":
+        case "nowplaying", "nowplaying-visualizer", "nowplaying-visualizer-bare":
             await playPaused(model)
-            model.nowPlayingVisualizer = scene == "nowplaying-visualizer"
+            model.nowPlayingVisualizer = scene.hasPrefix("nowplaying-visualizer")
+            if scene == "nowplaying-visualizer-bare" { model.nowPlayingPanel = .none }
             model.showNowPlaying = true
         case "nowplaying-lrclib":
             // A canned LRCLIB reply: the scene never asks lrclib.net.

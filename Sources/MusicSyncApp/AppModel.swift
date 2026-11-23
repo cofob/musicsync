@@ -97,6 +97,8 @@ final class AppModel {
     var nowPlayingVisualizer = false
     /// The visualizer hid its controls (no mouse moves): Now Playing hides its buttons too.
     var visualizerIdle = false
+    /// The mouse is on a Now Playing panel or button over the visualizer: its controls stay.
+    var visualizerHold = false
     /// Song shown in the "Get Info" sheet.
     var infoSong: Song?
     /// Song id -> lyrics (nil = none) seen this session.
