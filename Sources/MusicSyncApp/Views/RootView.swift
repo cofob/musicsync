@@ -55,7 +55,7 @@ struct RootView: View {
             .accessibilityHidden(model.showNowPlaying)  // VoiceOver reads only Now Playing over it
             if model.showNowPlaying {
                 NowPlayingView().transition(reduceMotion ? .opacity : .move(edge: .bottom)).zIndex(1)
-                NowPlayingVolume().transition(reduceMotion ? .opacity : NowPlayingVolume.transition).zIndex(2)
+                NowPlayingVolume().idleHidden(model.visualizerIdle).transition(reduceMotion ? .opacity : NowPlayingVolume.transition).zIndex(2)
             }
         }
         .animation(.smooth(duration: 0.35), value: model.showNowPlaying)

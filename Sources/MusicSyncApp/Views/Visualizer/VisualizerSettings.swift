@@ -66,7 +66,7 @@ struct VisualizerSettingsView: View {
                 Toggle("Announce songs", isOn: $announce)
                 Button("Show Visualizer") { openWindow(id: VisualizerView.windowID) }
             } footer: {
-                SettingsFooter("Window > Visualizer (⌘T), or the waveform button in Now Playing and the MiniPlayer. Announce Songs shows the artist and title when a song starts. While a visualizer is open, songs play through the same audio tap as the equalizer, so the next song starts with a short cut instead of gapless.")
+                SettingsFooter("Window > Visualizer (⌘T), or the waveform button in Now Playing and the MiniPlayer. Announce Songs shows the artist and title when a song starts.")
             }
             Section("Spectrum") {
                 Toggle("Peak caps", isOn: $peaks)

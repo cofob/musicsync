@@ -95,6 +95,8 @@ final class AppModel {
     var nowPlayingPanel = NowPlayingPanel.lyrics
     /// Now Playing shows the visualizer over the whole window.
     var nowPlayingVisualizer = false
+    /// The visualizer hid its controls (no mouse moves): Now Playing hides its buttons too.
+    var visualizerIdle = false
     /// Song shown in the "Get Info" sheet.
     var infoSong: Song?
     /// Song id -> lyrics (nil = none) seen this session.

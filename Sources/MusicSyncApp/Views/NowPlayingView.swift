@@ -46,6 +46,7 @@ struct NowPlayingView: View {
                 .glass(in: Capsule(), interactive: true)
                 // The window buttons hide with the toolbar, so the close button takes their corner.
                 .padding(.leading, 16).padding(.top, 12)
+                .idleHidden(model.visualizerIdle)
         }
         .overlay(alignment: .bottomTrailing) {
             HStack(spacing: 4) {
@@ -63,6 +64,7 @@ struct NowPlayingView: View {
             }
             .padding(4).glass(in: Capsule())
             .padding(16)
+            .idleHidden(model.visualizerIdle)
         }
         .ignoresSafeArea()
         .foregroundStyle(.white)
@@ -91,6 +93,13 @@ struct NowPlayingView: View {
             .background(on ? Color.white.opacity(0.9) : .clear, in: Capsule())
             .help(title)
             .accessibilityValue(on ? "On" : "Off")
+    }
+}
+
+extension View {
+    /// Gone while the visualizer has no mouse moves; the mouse then reaches the visualizer, which shows them again.
+    func idleHidden(_ idle: Bool) -> some View {
+        opacity(idle ? 0 : 1).allowsHitTesting(!idle).animation(.easeOut(duration: 0.3), value: idle)
     }
 }
 

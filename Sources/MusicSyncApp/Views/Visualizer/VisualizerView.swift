@@ -67,7 +67,9 @@ struct VisualizerView: View {
         .onKeyPress(.rightArrow) { milkDrop.step(1); return mode == .milkdrop ? .handled : .ignored }
         .onKeyPress("f") { toggleFullScreen(); return .handled }
         .onAppear { player.visualizers += 1 }
+        .onChange(of: hovering) { if !compact { model.visualizerIdle = !hovering } }
         .onDisappear {
+            if !compact { model.visualizerIdle = false }
             player.visualizers -= 1
             if let window = fullScreenWindow, window.styleMask.contains(.fullScreen) { window.toggleFullScreen(nil) }
         }
@@ -102,14 +104,11 @@ struct VisualizerView: View {
             }
             .lineLimit(1)
             ScrubBar(tint: .white)
-            HStack {
-                TransportControls(scale: 0.9, spacing: 12)
-                Spacer(minLength: 16)
-                visualizerButtons
-            }
+            TransportControls(scale: 0.9, spacing: 14)
+            visualizerButtons
         }
         .padding(.horizontal, 18).padding(.vertical, 12)
-        .frame(maxWidth: 640)
+        .frame(maxWidth: 560)
         // Dark, not glass: glass takes the colors of the bars under it.
         .background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(.white.opacity(0.12)))
@@ -118,9 +117,10 @@ struct VisualizerView: View {
     }
 
     private var visualizerButtons: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 4) {
             Picker("Mode", selection: $mode) { ForEach(VisualizerMode.allCases) { Text($0.title).tag($0) } }
-                .pickerStyle(.segmented).labelsHidden().fixedSize()
+                .pickerStyle(.segmented).labelsHidden().fixedSize().controlSize(.small)
+            Spacer(minLength: 8)
             if mode == .milkdrop {
                 Button("Previous Preset", systemImage: "chevron.left") { milkDrop.step(-1) }
                 Menu("Presets", systemImage: "sparkles") {

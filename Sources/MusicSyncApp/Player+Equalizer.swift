@@ -5,13 +5,16 @@ extension Player {
     func equalizerChanged(from old: EqualizerSettings) {
         guard equalizer != old else { return }
         equalizer.save()
-        mixer.equalizer.set(equalizer.gains)
         tapChanged()
     }
 
-    /// The tap runs for the equalizer and for visible visualizers; only the visualizers need its samples.
+    /// The tap runs on every song all the time: adding or removing it rebuilds the playing song's audio, which replays
+    /// what was buffered (an audible jump back). So turning the equalizer or a visualizer on or off only changes the gains
+    /// (flat leaves the samples untouched) and whether the samples are kept. Gapless still joins without a gap with the
+    /// tap (`OutputTests.gaplessWithEqualizer`); start and seek take about 0.15 s longer (`Mixer.usesEqualizer`).
     func tapChanged() {
-        mixer.usesEqualizer = equalizer.isOn || visualizers > 0
+        mixer.usesEqualizer = true
+        mixer.equalizer.set(equalizer.isOn ? equalizer.gains : .flat)
         mixer.equalizer.samples.isOn = visualizers > 0
     }
 }

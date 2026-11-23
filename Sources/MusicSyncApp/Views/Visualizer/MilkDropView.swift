@@ -120,7 +120,7 @@ struct MilkDropView: NSViewRepresentable {
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.userContentController.add(milkDrop, name: "visualizer")
-        let view = WKWebView(frame: .zero, configuration: config)
+        let view = FullBleedWebView(frame: .zero, configuration: config)
         view.setValue(false, forKey: "drawsBackground")
         view.navigationDelegate = milkDrop
         milkDrop.webView = view
@@ -160,4 +160,9 @@ struct MilkDropView: NSViewRepresentable {
             timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { _ in MainActor.assumeIsolated { tick() } }
         }
     }
+}
+
+/// Draws under the title bar too: a plain web view insets its page by the window's safe area (a dark band on top in Now Playing).
+final class FullBleedWebView: WKWebView {
+    override var safeAreaInsets: NSEdgeInsets { NSEdgeInsetsZero }
 }

@@ -123,7 +123,6 @@ final class Player {
     init() {
         if ProcessInfo.processInfo.environment["MUSICSYNC_MUTE"] == "1" { volume = 0; mixer.volume = 0 }
         applySpeed()
-        mixer.equalizer.set(equalizer.gains)
         tapChanged()
         mixer.onEvent = { [weak self] in self?.mixerEvent($0) }
         mixer.onTime = { [weak self] in self?.tick($0) }
