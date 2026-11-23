@@ -1,0 +1,94 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<canvas id="c"></canvas>
+<script>
+// Repeatable butterchurn: every random value is 0.5, as the native renderer gets in the parity tests.
+Math.random = () => 0.5;
+// Why butterchurn cannot be the reference for the current preset: programs it fails to link (it never checks).
+let failures = [];
+const link = WebGL2RenderingContext.prototype.linkProgram;
+WebGL2RenderingContext.prototype.linkProgram = function (p) {
+  link.call(this, p);
+  if (!this.getProgramParameter(p, this.LINK_STATUS))
+    failures.push('butterchurn cannot link: ' + this.getAttachedShaders(p).map((s) => this.getShaderInfoLog(s).split('\n')[0]).join(' ').trim());
+};
+</script>
+<script src="butterchurn.min.js"></script>
+<script src="milkdrop-preset-converter.min.js"></script>
+<script>
+const lib = window.butterchurn.default || window.butterchurn;
+let viz;
+
+// The test audio: frame `f` gets 1024 bytes of a sine, the same bytes the Swift side turns into floats.
+function audio(f) {
+  const a = new Uint8Array(1024);
+  for (let i = 0; i < 1024; i++) a[i] = Math.max(0, Math.min(255, Math.floor(128 + 100 * Math.sin((f * 1024 + i) * 0.05))));
+  return a;
+}
+
+// The texture pack the native renderer has, as { name: { data, width, height } }.
+let images = {};
+window.setImages = async (urls) => {
+  for (const [name, data] of Object.entries(urls)) {
+    const img = new Image();
+    img.src = data;
+    await img.decode();
+    images[name] = { data, width: img.width, height: img.height };
+  }
+  return Object.keys(images).length;
+};
+
+// Renders `frames` frames of the .milk text at width × height; returns the PNG data URL of each frame in `keep`,
+// and in `failure` why butterchurn got it wrong, if it did.
+window.renderPreset = async (milk, width, height, frames, keep) => {
+  const canvas = document.getElementById('c');
+  canvas.width = width; canvas.height = height;
+  viz = lib.createVisualizer(new AudioContext({ sampleRate: 44100 }), canvas, { width, height, pixelRatio: 1, textureRatio: 1 });
+  viz.loadExtraImages(images);
+  // butterchurn's first blur pass reads the frame at half size through mipmaps made two frames ago (frame 1: black);
+  // MilkDrop blurs the frame just warped, so make its mipmaps first.
+  const r = viz.renderer, blur = r.blurShader1.renderBlurTexture.bind(r.blurShader1);
+  r.blurShader1.renderBlurTexture = (t, ...rest) => { r.gl.bindTexture(r.gl.TEXTURE_2D, t); r.gl.generateMipmap(r.gl.TEXTURE_2D); blur(t, ...rest); };
+  const samplers = viz.renderer.image.samplers;
+  const missing = () => Object.keys(images).filter((n) => !samplers[n]);
+  for (let i = 0; i < 200 && missing().length; i++) await new Promise((r) => setTimeout(r, 5));
+  failures = missing().length ? ['images not loaded: ' + missing().join(' ')] : [];
+  const preset = await window.milkdropPresetConverter.convertPreset(milk);
+  // The converter's HLSL parser loses the second operator of a chain: a + b + c comes out as (a + b) && c.
+  const ops = (s) => (s.match(/&&|\|\|/g) || []).length;
+  const hlsl = milk.split('\n').filter((l) => /^(warp|comp)_\d+=/.test(l)).join('\n');
+  if (ops(preset.warp || '') + ops(preset.comp || '') > ops(hlsl)) failures.push('converter turns a + b + c into (a + b) && c');
+  if (/sampler_rand\d\d/i.test(hlsl)) failures.push('butterchurn has no random textures: sampler_randNN gets clouds2');
+  if (/sampler_[fp][wc]_(?!main|noise)/i.test(hlsl)) failures.push('butterchurn reads sampler_fc_name as an image "fc_name": clouds2');
+  const sizes = hlsl.match(/texsize_(?!noise)\w+/g) || [];
+  if (sizes.length > new Set(sizes).size) failures.push('butterchurn leaves texsize_<texture> at 0');
+  // The converter leaves keys a preset lacks as undefined, which hide butterchurn's defaults: a preset without
+  // custom waves would get four (`enabled` undefined is not 0). MilkDrop takes the defaults.
+  for (const o of [preset, ...preset.waves, ...preset.shapes])
+    for (const k of Object.keys(o.baseVals)) if (o.baseVals[k] === undefined) delete o.baseVals[k];
+  // butterchurn hands waves and shapes q1…q32 and reg00…reg99 even when the preset never set them (undefined: NaN in
+  // their math). MilkDrop starts them at 0.
+  const names = (prefix, from, to, digits) => Array.from({ length: to - from + 1 }, (_, i) => prefix + String(from + i).padStart(digits, '0'));
+  for (const n of [...names('q', 1, 32, 1), ...names('reg', 0, 99, 2)]) preset.baseVals[n] ??= 0;
+  // butterchurn works out rad, ang (and in the comp uv_orig) in main(), out of reach of the preset's shader function.
+  const head = 'vec4 main_shader_sentinel(vec2 uv) {';
+  const declare = (glsl, defs) => glsl && glsl.replace(head, head + defs
+    .filter(([n]) => new RegExp(`\\b${n}\\b`).test(glsl) && !new RegExp(`\\b(float|vec2) ${n}\\b`).test(glsl)).map(([, d]) => d).join(''));
+  preset.warp = declare(preset.warp, [['rad', ' float rad = length(uv_orig - 0.5);'], ['ang', ' float ang = atan(uv_orig.x - 0.5, uv_orig.y - 0.5);']]);
+  preset.comp = declare(preset.comp, [['uv_orig', ' vec2 uv_orig = uv;'], ['rad', ' float rad = length(uv - 0.5);'],
+    ['ang', ' float ang = atan(uv.x - 0.5, uv.y - 0.5);']]);
+  viz.loadPreset(preset, 0);
+  const out = {};
+  for (let f = 0; f < frames; f++) {
+    const a = audio(f);
+    viz.render({ audioLevels: { timeByteArray: a, timeByteArrayL: a, timeByteArrayR: a }, elapsedTime: 1 / 60 });
+    if (keep.includes(f + 1)) out[f + 1] = viz.toDataURL();
+  }
+  if (failures.length) out.failure = failures[0];
+  return out;
+};
+</script>
+</body>
+</html>

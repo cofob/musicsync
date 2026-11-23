@@ -1,3 +1,4 @@
+import MilkDropKit
 import Subsonic
 import SwiftUI
 
@@ -40,7 +41,7 @@ struct VisualizerView: View {
     /// Color scheme of the spectrum and the oscilloscope; the next one at each new part of the song.
     @State private var palette = 0
     @State private var lyrics: Lyrics?
-    @State private var milkDrop = MilkDrop()
+    @State private var milkDrop = MilkDrop.app()
     @State private var hovering = false
     @State private var hideTask: Task<Void, Never>?
     @State private var overControls = false
@@ -100,6 +101,7 @@ struct VisualizerView: View {
             #endif
         }
         .onChange(of: config, initial: true) { milkDrop.configure(config) }
+        .onReceive(NotificationCenter.default.publisher(for: VisualizerSettings.presetsChanged)) { _ in milkDrop.loadUserPresets() }
         // MilkDrop draws the song title and the lyrics into the preset, as it announced songs in Winamp.
         // Only moving on into the next part counts, not a seek.
         .onChange(of: section) { old, new in
@@ -223,7 +225,7 @@ struct VisualizerView: View {
             }
             Toggle("Announce Songs", isOn: $announces)
             Divider()
-            if !milkDrop.failed.isEmpty { Text("Not converted: \(milkDrop.failed.joined(separator: ", "))") }
+            if !milkDrop.failed.isEmpty { Text("Not shown: \(milkDrop.failed.count) presets that do not compile") }
             #if os(macOS)
             Button("Import Presets…") { if VisualizerSettings.importPresets() > 0 { milkDrop.loadUserPresets() } }
             Button("Show Presets Folder") { NSWorkspace.shared.open(MilkDrop.userFolder) }
@@ -242,12 +244,14 @@ struct VisualizerView: View {
         .help("Preset options; import MilkDrop .milk files here")
     }
 
-    /// Options for the MilkDrop page, see `ms.configure` in `Resources/Visualizer/index.html`.
-    private var config: String {
+    /// Options of the MilkDrop presets.
+    private var config: PresetCycler.Options {
         // The timer stands by while the song's parts are known.
         let byParts = followsSections && !(model.player.sections ?? []).isEmpty
-        let options: [String: Any] = ["cycle": cycles && !byParts, "seconds": cycleSeconds, "blend": blend, "shuffle": shuffle, "builtIn": builtIn, "quality": quality]
-        return (try? JSONSerialization.data(withJSONObject: options, options: .sortedKeys)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+        var options = PresetCycler.Options()
+        (options.cycle, options.seconds, options.blend) = (cycles && !byParts, cycleSeconds, blend)
+        (options.shuffle, options.builtIn, options.quality) = (shuffle, builtIn, quality)
+        return options
     }
 
     /// A new part of the song: MilkDrop shows the next preset (compiled ahead), the others their next colors.

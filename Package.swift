@@ -7,7 +7,7 @@ let package = Package(
     products: [
         // The modules of the iPad app (iPad/MusicSync.xcodeproj); the Mac app is the MusicSyncApp executable.
         .library(name: "MusicSyncKit", targets: ["Support", "Subsonic", "ITunesDB", "Artwork", "Transcode", "Device", "Sync",
-                                                 "Library", "Recommend", "Integration", "Remote", "Playback", "Preferences"]),
+                                                 "Library", "Recommend", "Integration", "Remote", "Playback", "Preferences", "MilkDropKit"]),
     ],
     targets: [
         .target(name: "Support"),
@@ -22,9 +22,9 @@ let package = Package(
         .target(name: "Remote"),
         .target(name: "Playback", dependencies: ["Support", "Subsonic"]),
         .target(name: "Preferences", dependencies: ["Support"]),
+        .target(name: "MilkDropKit", resources: [.copy("Resources/Presets"), .copy("Resources/Textures"), .copy("Resources/LICENSE.txt")]),
         .target(name: "Sync", dependencies: ["Support", "Subsonic", "ITunesDB", "Artwork", "Transcode", "Device"]),
-        .executableTarget(name: "MusicSyncApp", dependencies: ["Support", "Subsonic", "ITunesDB", "Artwork", "Transcode", "Device", "Sync", "Library", "Recommend", "Integration", "Remote", "Playback", "Preferences"],
-                          resources: [.copy("Resources/Visualizer")]),
+        .executableTarget(name: "MusicSyncApp", dependencies: ["Support", "Subsonic", "ITunesDB", "Artwork", "Transcode", "Device", "Sync", "Library", "Recommend", "Integration", "Remote", "Playback", "Preferences", "MilkDropKit"]),
         .testTarget(name: "SupportTests", dependencies: ["Support"]),
         .testTarget(name: "SubsonicTests", dependencies: ["Subsonic"]),
         .testTarget(name: "ITunesDBTests", dependencies: ["ITunesDB"]),
@@ -38,5 +38,7 @@ let package = Package(
         .testTarget(name: "RemoteTests", dependencies: ["Remote"]),
         .testTarget(name: "PlaybackTests", dependencies: ["Playback"]),
         .testTarget(name: "PreferencesTests", dependencies: ["Preferences"]),
+        .testTarget(name: "MilkDropKitTests", dependencies: ["MilkDropKit"]),
+        .testTarget(name: "MilkDropParityTests", dependencies: ["MilkDropKit"], resources: [.copy("Reference")]),
     ]
 )

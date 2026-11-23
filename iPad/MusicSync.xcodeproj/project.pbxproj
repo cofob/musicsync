@@ -8,12 +8,10 @@
 
 /* Begin PBXBuildFile section */
 		0A000000000000000000000A /* MusicSyncKit in Frameworks */ = {isa = PBXBuildFile; productRef = 0A0000000000000000000011 /* MusicSyncKit */; };
-		0A000000000000000000000B /* Visualizer in Resources */ = {isa = PBXBuildFile; fileRef = 0A0000000000000000000005 /* Visualizer */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		0A0000000000000000000004 /* MusicSync.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MusicSync.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		0A0000000000000000000005 /* Visualizer */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Visualizer; path = ../Sources/MusicSyncApp/Resources/Visualizer; sourceTree = "<group>"; };
 		0A0000000000000000000006 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -23,11 +21,6 @@
 			membershipExceptions = (
 				AccessibilityAudit.swift,
 				DockMenu.swift,
-				Resources/Visualizer/butterchurn.min.js,
-				Resources/Visualizer/butterchurnPresets.min.js,
-				Resources/Visualizer/index.html,
-				Resources/Visualizer/LICENSE.txt,
-				"Resources/Visualizer/milkdrop-preset-converter.min.js",
 				Shot.swift,
 				ShotChecks.swift,
 				"ShotChecks+Appearance.swift",
@@ -84,7 +77,6 @@
 			children = (
 				0A0000000000000000000008 /* MusicSync */,
 				0A0000000000000000000007 /* MusicSyncApp */,
-				0A0000000000000000000005 /* Visualizer */,
 				0A0000000000000000000006 /* Info.plist */,
 				0A0000000000000000000003 /* Products */,
 			);
@@ -167,7 +159,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0A000000000000000000000B /* Visualizer in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
