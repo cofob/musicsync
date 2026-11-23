@@ -36,6 +36,8 @@ struct VisualizerView: View {
     @State private var hovering = false
     @State private var hideTask: Task<Void, Never>?
     @State private var overControls = false
+    /// The window this view put in full screen; it leaves full screen when the view goes (Now Playing closes).
+    @State private var fullScreenWindow: NSWindow?
 
     var body: some View {
         let player = model.player
@@ -52,16 +54,7 @@ struct VisualizerView: View {
             // Takes the mouse from the web view: hover, double-click and keys stay here.
             if !compact {
                 Color.clear.contentShape(Rectangle())
-                    .onTapGesture(count: 2) { NSApp.keyWindow?.toggleFullScreen(nil) }
-            }
-        }
-        .overlay(alignment: .top) {
-            if hovering, !compact, let item = player.current {
-                VStack(spacing: 1) {
-                    Text(item.title).font(.headline)
-                    if mode == .milkdrop, let preset = milkDrop.current { Text(preset).font(.caption).foregroundStyle(.white.opacity(0.6)) }
-                }
-                .lineLimit(1).padding(.top, 14).padding(.horizontal, 80).transition(.opacity)
+                    .onTapGesture(count: 2) { toggleFullScreen() }
             }
         }
         .overlay(alignment: .bottom) { if hovering, !compact { controls.transition(.opacity) } }
@@ -72,9 +65,12 @@ struct VisualizerView: View {
         .focusable().focusEffectDisabled()
         .onKeyPress(.leftArrow) { milkDrop.step(-1); return mode == .milkdrop ? .handled : .ignored }
         .onKeyPress(.rightArrow) { milkDrop.step(1); return mode == .milkdrop ? .handled : .ignored }
-        .onKeyPress("f") { NSApp.keyWindow?.toggleFullScreen(nil); return .handled }
+        .onKeyPress("f") { toggleFullScreen(); return .handled }
         .onAppear { player.visualizers += 1 }
-        .onDisappear { player.visualizers -= 1 }
+        .onDisappear {
+            player.visualizers -= 1
+            if let window = fullScreenWindow, window.styleMask.contains(.fullScreen) { window.toggleFullScreen(nil) }
+        }
         .onChange(of: config, initial: true) { milkDrop.configure(config) }
         // MilkDrop draws the song title and the lyrics into the preset, as it announced songs in Winamp.
         .onChange(of: player.current?.id, initial: true) {
@@ -82,8 +78,10 @@ struct VisualizerView: View {
             milkDrop.title([item.artist, item.title].compactMap { $0 }.joined(separator: " - "))
         }
         .onChange(of: line) {
-            guard let line, let text = lyrics?.lines[line].text, !text.isEmpty else { return }
-            milkDrop.title(text)
+            guard let line, let lyrics, !lyrics.lines[line].text.isEmpty else { return }
+            // The line stays until the next one starts.
+            let start = lyrics.lines[line].start ?? 0, next = lyrics.lines.dropFirst(line + 1).first?.start ?? start + 4
+            milkDrop.title(lyrics.lines[line].text, seconds: min(max(next - start - 0.2, 2), 10))
         }
         .task(id: song?.id) {
             lyrics = nil
@@ -93,7 +91,33 @@ struct VisualizerView: View {
         }
     }
 
+    /// The player as usual (song, scrubber, transport) over the visualizer buttons.
     private var controls: some View {
+        let player = model.player
+        return VStack(spacing: 10) {
+            VStack(spacing: 1) {
+                Text(player.current?.title ?? "Not Playing").font(.headline)
+                Text([player.current?.artist, mode == .milkdrop ? milkDrop.current : nil].compactMap { $0 }.joined(separator: " · "))
+                    .font(.caption).foregroundStyle(.white.opacity(0.65))
+            }
+            .lineLimit(1)
+            ScrubBar(tint: .white)
+            HStack {
+                TransportControls(scale: 0.9, spacing: 12)
+                Spacer(minLength: 16)
+                visualizerButtons
+            }
+        }
+        .padding(.horizontal, 18).padding(.vertical, 12)
+        .frame(maxWidth: 640)
+        // Dark, not glass: glass takes the colors of the bars under it.
+        .background(.black.opacity(0.65), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(.white.opacity(0.12)))
+        .padding(.horizontal, 24).padding(.bottom, 20)
+        .onHover { overControls = $0 }
+    }
+
+    private var visualizerButtons: some View {
         HStack(spacing: 8) {
             Picker("Mode", selection: $mode) { ForEach(VisualizerMode.allCases) { Text($0.title).tag($0) } }
                 .pickerStyle(.segmented).labelsHidden().fixedSize()
@@ -118,20 +142,23 @@ struct VisualizerView: View {
             }
             Toggle("Lyrics", systemImage: "quote.bubble", isOn: $showsLyrics).toggleStyle(.button)
                 .help("Show synced lyrics")
-            Button("Full Screen", systemImage: "arrow.up.left.and.arrow.down.right") { NSApp.keyWindow?.toggleFullScreen(nil) }
+            Button("Full Screen", systemImage: "arrow.up.left.and.arrow.down.right") { toggleFullScreen() }
         }
         .labelStyle(.iconOnly)
         .buttonStyle(HitAreaButtonStyle(width: 28, height: 26))
         .font(.system(size: 13, weight: .semibold))
-        .padding(6).glass(in: Capsule(), interactive: true)
-        .padding(.bottom, 20)
-        .onHover { overControls = $0 }
     }
 
     /// Options for the MilkDrop page, see `ms.configure` in `Resources/Visualizer/index.html`.
     private var config: String {
         let options: [String: Any] = ["cycle": cycles, "seconds": cycleSeconds, "blend": blend, "shuffle": shuffle, "builtIn": builtIn, "quality": quality]
         return (try? JSONSerialization.data(withJSONObject: options, options: .sortedKeys)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+    }
+
+    private func toggleFullScreen() {
+        guard let window = NSApp.keyWindow else { return }
+        fullScreenWindow = window.styleMask.contains(.fullScreen) ? nil : window
+        window.toggleFullScreen(nil)
     }
 
     /// Shows the controls; they go away after 2 s without mouse moves.

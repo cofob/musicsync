@@ -22,15 +22,22 @@ struct NowPlayingView: View {
             HStack(spacing: 40) {
                 PlayerColumn().frame(maxWidth: 440)
                 if panel != .none {
-                    Group {
-                        if panel == .lyrics { LyricsPanel(lyrics: lyrics) } else { UpNextPanel().padding(.trailing, 20).padding(.bottom, 50) }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .transition(.opacity)
+                    panelView(panel).frame(maxWidth: .infinity, maxHeight: .infinity).transition(.opacity)
                 }
             }
             .padding(.horizontal, 60).padding(.top, 70).padding(.bottom, 40)
-            if model.nowPlayingVisualizer { VisualizerView().transition(.opacity) }
+            if model.nowPlayingVisualizer {
+                VisualizerView().transition(.opacity)
+                // The panel stays usable over the visualizer, on the right.
+                if panel != .none {
+                    panelView(panel)
+                        .frame(width: 420).frame(maxHeight: .infinity)
+                        .padding(.top, 70).padding(.bottom, 150).padding(.horizontal, 24)  // above the visualizer's player
+                        .background(LinearGradient(colors: [.clear, .black.opacity(0.75)], startPoint: .leading, endPoint: .trailing))
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .transition(.opacity)
+                }
+            }
         }
         .overlay(alignment: .topLeading) {
             Button("Close", systemImage: "xmark") { model.showNowPlaying = false }
@@ -44,7 +51,10 @@ struct NowPlayingView: View {
             HStack(spacing: 4) {
                 panelToggle("Lyrics", "quote.bubble", .lyrics)
                 panelToggle("Queue", "list.bullet", .queue)
-                Button("Visualizer", systemImage: "waveform") { model.nowPlayingVisualizer.toggle() }
+                Button("Visualizer", systemImage: "waveform") {
+                    model.nowPlayingVisualizer.toggle()
+                    if model.nowPlayingVisualizer { model.nowPlayingPanel = .none }  // its own lyrics show over it
+                }
                     .labelStyle(.iconOnly).buttonStyle(HitAreaButtonStyle(width: 34, height: 30)).font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(model.nowPlayingVisualizer ? Color.black : .white)
                     .background(model.nowPlayingVisualizer ? Color.white.opacity(0.9) : .clear, in: Capsule())
@@ -67,6 +77,10 @@ struct NowPlayingView: View {
             lyrics = found
             withAnimation(.smooth(duration: 0.5)) { showLyrics = found != nil }
         }
+    }
+
+    @ViewBuilder private func panelView(_ panel: NowPlayingPanel) -> some View {
+        if panel == .lyrics { LyricsPanel(lyrics: lyrics) } else { UpNextPanel().padding(.trailing, 20).padding(.bottom, 50) }
     }
 
     private func panelToggle(_ title: String, _ symbol: String, _ panel: NowPlayingPanel) -> some View {

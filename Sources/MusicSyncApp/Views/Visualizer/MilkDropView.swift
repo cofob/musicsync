@@ -13,6 +13,8 @@ import WebKit
     /// `.milk` presets the converter could not handle.
     private(set) var failed: [String] = []
     @ObservationIgnored weak var webView: WKWebView?
+    /// Hidden copy of the page that compiles the upcoming preset (see `index.html`).
+    @ObservationIgnored var warmView: WKWebView?
     /// A title and options sent before the page loaded; applied once it has.
     @ObservationIgnored private var pendingTitle: String?
     @ObservationIgnored private var config = "{}"
@@ -23,9 +25,9 @@ import WebKit
     func select(_ name: String) { run("ms.select(\(Self.literal(name)))") }
 
     /// MilkDrop's song title animation: the text flies in and melts into the preset.
-    func title(_ text: String) {
+    func title(_ text: String, seconds: Double = 4) {
         guard loaded else { pendingTitle = text; return }
-        run("ms.title(\(Self.literal(text)))")
+        run("ms.title(\(Self.literal(text)), \(seconds))")
     }
 
     /// The resource folder; the SwiftPM bundle is in `Contents/Resources` of the app, or next to the binary in a build.
@@ -40,26 +42,35 @@ import WebKit
     func configure(_ json: String) {
         config = json
         if loaded { run("ms.configure(\(json))") }
+        run("ms.configure(\(json))", in: warmView)
     }
 
-    /// Sends the folder's presets: `.json` as they are, `.milk` without a `.json` to the converter.
+    /// Sends the folder's presets to both pages: `.json` as they are, `.milk` without a `.json` to the converter.
     func loadUserPresets() {
+        let (script, names) = Self.jsonPresets()
+        if let script { run(script); run(script, in: warmView) }
         let files = (try? FileManager.default.contentsOfDirectory(at: Self.userFolder, includingPropertiesForKeys: nil)) ?? []
+        for file in files where file.pathExtension == "milk" {
+            let name = file.deletingPathExtension().lastPathComponent
+            guard !names.contains(name), !failed.contains(name),
+                  let data = try? Data(contentsOf: file), let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) else { continue }
+            run("ms.convert(\(Self.literal(name)), \(Self.literal(text)))")
+        }
+    }
+
+    /// `ms.addPresets` with the folder's `.json` presets, and their names.
+    private static func jsonPresets() -> (script: String?, names: Set<String>) {
+        let files = (try? FileManager.default.contentsOfDirectory(at: userFolder, includingPropertiesForKeys: nil)) ?? []
         var extra: [String: Any] = [:]
         for file in files where file.pathExtension == "json" {
             if let data = try? Data(contentsOf: file), let preset = try? JSONSerialization.jsonObject(with: data) {
                 extra[file.deletingPathExtension().lastPathComponent] = preset
             }
         }
-        if !extra.isEmpty, let json = try? JSONSerialization.data(withJSONObject: extra), let text = String(data: json, encoding: .utf8) {
-            run("ms.addPresets(\(text))")
+        guard !extra.isEmpty, let json = try? JSONSerialization.data(withJSONObject: extra), let text = String(data: json, encoding: .utf8) else {
+            return (nil, [])
         }
-        for file in files where file.pathExtension == "milk" {
-            let name = file.deletingPathExtension().lastPathComponent
-            guard extra[name] == nil, !failed.contains(name),
-                  let data = try? Data(contentsOf: file), let text = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) else { continue }
-            run("ms.convert(\(Self.literal(name)), \(Self.literal(text)))")
-        }
+        return ("ms.addPresets(\(text))", Set(extra.keys))
     }
 
     func feed(_ left: [Float], _ right: [Float]) {
@@ -68,7 +79,7 @@ import WebKit
         run("ms.feed('\(mono.base64EncodedString())','\(Data(left.map(byte)).base64EncodedString())','\(Data(right.map(byte)).base64EncodedString())')")
     }
 
-    private func run(_ script: String) { webView?.evaluateJavaScript(script, completionHandler: nil) }
+    private func run(_ script: String, in view: WKWebView? = nil) { (view ?? webView)?.evaluateJavaScript(script, completionHandler: nil) }
 
     private static func literal(_ text: String) -> String {
         (try? JSONSerialization.data(withJSONObject: [text])).flatMap { String(data: $0, encoding: .utf8) }.map { String($0.dropFirst().dropLast()) } ?? "''"
@@ -80,13 +91,20 @@ import WebKit
         if let name = body["current"] as? String { current = name }
         if let name = body["converted"] as? String, let preset = body["preset"] as? String {
             try? Data(preset.utf8).write(to: Self.userFolder.appendingPathComponent(name).appendingPathExtension("json"))
+            run("ms.addPresets({\(Self.literal(name)): \(preset)})", in: warmView)
         }
+        if let name = body["upcoming"] as? String { run("ms.select(\(Self.literal(name)), 0)", in: warmView) }
         if let name = body["failed"] as? String {
             failed.append(name)
         }
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        if webView === warmView {
+            run("ms.configure(\(config))", in: webView)
+            if let script = Self.jsonPresets().script { run(script, in: webView) }
+            return
+        }
         loaded = true
         run("ms.configure(\(config))")
         if let pendingTitle { title(pendingTitle) }
@@ -106,7 +124,17 @@ struct MilkDropView: NSViewRepresentable {
         view.setValue(false, forKey: "drawsBackground")
         view.navigationDelegate = milkDrop
         milkDrop.webView = view
-        if let page = MilkDrop.page { view.loadFileURL(page, allowingReadAccessTo: page.deletingLastPathComponent()) }
+        if let page = MilkDrop.page {
+            view.loadFileURL(page, allowingReadAccessTo: page.deletingLastPathComponent())
+            // Not in a window: it never draws, it only compiles.
+            let warm = WKWebView(frame: NSRect(x: 0, y: 0, width: 320, height: 200))
+            warm.navigationDelegate = milkDrop
+            milkDrop.warmView = warm
+            if var parts = URLComponents(url: page, resolvingAgainstBaseURL: false) {
+                parts.fragment = "warm"
+                if let url = parts.url { warm.loadFileURL(url, allowingReadAccessTo: page.deletingLastPathComponent()) }
+            }
+        }
         context.coordinator.start { [player, milkDrop] in
             let samples = player.mixer.equalizer.samples.latest(1024, at: player.mixer.time)
             milkDrop.feed(samples.left, samples.right)
@@ -118,6 +146,7 @@ struct MilkDropView: NSViewRepresentable {
 
     static func dismantleNSView(_ view: WKWebView, coordinator: Coordinator) {
         coordinator.timer?.invalidate()
+        (view.navigationDelegate as? MilkDrop)?.warmView = nil
         view.configuration.userContentController.removeScriptMessageHandler(forName: "visualizer")
     }
 

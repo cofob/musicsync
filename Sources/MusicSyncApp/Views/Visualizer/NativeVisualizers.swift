@@ -66,17 +66,17 @@ struct ScopeVisualizer: View {
     final class State { var trail: [(left: [Float], right: [Float])] = [] }
 
     var body: some View {
-        TimelineView(.animation) { _ in
+        TimelineView(.animation) { timeline in
             Canvas { context, size in
+                _ = timeline.date  // redraws on every frame: the samples are not a SwiftUI input
                 let frame = player.mixer.equalizer.samples.latest(1024, at: player.mixer.time)
-                state.trail = Array((state.trail + [frame]).suffix(5))
+                state.trail = Array((state.trail + [frame]).suffix(3))
                 for (age, frame) in state.trail.reversed().enumerated() {
-                    let opacity = 1 - Double(age) / 5
-                    let width: CGFloat = age == 0 ? 2 : 1.5
+                    let opacity = 1 - Double(age) / 3
                     for (samples, color, row) in [(frame.left, Color(red: 0.3, green: 1, blue: 0.5), 0.3), (frame.right, Color(red: 0.3, green: 0.8, blue: 1), 0.7)] {
                         let path = Self.line(samples, in: size, middle: size.height * row, amplitude: size.height * 0.25)
-                        if age == 0 { context.stroke(path, with: .color(color.opacity(0.25)), lineWidth: 8) }  // glow
-                        context.stroke(path, with: .color(color.opacity(opacity)), lineWidth: width)
+                        if age == 0 { context.stroke(path, with: .color(color.opacity(0.2)), lineWidth: 5) }  // glow
+                        context.stroke(path, with: .color(color.opacity(opacity)), lineWidth: age == 0 ? 2 : 1.5)
                     }
                 }
             }
@@ -85,9 +85,12 @@ struct ScopeVisualizer: View {
 
     private static func line(_ samples: [Float], in size: CGSize, middle: CGFloat, amplitude: CGFloat) -> Path {
         Path { path in
-            guard samples.count > 1 else { return }
-            let step = size.width / CGFloat(samples.count - 1)
-            for (i, sample) in samples.enumerated() {
+            // About one point per 2 px: more only costs stroke time.
+            let count = min(samples.count, max(Int(size.width / 2), 2))
+            guard count > 1 else { return }
+            let step = size.width / CGFloat(count - 1), stride = Double(samples.count) / Double(count)
+            for i in 0..<count {
+                let sample = samples[min(Int(Double(i) * stride), samples.count - 1)]
                 let point = CGPoint(x: CGFloat(i) * step, y: middle - CGFloat(max(min(sample, 1), -1)) * amplitude)
                 if i == 0 { path.move(to: point) } else { path.addLine(to: point) }
             }

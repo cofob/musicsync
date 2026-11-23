@@ -11,6 +11,9 @@
 <script>
 // MilkDrop presets through butterchurn. The app feeds 1024 8-bit samples per channel (128 = silence) with `ms.feed`,
 // sets options with `ms.configure` and adds the user's presets with `ms.addPresets` and `ms.convert` (.milk text).
+// Loading a preset compiles its shaders (about 250 ms, the picture stops); a second copy of the page, opened with
+// #warm and not drawing, compiles the next preset first: WebKit keeps compiled shaders for all pages (then about 7 ms).
+const warmOnly = location.hash === '#warm';
 const lib = window.butterchurn.default || window.butterchurn;
 const builtIn = (window.butterchurnPresets.default || window.butterchurnPresets).getPresets();
 const user = {};
@@ -24,7 +27,14 @@ const sorted = (o) => Object.keys(o).sort((a, b) => a.toLowerCase().localeCompar
 let [w, h] = size();
 canvas.width = w; canvas.height = h;
 const viz = lib.createVisualizer(new AudioContext(), canvas, { width: w, height: h, pixelRatio: 1 });
-let presets = {}, names = [], index = -1, changed = 0, converter;
+let presets = {}, names = [], index = -1, changed = 0, converter, upcoming;
+
+// The preset the next change shows; the app has the warm page compile it now.
+function pickUpcoming() {
+  if (warmOnly || !names.length) return;
+  upcoming = config.shuffle ? names[Math.floor(Math.random() * names.length)] : names[(index + 1) % names.length];
+  post({ upcoming });
+}
 
 // Built-in presets, unless turned off while the user has their own.
 function rebuild() {
@@ -32,6 +42,7 @@ function rebuild() {
   presets = Object.assign({}, useBuiltIn ? builtIn : {}, user);
   names = sorted(presets);
   post({ presets: names });
+  pickUpcoming();
 }
 
 // The converter is large: it loads on the first .milk file.
@@ -46,9 +57,9 @@ const loadConverter = () => converter ??= new Promise((ok, fail) => {
 window.ms = {
   feed(mono, left, right) { decode(mono, levels.timeByteArray); decode(left, levels.timeByteArrayL); decode(right, levels.timeByteArrayR); },
   configure(options) {
-    const lists = options.builtIn !== config.builtIn;
+    const lists = options.builtIn !== config.builtIn, order = options.shuffle !== config.shuffle;
     Object.assign(config, options);
-    if (lists) rebuild();
+    if (lists) rebuild(); else if (order) pickUpcoming();
   },
   select(name, blend = config.blend) {
     if (!presets[name]) return;
@@ -56,10 +67,12 @@ window.ms = {
     changed = performance.now();
     viz.loadPreset(presets[name], blend);
     post({ current: name });
+    pickUpcoming();
   },
   step(by) { ms.select(names[(index + by + names.length) % names.length]); },
-  random() { ms.select(names[Math.floor(Math.random() * names.length)]); },
-  title(text) { viz.launchSongTitleAnim(text); },
+  random() { ms.select(presets[upcoming] && config.shuffle ? upcoming : names[Math.floor(Math.random() * names.length)]); },
+  // MilkDrop's title animation; `seconds` stretches it (butterchurn plays it for 1.7 s).
+  title(text, seconds = 1.7) { viz.launchSongTitleAnim(text); viz.renderer.supertext.duration = seconds; },
   addPresets(extra) { Object.assign(user, extra); rebuild(); },
   async convert(name, text) {
     try {
@@ -80,8 +93,10 @@ function frame() {
   requestAnimationFrame(frame);
 }
 rebuild();
-ms.random();
-requestAnimationFrame(frame);
+if (!warmOnly) {
+  ms.random();
+  requestAnimationFrame(frame);
+}
 </script>
 </body>
 </html>
