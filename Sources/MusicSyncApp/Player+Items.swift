@@ -24,14 +24,16 @@ extension Player {
     private static func streamCue(_ id: String, _ stream: StreamRequest, _ client: SubsonicClient, gain: Float, from: Int,
                                   seeksOnServer: Bool) -> Mixer.Cue {
         let url = client.streamURL(id: id, format: stream.format, maxBitRate: stream.maxBitRate, timeOffset: from > 0 ? from : nil)
-        var cue = cue(url, gain: gain, contentType: stream.contentType)
+        // Originals go through `StreamLoader`, so the equalizer and the visualizer get their audio.
+        let asset = stream.isConverted ? nil : StreamLoader.asset(url, contentType: stream.contentType)
+        var cue = cue(url, gain: gain, contentType: stream.contentType, asset: asset)
         cue.offset = TimeInterval(from)
         if seeksOnServer { cue.reload = { streamCue(id, stream, client, gain: gain, from: Int($0), seeksOnServer: true) } }
         return cue
     }
 
-    private static func cue(_ url: URL, gain: Float, contentType: String? = nil) -> Mixer.Cue {
-        let item = AVPlayerItem(asset: AVURLAsset(url: url, options: contentType.map { [AVURLAssetOverrideMIMETypeKey: $0] }))
+    private static func cue(_ url: URL, gain: Float, contentType: String? = nil, asset: AVURLAsset? = nil) -> Mixer.Cue {
+        let item = AVPlayerItem(asset: asset ?? AVURLAsset(url: url, options: contentType.map { [AVURLAssetOverrideMIMETypeKey: $0] }))
         // Keeps the pitch when the speed is not 1. Spectral raises the peaks off rate 1 (up to +5 dB over full scale, measured).
         item.audioTimePitchAlgorithm = .timeDomain
         return Mixer.Cue(item: item, gain: gain)
