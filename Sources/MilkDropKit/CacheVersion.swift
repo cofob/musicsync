@@ -4,5 +4,5 @@ public enum PresetCacheFormat {
     /// Raised when the layout of the index or the manifest changes.
     public static let format = 1
     /// Raised when what a preset gives changes: the shader translator, the renderer, the demo track or the measures.
-    public static let renderer = 1
+    public static let renderer = 2
 }
