@@ -74,6 +74,21 @@ import Testing
         #expect(abs(try await Self.render(preset, frames: 1, renderer: renderer, screen: screen) - 128) < 3)
     }
 
+    /// Without a comp shader MilkDrop 2 uses fixed-function passes (`ShowToUser_NoShaders`): with echo, gamma adds
+    /// each layer at least once; brighten is 1 - (1 - x)² and solarize 2x(1 - x), on the clamped picture.
+    @Test func fixedFunctionComp() async throws {
+        guard let device = MTLCreateSystemDefaultDevice(), let screen = Self.screen(device) else { return }
+        let renderer = try #require(Renderer(device: device))
+        func level(_ lines: String, warp: Double) async throws -> Double {
+            let preset = PresetFile.parse("[preset00]\nfWaveAlpha=0\nmv_a=0\n\(lines)\nwarp_1=`shader_body { ret = \(warp); }", name: "T")
+            return try await Self.render(preset, frames: 1, renderer: renderer, screen: screen)
+        }
+        #expect(abs(try await level("fGammaAdj=1\nbSolarize=1", warp: 0.5) - 128) < 3)
+        #expect(abs(try await level("fGammaAdj=1\nbBrighten=1", warp: 0.25) - 112) < 3)
+        #expect(abs(try await level("fGammaAdj=2\nbBrighten=1", warp: 0.75) - 255) < 3)
+        #expect(abs(try await level("fGammaAdj=0.5\nfVideoEchoAlpha=0.5\nfVideoEchoZoom=1", warp: 0.5) - 128) < 3)
+    }
+
     @Test func blendsTwoPresets() async throws {
         guard let device = MTLCreateSystemDefaultDevice(), let screen = Self.screen(device) else { return }
         let renderer = try #require(Renderer(device: device))

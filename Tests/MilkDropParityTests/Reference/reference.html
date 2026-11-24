@@ -56,7 +56,10 @@ async function prepared(milk) {
   if (/sampler_[fp][wc]_(?!main|noise)/i.test(hlsl)) failures.push('butterchurn reads sampler_fc_name as an image "fc_name": clouds2');
   const sizes = hlsl.match(/texsize_(?!noise)\w+/g) || [];
   if (sizes.length > new Set(sizes).size) failures.push('butterchurn leaves texsize_<texture> at 0');
-  // The converter leaves keys a preset lacks as undefined, which hide butterchurn's defaults: a preset without
+  // MilkDrop 2 draws a preset without comp shader by fixed-function blends: brighten 1 - (1 - x)², solarize 2x(1 - x).
+  const frame = milk.split('\n').filter((l) => /^per_frame_\d+=/i.test(l)).join('\n');
+  if (!/^comp_\d+=/im.test(milk) && (/^b(Brighten|Solarize)=1/im.test(milk) || /\b(brighten|solarize)\s*=[^=]/i.test(frame)))
+    failures.push("butterchurn's default comp has sqrt and 4x(1 - x), not MilkDrop's fixed-function brighten and solarize");  // The converter leaves keys a preset lacks as undefined, which hide butterchurn's defaults: a preset without
   // custom waves would get four (`enabled` undefined is not 0). MilkDrop takes the defaults.
   for (const o of [preset, ...preset.waves, ...preset.shapes])
     for (const k of Object.keys(o.baseVals)) if (o.baseVals[k] === undefined) delete o.baseVals[k];
