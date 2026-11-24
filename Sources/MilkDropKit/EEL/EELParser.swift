@@ -109,7 +109,9 @@ struct EELParser {
         switch token.kind {
         case .number(let n):
             pos += 1
-            return .number(n)
+            // NS-EEL2 also takes `0 = x` (it stores x into the constant's own cell): its value is x.
+            guard accept("=") else { return .number(n) }
+            return try ternary()
         case .name(let name):
             pos += 1
             return accept("(") ? try call(name) : try assignment(to: .variable(resolve(name)))

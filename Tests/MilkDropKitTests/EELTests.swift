@@ -243,6 +243,11 @@ private func value(_ expression: String) throws -> Double {
         #expect(try value("1 + . + 2") == 3)
     }
 
+    @Test func assignToConstantGivesTheValue() throws {
+        #expect(try value("if(1, 0 = 3, 5)") == 3)
+        #expect(try value("2 + 0 = 3") == 5)
+    }
+
     @Test func errors() {
         for bad in ["x = (1 + 2", "x = foo(1)", "x = sin(1, 2)", "x = 1 +", "x = 1 $ 2", "if(1, 2)", "x = 1 y = 2"] {
             let scope = EELScope(memory: EELMemory(), globals: EELGlobals())
