@@ -1,8 +1,8 @@
 import MilkDropKit
 import SwiftUI
 
-/// Downloads of the "Cream of the Crop" preset pack, by category, into `MilkDrop.downloadedFolder`; new presets
-/// compile ahead in the background.
+/// Downloads of the "Cream of the Crop" preset pack, by category, into `MilkDrop.downloadedFolder`: from the preset
+/// cache, ready to show, or else from GitHub, and then new presets compile ahead in the background.
 @Observable @MainActor final class PresetPacks {
     let compiler = MilkDrop.precompiler
     private(set) var installed: [String: Int] = [:]
@@ -10,9 +10,15 @@ import SwiftUI
     private(set) var loading: Set<String> = []
     private(set) var progress = 0.0
     private(set) var error: String?
+    /// The preset cache's set (`PresetCDN`), nil until it comes or when there is none.
+    private(set) var cache: PresetCacheManifest?
+    var categories: [PresetPack.Category] { cache.map(PresetCDN.categories) ?? PresetPack.categories }
     private var task: Task<Void, Never>?
 
-    func refresh() { installed = PresetPack.installed(in: MilkDrop.downloadedFolder) }
+    func refresh() {
+        installed = PresetPack.installed(in: MilkDrop.downloadedFolder)
+        if cache == nil { Task { cache = await MilkDrop.cachedPresets() } }
+    }
 
     /// One download at a time: the archive holds all categories.
     func download(_ categories: Set<String>) {
@@ -22,8 +28,11 @@ import SwiftUI
         error = nil
         task = Task {
             do {
-                _ = try await PresetPack.download(categories, to: MilkDrop.downloadedFolder) { value in
-                    Task { @MainActor in self.progress = value }
+                let progress: @Sendable (Double) -> Void = { value in Task { @MainActor in self.progress = value } }
+                if let manifest = await MilkDrop.cachedPresets() {
+                    try await PresetCDN().install(categories, from: manifest, into: MilkDrop.cachePlaces, progress: progress)
+                } else {
+                    _ = try await PresetPack.download(categories, to: MilkDrop.downloadedFolder, progress: progress)
                 }
             } catch is CancellationError {
             } catch {
@@ -58,7 +67,7 @@ struct PresetPacksSection: View {
 
     var body: some View {
         Section {
-            ForEach(PresetPack.categories) { category in
+            ForEach(packs.categories) { category in
                 LabeledContent {
                     if packs.loading.contains(category.name) {
                         ProgressView(value: packs.progress).frame(width: 80)
@@ -69,11 +78,12 @@ struct PresetPacksSection: View {
                     }
                 } label: {
                     Text(category.name)
-                    Text("\(category.count) presets").foregroundStyle(.secondary)
+                    Text("\(category.count) presets" + (category.bytes.map { ", " + $0.formatted(.byteCount(style: .file)) } ?? ""))
+                        .foregroundStyle(.secondary)
                 }
             }
             HStack {
-                let missing = Set(PresetPack.categories.map(\.name)).subtracting(packs.installed.keys)
+                let missing = Set(packs.categories.map(\.name)).subtracting(packs.installed.keys)
                 Button("Download All") { packs.download(missing) }.disabled(missing.isEmpty || !packs.loading.isEmpty)
                 if !packs.loading.isEmpty { Button("Cancel") { packs.cancel() } }
             }
@@ -82,7 +92,7 @@ struct PresetPacksSection: View {
         } header: {
             Text("More Presets")
         } footer: {
-            SettingsFooter("The Cream of the Crop pack from projectM, 9,795 presets sorted by theme. Each download fetches the whole pack (about 20 MB) and keeps the chosen themes. Compile All prepares every preset ahead, so it shows at once; downloaded presets compile on their own. Presets that do not compile are left out.")
+            SettingsFooter("The Cream of the Crop pack from projectM, 9,795 presets sorted by theme. Presets come ready to show, with their pictures and measures; when that cannot be reached, each download fetches the whole pack (about 20 MB) and keeps the chosen themes. Compile All prepares every preset ahead, so it shows at once; downloaded presets compile on their own. Presets that do not compile are left out.")
         }
     }
 }

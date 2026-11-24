@@ -28,6 +28,32 @@ extension MilkDropController {
     @MainActor static let precompiler = PresetPrecompiler(folders: presetFolders, index: compileIndex,
                                                           thumbnails: thumbnailFolder, textureFolders: [userFolder], measures: measuresFile)
 
+    nonisolated static var cachePlaces: PresetCDN.Places {
+        PresetCDN.Places(downloads: downloadedFolder, thumbnails: thumbnailFolder, index: compileIndex, measures: measuresFile)
+    }
+
+    @MainActor private static var cacheManifest: Task<PresetCacheManifest?, Never>?
+    @MainActor private static var builtInFetch: Task<Void, Never>?
+
+    /// The preset cache's set for this build (`PresetCDN`), fetched once per launch; nil when there is none or it
+    /// cannot be reached.
+    @MainActor static func cachedPresets() async -> PresetCacheManifest? {
+        let task = cacheManifest ?? Task { try? await PresetCDN().manifest() }
+        cacheManifest = task
+        return await task.value
+    }
+
+    /// Pictures, measures and compiled shaders of the built-in presets from the preset cache, once per launch, so
+    /// that they are not made here.
+    @MainActor static func fetchBuiltIn() async {
+        let task = builtInFetch ?? Task {
+            guard let manifest = await cachedPresets() else { return }
+            _ = try? await PresetCDN().install([PresetLibrary.builtInCategory], from: manifest, into: cachePlaces)
+        }
+        builtInFetch = task
+        await task.value
+    }
+
     /// Reads the presets folders again. Butterchurn `.json` files that an earlier version converted from a `.milk`
     /// next to them are deleted: the native renderer reads the `.milk` itself.
     func loadUserPresets() {

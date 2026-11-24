@@ -277,7 +277,10 @@ struct VisualizerView: View {
 
     private func measurePresets() {
         let milkDrop = milkDrop
-        MilkDrop.precompiler.compileAll(finished: { milkDrop.reload() }, progress: { milkDrop.reload() })
+        Task {
+            await MilkDrop.fetchBuiltIn()
+            MilkDrop.precompiler.compileAll(finished: { milkDrop.reload() }, progress: { milkDrop.reload() })
+        }
     }
 
     /// A preset whose mood is close to that of the part playing and the whole song; false when not known.

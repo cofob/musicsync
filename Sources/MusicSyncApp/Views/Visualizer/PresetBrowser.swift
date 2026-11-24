@@ -39,6 +39,7 @@ struct PresetBrowser: View {
         .onAppear {
             preview.samples = MilkDropView.samples(player)
             preview.show(entries.first { $0.name == hovered })  // a hover set from outside (screenshots)
+            Task { await MilkDrop.fetchBuiltIn() }
         }
         .onDisappear { preview.show(nil) }
     }
