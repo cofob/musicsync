@@ -39,6 +39,9 @@ struct EELParser {
         "rand": (.rand, 1), "bnot": (.not, 1), "atan2": (.atan2, 2), "pow": (.pow, 2), "min": (.min, 2), "max": (.max, 2),
         "above": (.gt, 2), "below": (.lt, 2), "equal": (.eq, 2), "band": (.band, 2), "bor": (.bor, 2),
         "sigmoid": (.sigmoid, 2), "memcpy": (.memcpy, 3), "memset": (.memset, 3),
+        // MilkDrop's NS-EEL2 compiles `a >= b` as `_aboeq(a, b)` and so on, and presets may call these names too.
+        "_equal": (.eq, 2), "_noteq": (.ne, 2), "_below": (.lt, 2), "_above": (.gt, 2), "_beleq": (.le, 2), "_aboeq": (.ge, 2),
+        "_mod": (.mod, 2), "_not": (.not, 1),
     ]
 
     private let tokens: [EELToken]
@@ -131,7 +134,14 @@ struct EELParser {
             guard args.count == n else { throw EELError("line \(line): \(name) takes \(n) argument\(n == 1 ? "" : "s"), not \(args.count)") }
         }
         switch name {
-        case "if": try arity(3); return .select(args[0], args[1], args[2])
+        case "if", "_if": try arity(3); return .select(args[0], args[1], args[2])
+        case "_and": try arity(2); return .and(args[0], args[1])
+        case "_or": try arity(2); return .or(args[0], args[1])
+        case "_set", "assign":
+            try arity(2)
+            // NS-EEL2 stores into what the first argument points to: a constant or a temporary just takes the value.
+            guard case .read(let target) = args[0] else { return .sequence(args) }
+            return .assign(target, op: nil, args[1])
         case "loop": try arity(2); return .loop(args[0], args[1])
         case "while": try arity(1); return .whileLoop(args[0])
         case "exec2": try arity(2); return .sequence(args)

@@ -230,6 +230,14 @@ private func value(_ expression: String) throws -> Double {
         #expect(try value("sin(0) + cos(0) + tan(0) + asin(0) + acos(1) + atan(0)") == 1)
     }
 
+    @Test func internalOperatorNames() throws {
+        #expect(try value("_aboeq(2, 2) + _beleq(3, 2) + _above(3, 2) + _below(3, 2)") == 2)
+        #expect(try value("_equal(1, 1) + _noteq(1, 1) + _not(0) + _and(1, 2) + _or(0, 0)") == 3)
+        #expect(try value("_if(0, 1, 2) + _mod(7, 4)") == 5)
+        let scope = try run("_set(a, 2); assign(megabuf(3), a + 1); c = megabuf(3); b = assign(5, 4)")
+        #expect(scope["a"] == 2 && scope["c"] == 3 && scope["b"] == 4)
+    }
+
     @Test func errors() {
         for bad in ["x = (1 + 2", "x = foo(1)", "x = sin(1, 2)", "x = 1 +", "x = 1 $ 2", "if(1, 2)", "x = 1 y = 2"] {
             let scope = EELScope(memory: EELMemory(), globals: EELGlobals())
