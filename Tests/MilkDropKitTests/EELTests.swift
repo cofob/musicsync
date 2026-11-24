@@ -117,9 +117,9 @@ private func value(_ expression: String) throws -> Double {
     @Test func rand() throws {
         let scope = EELScope(memory: EELMemory(), globals: EELGlobals(), random: { 0.75 })
         try run("a = rand(10); b = rand(0.5); c = rand(1); d = rand(4.9)", scope: scope)
-        #expect(scope["a"] == 7)
-        #expect(scope["b"] == 0)
-        #expect(scope["c"] == 0)
+        #expect(scope["a"] == 7.5)
+        #expect(scope["b"] == 0.75)
+        #expect(scope["c"] == 0.75)
         #expect(scope["d"] == 3)
     }
 

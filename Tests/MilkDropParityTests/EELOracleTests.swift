@@ -20,6 +20,8 @@ import Testing
         let end = try #require(butterchurn.range(of: ",e}", range: memcpy.upperBound..<butterchurn.endIndex))
         context.evaluateScript("var window = this, self = this; Math.random = function () { return 0.5 };")
         context.evaluateScript(String(butterchurn[start.lowerBound..<end.upperBound]))
+        // MilkDrop's rand(n) is not rounded (butterchurn floors it); compare against MilkDrop's.
+        context.evaluateScript("window.randint = function (t) { return Math.random() * Math.max(Math.floor(t), 1) };")
         context.evaluateScript(try String(contentsOf: visualizer.appending(path: "butterchurnPresets.min.js"), encoding: .utf8))
         context.evaluateScript("""
         function setUp(p, keys) {

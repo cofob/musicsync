@@ -27,10 +27,10 @@ enum EELMath {
 
     @inline(__always) static func sign(_ x: Double) -> Double { x > 0 ? 1 : x < 0 ? -1 : 0 }
 
-    /// `floor(random * floor(n))`, so 0 for `n < 1`, as MilkDrop's EEL and butterchurn.
+    /// A random number in `0..<max(floor(n), 1)`, not rounded: MilkDrop builds ns-eel2 without
+    /// NSEEL_EEL1_COMPAT_MODE, so `nseel_int_rand` returns `genrand * x` (projectM agrees; butterchurn floors it).
     @inline(__always) static func rand(_ n: Double, _ random: () -> Double) -> Double {
-        let m = n.rounded(.down)
-        return m < 1 ? 0 : (random() * m).rounded(.down)
+        random() * max(n.rounded(.down), 1)
     }
 
     /// JavaScript's `Math.floor(x) | 0`: floor, then wrap to Int32; NaN and infinity give 0.

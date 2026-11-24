@@ -16,6 +16,10 @@ WebGL2RenderingContext.prototype.linkProgram = function (p) {
 };
 </script>
 <script src="butterchurn.min.js"></script>
+<script>
+// MilkDrop's rand(n) is not rounded (ns-eel2 without EEL1 compat mode); butterchurn floors it.
+window.randint = (t) => Math.random() * Math.max(Math.floor(t), 1);
+</script>
 <script src="milkdrop-preset-converter.min.js"></script>
 <script>
 const lib = window.butterchurn.default || window.butterchurn;
