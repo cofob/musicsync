@@ -89,6 +89,14 @@ import Testing
         #expect(abs(try await level("fGammaAdj=0.5\nfVideoEchoAlpha=0.5\nfVideoEchoZoom=1", warp: 0.5) - 128) < 3)
     }
 
+    /// A global without initializer is a uniform nothing sets, 0 as in D3D9 ("martin - organic light" reads `uv3` so).
+    @Test func globalWithoutInitializerIsZero() async throws {
+        guard let device = MTLCreateSystemDefaultDevice(), let screen = Self.screen(device) else { return }
+        let renderer = try #require(Renderer(device: device))
+        let preset = PresetFile.parse("[preset00]\nfWaveAlpha=0\ncomp_1=`float2 g;\ncomp_2=`shader_body { ret = 0.5 + abs(g.x) + abs(g.y); }", name: "T")
+        #expect(abs(try await Self.render(preset, frames: 1, renderer: renderer, screen: screen) - 128) < 3)
+    }
+
     @Test func blendsTwoPresets() async throws {
         guard let device = MTLCreateSystemDefaultDevice(), let screen = Self.screen(device) else { return }
         let renderer = try #require(Renderer(device: device))
