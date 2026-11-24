@@ -10,7 +10,9 @@ import UniformTypeIdentifiers
 @MainActor @Suite(.serialized) struct ParityTests {
     static let size = (w: 256, h: 192)
     static let frames = [1, 10, 30]
-    static let report = FileManager.default.temporaryDirectory.appendingPathComponent("MilkDropParity", isDirectory: true)
+    /// `MILKDROP_PARITY_REPORT` sets it, so runs at the same time do not share it.
+    static let report = ProcessInfo.processInfo.environment["MILKDROP_PARITY_REPORT"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+        ?? FileManager.default.temporaryDirectory.appendingPathComponent("MilkDropParity", isDirectory: true)
     /// Presets butterchurn gets wrong in ways reference.html cannot see, with why. They do not count for the medians.
     static let knownReferenceFailures: [String: String] = [:]
 
@@ -79,11 +81,18 @@ import UniformTypeIdentifiers
     }
 
     /// Presets to compare: `MILKDROP_PARITY=all` for every bundled one, `MILKDROP_PARITY=name|name` for those, else every 10th.
+    /// `MILKDROP_PARITY_DIR` takes them from that folder and its subfolders instead, every `MILKDROP_PARITY_STEP`th (20).
     static func presets() throws -> [URL] {
+        let env = ProcessInfo.processInfo.environment
+        if let dir = env["MILKDROP_PARITY_DIR"] {
+            let all = (FileManager.default.enumerator(at: URL(fileURLWithPath: dir), includingPropertiesForKeys: nil)?.allObjects as? [URL] ?? [])
+                .filter { $0.pathExtension == "milk" }.sorted { $0.path < $1.path }
+            return stride(from: 0, to: all.count, by: Int(env["MILKDROP_PARITY_STEP"] ?? "") ?? 20).map { all[$0] }
+        }
         let folder = try #require(MilkDropResources.presets)
         let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
             .filter { $0.pathExtension == "milk" }.sorted { $0.path < $1.path }
-        switch ProcessInfo.processInfo.environment["MILKDROP_PARITY"] {
+        switch env["MILKDROP_PARITY"] {
         case "all": return files
         case let names?: return files.filter { names.split(separator: "|").contains(Substring($0.deletingPathExtension().lastPathComponent)) }
         case nil: return stride(from: 0, to: files.count, by: 10).map { files[$0] }
