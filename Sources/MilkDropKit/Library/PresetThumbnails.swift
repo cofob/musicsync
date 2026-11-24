@@ -43,6 +43,9 @@ public final class PresetThumbnails: Sendable {
         return folder.appendingPathComponent(String(safe) + "-" + CompileIndex.stamp(entry.url) + "-v2.jpg")
     }
 
+    /// The picture is on disk; cheaper than `cached`, which decodes it.
+    public func isCached(_ entry: PresetLibrary.Entry) -> Bool { FileManager.default.fileExists(atPath: url(entry).path) }
+
     /// The picture on disk, if made.
     public func cached(_ entry: PresetLibrary.Entry) -> CGImage? {
         guard let source = CGImageSourceCreateWithURL(url(entry) as CFURL, nil) else { return nil }

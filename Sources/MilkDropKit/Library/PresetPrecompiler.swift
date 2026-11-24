@@ -30,14 +30,17 @@ import Observation
                            progress: @escaping @MainActor () -> Void = {}) {
         guard task == nil, let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else { return }
         let noise = Noise.makeTextures(device: device, queue: queue), thumbnails = self.thumbnails, measures = self.measures
-        let library = PresetLibrary(folders: folders)
-        let index = self.index
-        let entries = library.entries.values.filter { entry in
-            (only?.contains(entry.name) ?? true) && (index.status(entry) == nil || (index.status(entry) == true
-                && (thumbnails?.cached(entry) == nil || (measures != nil && measures?.measure(entry) == nil))))
-        }
-        (done, total, failed, isRunning) = (0, entries.count, 0, true)
+        let folders = folders, index = self.index
+        (done, total, failed, isRunning) = (0, 0, 0, true)
         task = Task {
+            // Off the main thread: a stat of every preset file takes seconds with thousands.
+            let entries = await Task.detached(priority: .utility) {
+                PresetLibrary(folders: folders).entries.values.filter { entry in
+                    (only?.contains(entry.name) ?? true) && (index.status(entry) == nil || (index.status(entry) == true
+                        && (thumbnails?.isCached(entry) == false || (measures != nil && measures?.measure(entry) == nil))))
+                }
+            }.value
+            total = entries.count
             // A few at a time: the Metal compiler runs in its own processes, one per request.
             let width = max(ProcessInfo.processInfo.activeProcessorCount / 2, 2)
             await withTaskGroup(of: Bool.self) { group in
@@ -51,14 +54,13 @@ import Observation
                 for await ok in group {
                     done += 1
                     if !ok { failed += 1 }
-                    if done % 200 == 0 { index.save() }
-                    if done % 50 == 0 { measures?.save(); progress() }
+                    if done % 200 == 0 { Self.save(index, nil) }
+                    if done % 50 == 0 { Self.save(nil, measures); progress() }
                     if Task.isCancelled { group.cancelAll(); break }
                     _ = add()
                 }
             }
-            index.save()
-            measures?.save()
+            await Self.save(index, measures).value
             isRunning = false
             task = nil
             finished()
@@ -66,6 +68,11 @@ import Observation
     }
 
     public func cancel() { task?.cancel() }
+
+    /// Writes the stores off the main thread: all records as JSON take ~50 ms with thousands.
+    @discardableResult private static func save(_ index: CompileIndex?, _ measures: PresetMeasures?) -> Task<Void, Never> {
+        Task.detached(priority: .utility) { index?.save(); measures?.save() }
+    }
 
     private nonisolated static func compile(_ entry: PresetLibrary.Entry, device: MTLDevice, index: CompileIndex,
                                             thumbnails: PresetThumbnails?, measures: PresetMeasures?,
@@ -77,7 +84,7 @@ import Observation
             _ = try PresetGeometry(preset, globals: EELGlobals(), frame: FrameGlobals())
             let compiled = try await CompiledPreset.compile(preset, device: device, screenFormat: MilkDropController.screenFormat)
             index.record(entry, ok: true)
-            if let thumbnails, thumbnails.cached(entry) == nil { try thumbnails.make(compiled, entry: entry, device: device, noise: noise) }
+            if let thumbnails, !thumbnails.isCached(entry) { try thumbnails.make(compiled, entry: entry, device: device, noise: noise) }
             if let measures, measures.measure(entry) == nil {
                 measures.record(entry, try PresetMeasurer.measure(compiled, device: device, noise: noise))
             }
