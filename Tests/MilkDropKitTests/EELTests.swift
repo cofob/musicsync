@@ -300,4 +300,8 @@ private func value(_ expression: String) throws -> Double {
         try run(source, scope: scope)
         #expect(scope["k"] == 6)
     }
+
+    @Test func backslashCommentsLikeMilkDrop() {
+        #expect(EELScope.joinCodeLines(["a = 1;\\\\ a = 2;", "\\\\b = 3;", "c = 4; // \\\\"]) == "a = 1;c = 4;")
+    }
 }

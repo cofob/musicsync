@@ -62,11 +62,12 @@ public final class EELScope {
     }
 
     /// Joins the code lines of one .milk block (`per_frame_1`, `per_frame_2`...) as MilkDrop and butterchurn do:
-    /// drops each line's `//` comment, trims it, and joins with no separator, since old editors wrapped long lines
-    /// in the middle of names.
+    /// drops each line's `//` or `\\` comment (MilkDrop takes both), trims it, and joins with no separator, since old
+    /// editors wrapped long lines in the middle of names.
     public static func joinCodeLines(_ lines: [String]) -> String {
         lines.map { line in
-            let code = line.range(of: "//").map { line[..<$0.lowerBound] } ?? line[...]
+            let comment = [line.range(of: "//"), line.range(of: "\\\\")].compactMap { $0?.lowerBound }.min()
+            let code = comment.map { line[..<$0] } ?? line[...]
             return code.trimmingCharacters(in: .whitespaces)
         }.joined()
     }
