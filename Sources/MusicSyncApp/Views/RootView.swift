@@ -74,6 +74,8 @@ struct RootView: View {
         .onChange(of: model.selection) { compactColumn = .detail }
         #if os(macOS)
         .toolbar(model.showNowPlaying ? .hidden : .automatic, for: .windowToolbar)
+        // In full screen the hidden toolbar keeps its strip over the top of the screen and takes the clicks.
+        .windowToolbarFullScreenVisibility(model.showNowPlaying ? .onHover : .automatic)
         #else
         .toolbar(model.showNowPlaying ? .hidden : .automatic, for: .navigationBar)
         #endif
