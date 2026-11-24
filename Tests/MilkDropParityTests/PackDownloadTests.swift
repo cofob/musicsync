@@ -8,10 +8,13 @@ import Testing
 struct PackDownloadTests {
     @Test func downloadAndCompileAll() async throws {
         let fm = FileManager.default
-        let dir = fm.temporaryDirectory.appendingPathComponent("MilkDropPack-\(UUID().uuidString)")
-        defer { try? fm.removeItem(at: dir) }
+        // MILKDROP_PACK_DIR keeps the pack (and reuses it) for work on the presets that fail.
+        let kept = ProcessInfo.processInfo.environment["MILKDROP_PACK_DIR"].map { URL(fileURLWithPath: $0) }
+        let dir = kept ?? fm.temporaryDirectory.appendingPathComponent("MilkDropPack-\(UUID().uuidString)")
+        defer { if kept == nil { try? fm.removeItem(at: dir) } }
         var t = Date()
-        let saved = try await PresetPack.download(Set(PresetPack.categories.map(\.name)), to: dir)
+        let have = PresetPack.installed(in: dir).values.reduce(0, +)
+        let saved = have > 9000 ? have : try await PresetPack.download(Set(PresetPack.categories.map(\.name)), to: dir)
         let download = Date().timeIntervalSince(t)
         let installed = PresetPack.installed(in: dir)
         let size = (fm.enumerator(at: dir, includingPropertiesForKeys: [.fileSizeKey])?.compactMap { ($0 as? URL).flatMap { try? $0.resourceValues(forKeys: [.fileSizeKey]).fileSize } }.reduce(0, +)) ?? 0
@@ -20,7 +23,8 @@ struct PackDownloadTests {
         #expect(installed.count == PresetPack.categories.count)
 
         let names = Set(PresetLibrary(builtIn: nil, folders: [dir]).entries.keys)
-        let indexURL = dir.appendingPathComponent("compiled.json")
+        let indexURL = dir.appendingPathComponent("compiled-\(UUID().uuidString).json")
+        defer { try? fm.removeItem(at: indexURL) }
         let compiler = PresetPrecompiler(folders: [dir], index: indexURL)
         t = Date()
         await withCheckedContinuation { done in compiler.compileAll(only: names) { done.resume() } }
@@ -35,6 +39,10 @@ struct PackDownloadTests {
                 reasons[String(error.prefix(70)), default: 0] += 1
             }
             for (reason, count) in reasons.sorted(by: { $0.value > $1.value }).prefix(12) { print("PACK fail \(count): \(reason)") }
+            // Every failing preset with its whole error, for whoever fixes them.
+            let lines = records.filter { $0.value["ok"] as? Bool == false }.sorted { $0.key < $1.key }
+                .map { "\($0.key)\t\(($0.value["error"] as? String ?? "?").replacingOccurrences(of: "\n", with: " | "))" }
+            try lines.joined(separator: "\n").write(to: dir.appendingPathComponent("failures.tsv"), atomically: true, encoding: .utf8)
         }
 
         // Shown again later: from the shader cache.

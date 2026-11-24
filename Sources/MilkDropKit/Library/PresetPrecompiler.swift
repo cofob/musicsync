@@ -72,7 +72,7 @@ import Observation
             if let thumbnails, thumbnails.cached(entry) == nil { try thumbnails.make(compiled, entry: entry, device: device, noise: noise) }
             return true
         } catch {
-            index.record(entry, ok: false, error: String(describing: error).prefix(200).description)
+            index.record(entry, ok: false, error: String(describing: error).prefix(600).description)
             return false
         }
     }
