@@ -31,6 +31,8 @@ struct VisualizerView: View {
     var showsOverlayLyrics = true
     /// Room the player keeps free at the sides, for the Now Playing panel and buttons.
     var insets = EdgeInsets()
+    /// Only the picture, under Now Playing's player: no controls, lyrics, titles or keys.
+    var backdrop = false
 
     @Environment(AppModel.self) private var model
     @AppStorage(VisualizerSettings.mode, store: .app) private var mode = VisualizerMode.milkdrop
@@ -68,7 +70,7 @@ struct VisualizerView: View {
     var body: some View {
         let player = model.player
         let song: Song? = if case .server(let s)? = player.current { s } else { nil }
-        let line = showsLyrics && showsOverlayLyrics && !standalone ? lyrics?.line(at: player.elapsed) : nil
+        let line = showsLyrics && showsOverlayLyrics && !standalone && !backdrop ? lyrics?.line(at: player.elapsed) : nil
         // The part of the song playing now: −1 before the first boundary, nil while not followed or not analyzed.
         let section = followsSections && !standalone ? player.sections.map { s in s.lastIndex { $0 <= player.elapsed } ?? -1 } : nil
         ZStack {
@@ -85,11 +87,11 @@ struct VisualizerView: View {
             if reducesFlashing, mode == .milkdrop, milkDrop.presets.isEmpty, milkDrop.unmeasured > 0 {
                 Text("Checking presets for flashing…").font(.headline).foregroundStyle(.white.opacity(0.6))
             }
-            if model.jukebox.isActive, !compact, !standalone {
+            if model.jukebox.isActive, !compact, !standalone, !backdrop {
                 Text("Playing on the server: there is no sound here to show.").font(.headline).foregroundStyle(.white.opacity(0.6))
             }
             // Takes the mouse from the web view: hover, double-click and keys stay here.
-            if !compact {
+            if !compact, !backdrop {
                 Color.clear.contentShape(Rectangle())
                     #if os(macOS)
                     .onTapGesture(count: 2) { toggleFullScreen() }
@@ -105,7 +107,7 @@ struct VisualizerView: View {
         .foregroundStyle(.white)
         .environment(\.colorScheme, .dark)
         .ignoresSafeArea()
-        .focusable().focusEffectDisabled()
+        .focusable(!backdrop).focusEffectDisabled()
         .onKeyPress(.leftArrow) { milkDrop.step(-1); return mode == .milkdrop ? .handled : .ignored }
         .onKeyPress(.rightArrow) { milkDrop.step(1); return mode == .milkdrop ? .handled : .ignored }
         .onKeyPress("f") { toggleFullScreen(); return .handled }
@@ -136,7 +138,7 @@ struct VisualizerView: View {
         }
         .onChange(of: player.current?.id, initial: true) { old, _ in
             if followsSections, old != nil, old != player.current?.id { partStarted() }  // a new song is a new part too
-            guard announces, !standalone, let item = player.current else { return }
+            guard announces, !standalone, !backdrop, let item = player.current else { return }
             milkDrop.title([item.artist, item.title].compactMap { $0 }.joined(separator: " - "))
         }
         .onChange(of: line) {
@@ -301,7 +303,7 @@ struct VisualizerView: View {
         let byParts = followsSections && !(model.player.sections ?? []).isEmpty
         var options = PresetCycler.Options()
         (options.cycle, options.seconds, options.blend) = (cycles && !byParts, cycleSeconds, blend)
-        (options.shuffle, options.builtIn, options.quality) = (shuffle, builtIn, quality)
+        (options.shuffle, options.builtIn, options.quality) = (shuffle, builtIn, backdrop ? min(quality, 0.5) : quality)
         options.reduceFlashing = reducesFlashing
         return options
     }

@@ -43,7 +43,15 @@ struct NowPlayingView: View {
                 }
             } else {
                 let background = AppPreferences.shared.appearance.nowPlayingBackground
-                ArtworkBackground(image: background == .plain ? nil : player.artwork, animated: background == .animated)
+                if background == .visualizer {
+                    // `.blur` does not reach the MilkDrop Metal view: a material over it blurs it.
+                    VisualizerView(backdrop: true)
+                        .overlay { Rectangle().fill(.ultraThinMaterial) }
+                        .overlay(Color.black.opacity(0.55))
+                        .allowsHitTesting(false)
+                } else {
+                    ArtworkBackground(image: background == .plain ? nil : player.artwork, animated: background == .animated)
+                }
                 HStack(spacing: 40) {
                     PlayerColumn().frame(maxWidth: 440)
                         #if os(iOS)

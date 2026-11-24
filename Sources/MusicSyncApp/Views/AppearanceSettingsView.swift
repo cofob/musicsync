@@ -26,9 +26,10 @@ struct AppearanceSettingsView: View {
                     Text("Animated Cover Colors").tag(AppearanceSettings.NowPlayingBackground.animated)
                     Text("Static Cover Colors").tag(AppearanceSettings.NowPlayingBackground.artwork)
                     Text("Plain").tag(AppearanceSettings.NowPlayingBackground.plain)
+                    Text("Blurred Visualizer").tag(AppearanceSettings.NowPlayingBackground.visualizer)
                 }
             } footer: {
-                SettingsFooter("The full-window player takes its colors from the cover, or stays dark gray. With Reduce Motion the colors stay still.")
+                SettingsFooter("The full-window player takes its colors from the cover, stays dark gray, or shows the visualizer blurred and dark. With Reduce Motion the colors stay still.")
             }
             Section {
                 Picker("Open at launch", selection: $prefs.appearance.startPage) {

@@ -91,6 +91,8 @@ public struct AppearanceSettings: StoredSettings {
         /// Colors taken from the cover.
         case artwork
         case plain
+        /// The visualizer (its mode from Settings > Visualizer), blurred and dark.
+        case visualizer
     }
 
     /// Page the main window opens with.
