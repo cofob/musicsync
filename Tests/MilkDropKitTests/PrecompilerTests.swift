@@ -11,7 +11,7 @@ import Testing
         defer { try? fm.removeItem(at: dir) }
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         try Data("[preset00]\nper_frame_1=zoom = 1.01;\n".utf8).write(to: dir.appendingPathComponent("Good.milk"))
-        try Data("[preset00]\nPSVERSION_COMP=2\ncomp_1=`shader_body { ret = nonsense(; }\n".utf8).write(to: dir.appendingPathComponent("Broken.milk"))
+        try Data("[preset00]\nper_frame_1=zoom = (1 +;\n".utf8).write(to: dir.appendingPathComponent("Broken.milk"))
         let indexURL = dir.appendingPathComponent("index/compiled.json")
 
         let compiler = PresetPrecompiler(folders: [dir], index: indexURL)
@@ -29,10 +29,18 @@ import Testing
         #expect(index.status(try #require(PresetLibrary(folders: [dir]).entries["Broken"])) == nil)
 
         // The visualizer leaves known failures out from the start.
-        try Data("[preset00]\nPSVERSION_COMP=2\ncomp_1=`shader_body { ret = nonsense(; }\n".utf8).write(to: dir.appendingPathComponent("Broken2.milk"))
+        try Data("[preset00]\nper_frame_1=zoom = (1 +;\n".utf8).write(to: dir.appendingPathComponent("Broken2.milk"))
         let entry = try #require(PresetLibrary(folders: [dir]).entries["Broken2"])
         index.record(entry, ok: false)
         let controller = MilkDropController(folders: [dir], index: indexURL)
         #expect(controller.failed.contains("Broken2") && !controller.presets.contains("Broken2"))
+    }
+
+    /// As MilkDrop: a shader that does not compile runs on the default shader of its stage; the preset still shows.
+    @Test func brokenShaderFallsBackToDefault() async throws {
+        guard let device = MTLCreateSystemDefaultDevice() else { return }
+        let preset = PresetFile.parse("[preset00]\nPSVERSION_COMP=2\ncomp_1=`shader_body { ret = nonsense(; }\n", name: "b")
+        let compiled = try await CompiledPreset.compile(preset, device: device, screenFormat: .bgra8Unorm)
+        #expect(compiled.fallbacks.count == 1 && compiled.fallbacks[0].hasPrefix("comp:"))
     }
 }

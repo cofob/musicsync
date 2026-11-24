@@ -17,13 +17,33 @@ public final class CompiledPreset: @unchecked Sendable {
         compPipeline = cp
     }
 
-    /// Throws when a shader does not translate or compile: such presets are left out, not shown with a stand-in.
+    /// A shader that does not translate or compile is replaced by the default one of its stage, as MilkDrop does when
+    /// D3D rejects it; `fallbacks` says which and why. Throws only when even the default fails (no GPU).
     public static func compile(_ preset: Preset, device: MTLDevice, screenFormat: MTLPixelFormat) async throws -> CompiledPreset {
-        let warp = try preset.warp.isEmpty ? HLSLTranslator.defaultShader(.warp) : HLSLTranslator.translate(preset.warp, stage: .warp)
-        let comp = try preset.comp.isEmpty ? HLSLTranslator.defaultShader(.comp) : HLSLTranslator.translate(preset.comp, stage: .comp)
-        async let wp = pipeline(warp, device: device, format: Targets.format)
-        async let cp = pipeline(comp, device: device, format: screenFormat)
-        return try await CompiledPreset(preset, warp, comp, wp, cp)
+        async let w = stage(preset.warp, .warp, device: device, format: Targets.format)
+        async let c = stage(preset.comp, .comp, device: device, format: screenFormat)
+        let (warp, comp) = try await (w, c)
+        let result = CompiledPreset(preset, warp.shader, comp.shader, warp.pipeline, comp.pipeline)
+        result.fallbacks = [warp.error, comp.error].compactMap { $0 }
+        return result
+    }
+
+    /// Why a stage runs on the default shader ("warp: line 3: …"); empty when both are the preset's own.
+    public private(set) var fallbacks: [String] = []
+
+    private static func stage(_ hlsl: String, _ stage: ShaderStage, device: MTLDevice, format: MTLPixelFormat) async throws
+        -> (shader: TranslatedShader, pipeline: MTLRenderPipelineState, error: String?) {
+        if !hlsl.isEmpty {
+            do {
+                let shader = try HLSLTranslator.translate(hlsl, stage: stage)
+                return (shader, try await pipeline(shader, device: device, format: format), nil)
+            } catch {
+                let fallback = HLSLTranslator.defaultShader(stage)
+                return (fallback, try await pipeline(fallback, device: device, format: format), "\(stage): \(error)")
+            }
+        }
+        let shader = HLSLTranslator.defaultShader(stage)
+        return (shader, try await pipeline(shader, device: device, format: format), nil)
     }
 
     private static func pipeline(_ shader: TranslatedShader, device: MTLDevice, format: MTLPixelFormat) async throws -> MTLRenderPipelineState {
