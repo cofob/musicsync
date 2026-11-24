@@ -25,6 +25,10 @@ struct ProjectMParityTests {
     /// Presets where projectM is the one that is wrong, with why. They do not count.
     static let knownReferenceFailures: [String: String] = [
         "Goody - The Shakes": "the warp shader lerps with a weight near -3, so in 8-bit buffers the frame stays black and the comp shader gives white, as natively and in butterchurn; projectM stays dark",
+        "phat + Eo.S. - PeopleWhoEatAcid_phatColoursV2": "per-frame code sets invert, which MilkDrop reads (var_pf_invert); projectM's comp without shader takes the file's flags, so it stays black",
+        "Eo.S. - angels of decay": "darken, solarize and invert make the black first frame white in MilkDrop's fixed-function comp; projectM is grey from frame 1",
+        "Rovastar - Explosive Minds": "zoom follows (bass+bass_att)³, so projectM's other audio levels zoom in where ours zoom out; with q1 fixed both agree",
+        "martin - organic light": "the comp reads the global uv3 before setting it: a D3D9 uniform nothing sets, 0; projectM's is not, so its picture goes grey",
     ]
 
     /// Both pictures as 32×24 blocks of 8×8 pixels, blurred over 3×3 blocks: RGB values 0…255, rows top first.
