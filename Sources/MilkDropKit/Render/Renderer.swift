@@ -124,10 +124,6 @@ public final class Renderer {
 
         targets.swap()
         self.targets = targets
-        if let blit = buffer.makeBlitCommandEncoder() {
-            blit.generateMipmaps(for: targets.prev)
-            blit.endEncoding()
-        }
         let (mins, maxs) = Blur.ranges(mixed)
 
         // Warp the last frame into the target.
@@ -150,6 +146,13 @@ public final class Renderer {
                 title.draw(encoder, progress: t, intoTarget: true, time: time, size: targets.size, invAspectY: Float(1 / aspect.y))
             }
             encoder.endEncoding()
+        }
+
+        // Its mip levels, for the comp pass and as `prev` of the next frame: MilkDrop's frames have none, so the comp
+        // must not read levels left from two frames ago.
+        if let blit = buffer.makeBlitCommandEncoder() {
+            blit.generateMipmaps(for: targets.target)
+            blit.endEncoding()
         }
 
         // Comp to the screen.
@@ -331,16 +334,16 @@ public final class Renderer {
         for texture in [fresh.prev, fresh.target] + blur.textures + blur.horizontalTextures {
             pass(buffer, texture, clear: true)?.endEncoding()
         }
-        // Their smaller mip levels too: the comp pass reads the target's mips before any frame made them.
-        if let blit = buffer.makeBlitCommandEncoder() {
-            [fresh.prev, fresh.target].forEach(blit.generateMipmaps)
-            blit.endEncoding()
-        }
         if let old, let encoder = pass(buffer, fresh.target, clear: true) {
             encoder.setRenderPipelineState(copy)
             encoder.setFragmentTexture(old.target, index: 0)
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
             encoder.endEncoding()
+        }
+        // Their smaller mip levels too, after the copy: the warp reads those of `prev`.
+        if let blit = buffer.makeBlitCommandEncoder() {
+            [fresh.prev, fresh.target].forEach(blit.generateMipmaps)
+            blit.endEncoding()
         }
     }
 

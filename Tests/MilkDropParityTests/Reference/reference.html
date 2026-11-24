@@ -85,6 +85,9 @@ window.renderPreset = async (milk, width, height, frames, keep) => {
   // MilkDrop blurs the frame just warped, so make its mipmaps first.
   const r = viz.renderer, blur = r.blurShader1.renderBlurTexture.bind(r.blurShader1);
   r.blurShader1.renderBlurTexture = (t, ...rest) => { r.gl.bindTexture(r.gl.TEXTURE_2D, t); r.gl.generateMipmap(r.gl.TEXTURE_2D); blur(t, ...rest); };
+  // Its comp pass, too, reads the frame through mipmaps made two frames ago; MilkDrop's frames have no smaller levels.
+  const comp = r.compShader.renderQuadTexture.bind(r.compShader);
+  r.compShader.renderQuadTexture = (b, t, ...rest) => { r.gl.bindTexture(r.gl.TEXTURE_2D, t); r.gl.generateMipmap(r.gl.TEXTURE_2D); comp(b, t, ...rest); };
   const samplers = viz.renderer.image.samplers;
   const missing = () => Object.keys(images).filter((n) => !samplers[n]);
   for (let i = 0; i < 200 && missing().length; i++) await new Promise((r) => setTimeout(r, 5));

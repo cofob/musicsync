@@ -59,6 +59,21 @@ import Testing
         #expect(try await Self.render(preset, frames: 1, renderer: renderer, screen: screen) < 0.5)
     }
 
+    /// A comp shader that tiles the frame reads its smaller mip levels: they must be of this frame, not black ones
+    /// left from two frames ago.
+    @Test func compReadsMipsOfThisFrame() async throws {
+        guard let device = MTLCreateSystemDefaultDevice(), let screen = Self.screen(device) else { return }
+        let renderer = try #require(Renderer(device: device))
+        let preset = PresetFile.parse("""
+            [preset00]
+            fWaveAlpha=0
+            mv_a=0
+            warp_1=`shader_body { ret = 0.5; }
+            comp_1=`shader_body { ret = tex2D(sampler_main, uv*4).xyz; }
+            """, name: "T")
+        #expect(abs(try await Self.render(preset, frames: 1, renderer: renderer, screen: screen) - 128) < 3)
+    }
+
     @Test func blendsTwoPresets() async throws {
         guard let device = MTLCreateSystemDefaultDevice(), let screen = Self.screen(device) else { return }
         let renderer = try #require(Renderer(device: device))
