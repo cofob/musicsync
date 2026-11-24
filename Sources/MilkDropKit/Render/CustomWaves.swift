@@ -16,8 +16,8 @@ final class CustomWave {
 
     init(_ wave: Preset.Wave, globals: EELGlobals, frame: FrameGlobals, random: @escaping () -> Double) throws {
         eq = try ElementEquations(values: wave.values, initCode: wave.initCode, globals: globals, frame: frame, random: random)
-        frameCode = try eq.scope.compile(wave.frameCode)
-        pointCode = try eq.scope.compile(wave.pointCode)
+        frameCode = eq.scope.compileOrSkip(wave.frameCode)
+        pointCode = eq.scope.compileOrSkip(wave.pointCode)
         slots = Key.allCases.map { [scope = eq.scope] in scope.slot("\($0)") }
     }
 

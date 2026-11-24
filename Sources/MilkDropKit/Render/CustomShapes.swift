@@ -20,7 +20,7 @@ final class CustomShape {
     init(_ shape: Preset.Shape, globals: EELGlobals, frame: FrameGlobals, random: @escaping () -> Double) throws {
         eq = try ElementEquations(values: shape.values, initCode: shape.initCode, globals: globals, frame: frame, random: random)
         let scope = eq.scope
-        frameCode = try scope.compile(shape.frameCode)
+        frameCode = scope.compileOrSkip(shape.frameCode)
         slots = Key.allCases.map { scope.slot("\($0)") }
         resets = Key.allCases.dropFirst().map { (scope.slot("\($0)"), shape.values["\($0)"] ?? 0) }
         instanceSlot = scope.slot("instance")

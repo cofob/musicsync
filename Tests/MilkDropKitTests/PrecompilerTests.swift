@@ -11,7 +11,9 @@ import Testing
         defer { try? fm.removeItem(at: dir) }
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         try Data("[preset00]\nper_frame_1=zoom = 1.01;\n".utf8).write(to: dir.appendingPathComponent("Good.milk"))
-        try Data("[preset00]\nper_frame_1=zoom = (1 +;\n".utf8).write(to: dir.appendingPathComponent("Broken.milk"))
+        // A file that cannot be read: about the only preset that cannot run, since broken code and shaders are skipped.
+        try Data("[preset00]\n".utf8).write(to: dir.appendingPathComponent("Broken.milk"))
+        try fm.setAttributes([.posixPermissions: 0], ofItemAtPath: dir.appendingPathComponent("Broken.milk").path)
         let indexURL = dir.appendingPathComponent("index/compiled.json")
 
         let compiler = PresetPrecompiler(folders: [dir], index: indexURL)
@@ -25,6 +27,7 @@ import Testing
         #expect(fm.fileExists(atPath: indexURL.path))
 
         // A changed file is not known any more.
+        try fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: dir.appendingPathComponent("Broken.milk").path)
         try Data("[preset00]\nper_frame_1=zoom = 1.02;\n".utf8).write(to: dir.appendingPathComponent("Broken.milk"))
         #expect(index.status(try #require(PresetLibrary(folders: [dir]).entries["Broken"])) == nil)
 

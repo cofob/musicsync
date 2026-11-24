@@ -41,9 +41,9 @@ final class PresetEquations {
         self.preset = preset
         let scope = EELScope(memory: memory, globals: globals, random: random)
         self.scope = scope
-        let initCode = try scope.compile(preset.initCode)
-        frame = try scope.compile(preset.frameCode)
-        pixel = try scope.compile(preset.pixelCode)
+        let initCode = scope.compileOrSkip(preset.initCode)
+        frame = scope.compileOrSkip(preset.frameCode)
+        pixel = scope.compileOrSkip(preset.pixelCode)
         base = preset.values.map { (scope.slot($0.key), $0.value) }
         qSlots = Self.qNames.map(scope.slot)
         valueSlots = (Set(preset.values.keys).union(PresetKeys.preset.keys).union(Self.qNames).union(["old_wave_mode"]))

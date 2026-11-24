@@ -159,7 +159,7 @@ final class ElementEquations {
         qSlots = PresetEquations.qNames.map(scope.slot)
         tSlots = (1...8).map { scope.slot("t\($0)") }
         globalSlots = frame.named.map { scope.slot($0.0) }
-        let program = try scope.compile(initCode)
+        let program = scope.compileOrSkip(initCode)
         setBase(frame)
         scope.run(program)
         for (slot, value) in base { scope[slot] = value }

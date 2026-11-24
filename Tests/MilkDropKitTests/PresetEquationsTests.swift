@@ -48,4 +48,12 @@ import Testing
         }
         print("frame + mesh for \(files.count) presets: \(Date().timeIntervalSince(start)) s")
     }
+
+    /// As MilkDrop: a block that does not compile is left out, and the preset runs without it.
+    @Test func brokenBlockIsSkipped() throws {
+        let eq = try PresetEquations(preset("per_frame_init_1=q1 = (1 +;\nper_frame_1=zoom = 2;\n"), globals: EELGlobals(), frame: FrameGlobals())
+        eq.runFrame(FrameGlobals())
+        #expect(eq.values["zoom"] == 2 && eq.q[0] == 0)
+        #expect(eq.scope.skipped.count == 1)
+    }
 }

@@ -61,6 +61,18 @@ public final class EELScope {
         return EELCompiler.compile(try parser.parseProgram())
     }
 
+    /// Errors of blocks `compileOrSkip` left out.
+    public private(set) var skipped: [String] = []
+
+    /// As MilkDrop's preset loader: a block that does not compile is left out (an empty program) and the preset runs
+    /// without it; the error goes to `skipped`.
+    public func compileOrSkip(_ source: String) -> EELProgram {
+        do { return try compile(source) } catch {
+            skipped.append("\(error)")
+            return try! compile("")  // empty code always compiles
+        }
+    }
+
     /// Joins the code lines of one .milk block (`per_frame_1`, `per_frame_2`...) as MilkDrop and butterchurn do:
     /// drops each line's `//` or `\\` comment (MilkDrop takes both), trims it, and joins with no separator, since old
     /// editors wrapped long lines in the middle of names.
