@@ -47,7 +47,7 @@ enum EELLexer {
                 continue
             }
             let start = i
-            if isDigit(c) || c == 46 && isDigit(at(i + 1)) {
+            if isDigit(c) || c == 46 {
                 while isDigit(at(i)) { i += 1 }
                 if at(i) == 46 { i += 1 }
                 while isDigit(at(i)) { i += 1 }
@@ -55,7 +55,8 @@ enum EELLexer {
                     i += 2
                     while isDigit(at(i)) { i += 1 }
                 }
-                guard let value = Double(text(start)) else { throw EELError("line \(line): bad number '\(text(start))'") }
+                // NS-EEL2 reads a lone `.` with atof, as 0.
+                guard let value = text(start) == "." ? 0 : Double(text(start)) else { throw EELError("line \(line): bad number '\(text(start))'") }
                 tokens.append(EELToken(kind: .number(value), line: line))
             } else if isNameStart(c) {
                 while isNameStart(at(i)) || isDigit(at(i)) { i += 1 }

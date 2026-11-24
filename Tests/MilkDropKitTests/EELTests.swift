@@ -238,6 +238,11 @@ private func value(_ expression: String) throws -> Double {
         #expect(scope["a"] == 2 && scope["c"] == 3 && scope["b"] == 4)
     }
 
+    @Test func loneDotIsZero() throws {
+        #expect(try value(".-.4") == -0.4)
+        #expect(try value("1 + . + 2") == 3)
+    }
+
     @Test func errors() {
         for bad in ["x = (1 + 2", "x = foo(1)", "x = sin(1, 2)", "x = 1 +", "x = 1 $ 2", "if(1, 2)", "x = 1 y = 2"] {
             let scope = EELScope(memory: EELMemory(), globals: EELGlobals())
