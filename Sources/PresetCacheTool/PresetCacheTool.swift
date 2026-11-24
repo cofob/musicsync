@@ -23,8 +23,9 @@ import MilkDropKit
     static let stages: [ShaderStage] = [.warp, .comp]
 
     static func main() async {
+        setvbuf(stdout, nil, _IOLBF, 0)  // progress shows in a log file as it happens
         do { try await run(options()) } catch {
-            FileHandle.standardError.write(Data("error: \(error)\n".utf8))
+            report("error: \(error)")
             exit(1)
         }
     }
@@ -65,7 +66,7 @@ import MilkDropKit
         let hashes = files.map(PresetCacheManifest.sha256)
         var unique: [String: URL] = [:]
         for (source, hash) in zip(list, hashes) where unique[hash] == nil { unique[hash] = source.url }
-        print("\(list.count) presets, \(unique.count) different files; platforms \(options.platforms.joined(separator: ","))")
+        report("\(list.count) presets, \(unique.count) different files; platforms \(options.platforms.joined(separator: ","))")
 
         // Compute what the work folder does not have.
         guard let baker = PresetBaker() else { throw ToolError("no Metal device") }
@@ -82,7 +83,11 @@ import MilkDropKit
             for _ in 0..<width where add() {}
             for try await (b, c) in group {
                 (baked, compiled, finished) = (baked + b, compiled + c, finished + 1)
-                if finished % 100 == 0 { print("  \(finished) of \(unique.count), \(Int(Date().timeIntervalSince(started))) s") }
+                if finished % 100 == 0 {
+                    let s = Date().timeIntervalSince(started), left = s / Double(finished) * Double(unique.count - finished)
+                    let line = "  \(finished) of \(unique.count) (\(finished * 100 / unique.count)%), \(baked) computed, \(Int(s / 60)) min, about \(Int(left / 60)) min left"
+                    if finished % 500 == 0 { report(line) } else { print(line) }
+                }
                 _ = add()
             }
         }
@@ -98,7 +103,7 @@ import MilkDropKit
             }
         }
         let seconds = Date().timeIntervalSince(started)
-        print(String(format: "Computed %d presets and %d shader libraries in %.0f s (%.2f s a preset); %d from the work folder",
+        report(String(format: "Computed %d presets and %d shader libraries in %.0f s (%.2f s a preset); %d from the work folder",
                      baked, compiled, seconds, baked > 0 ? seconds / Double(baked) : 0, unique.count - baked))
 
         // Pack.
@@ -175,13 +180,14 @@ import MilkDropKit
             let mine = packed.chunks.filter { $0.group.hasPrefix(group + "/") }
             print("  \(group): \(mine.count) chunks, \(mine.map(\.bytes).reduce(0, +)) bytes")
         }
-        guard !options.dryRun else { print("Dry run: nothing uploaded"); return }
+        guard !options.dryRun else { report("Dry run: nothing uploaded"); return }
 
         // Upload: chunks R2 lacks, then the manifest, then the index, which makes the set visible.
         guard var storage = Storage(prefix: options.prefix) else { throw ToolError("S3_BUCKET is not set; is ENV_FILE right?") }
         let keys = try storage.list()
         let missing = packed.chunks.filter { !keys.contains("chunks/\($0.id).bin") }
         if !missing.isEmpty {
+            report("Uploading \(missing.count) of \(packed.chunks.count) chunks, \(missing.map(\.bytes).reduce(0, +) / 1_000_000) MB…")
             try storage.upload(chunks, files: missing.map { "\($0.id).bin" }, to: "chunks", type: "application/octet-stream", cache: "public, max-age=31536000, immutable")
         }
         let existing = keys.first { $0.hasPrefix("datasets/r\(PresetCacheFormat.renderer)-") && $0.hasSuffix("-\(hash)/manifest.json.gz") }
@@ -205,8 +211,8 @@ import MilkDropKit
             try storage.upload(file, to: "index.json", type: "application/json", cache: "max-age=300")
             indexUploaded = true
         }
-        print("Uploaded \(missing.count) of \(packed.chunks.count) chunks (\(missing.map(\.bytes).reduce(0, +)) bytes), manifest \(existing == nil ? "yes" : "no"), index \(indexUploaded ? "yes" : "no"); \(storage.requests) requests")
-        print("Dataset \(id)")
+        report("Uploaded \(missing.count) of \(packed.chunks.count) chunks (\(missing.map(\.bytes).reduce(0, +)) bytes), manifest \(existing == nil ? "yes" : "no"), index \(indexUploaded ? "yes" : "no"); \(storage.requests) requests")
+        report("Dataset \(id)")
     }
 
     /// Bundled presets, then the pack's (downloaded once into `root`), by category and name.
@@ -265,4 +271,17 @@ import MilkDropKit
         }
         return (baked, compiled)
     }
+}
+
+/// Prints `line` and, when `PROGRESS_CMD` is set, runs it with the line (for example a chat notifier).
+func report(_ line: String) {
+    print(line)
+    guard let command = ProcessInfo.processInfo.environment["PROGRESS_CMD"], !command.isEmpty else { return }
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/bin/sh")
+    process.arguments = ["-c", command + " \"$0\"", "PresetCacheTool: " + line.trimmingCharacters(in: .whitespaces)]
+    process.standardOutput = FileHandle.nullDevice
+    process.standardError = FileHandle.nullDevice
+    try? process.run()
+    process.waitUntilExit()
 }
