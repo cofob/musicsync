@@ -91,14 +91,16 @@ public struct PresetLook: Codable, Equatable, Sendable {
         beatReaction = min(max((across - away) / (across + away + 0.002), 0), 1)
     }
 
-    /// The mood the look suggests (all terms scaled to 0…1 by the ranges that bundled presets span):
-    /// - arousal = 0.4 motion (0…0.05) + 0.3 beat reaction + 0.15 contrast + 0.15 saturation.
-    /// - valence = 0.5 brightness (0.05…0.5) + 0.3 warmth (−0.3…0.3) + 0.2 saturation.
-    /// - tension = 0.5 contrast (0.05…0.3) + 0.3 beat reaction + 0.2 coldness.
+    /// The mood the look suggests; every term is scaled to 0…1 by the range that bundled presets span (5th to 95th
+    /// percentile over a sample of them):
+    /// - arousal = 0.4 motion (0.01…0.12) + 0.3 beat reaction (0…0.4) + 0.15 contrast + 0.15 saturation.
+    /// - valence = 0.5 brightness (0.05…0.6) + 0.3 warmth (−0.3…0.3) + 0.2 saturation.
+    /// - tension = 0.5 contrast (0.05…0.25) + 0.3 beat reaction + 0.2 coldness.
     public var mood: Mood {
-        let contrast = Mood.scaled(contrast, 0.05, 0.3), warm = Mood.scaled(warmth, -0.3, 0.3)
-        return Mood(arousal: 0.4 * Mood.scaled(motion, 0, 0.05) + 0.3 * beatReaction + 0.15 * contrast + 0.15 * saturation,
-                    valence: 0.5 * Mood.scaled(brightness, 0.05, 0.5) + 0.3 * warm + 0.2 * saturation,
-                    tension: 0.5 * contrast + 0.3 * beatReaction + 0.2 * (1 - warm))
+        let contrast = Mood.scaled(contrast, 0.05, 0.25), warm = Mood.scaled(warmth, -0.3, 0.3)
+        let beat = Mood.scaled(beatReaction, 0, 0.4)
+        return Mood(arousal: 0.4 * Mood.scaled(motion, 0.01, 0.12) + 0.3 * beat + 0.15 * contrast + 0.15 * saturation,
+                    valence: 0.5 * Mood.scaled(brightness, 0.05, 0.6) + 0.3 * warm + 0.2 * saturation,
+                    tension: 0.5 * contrast + 0.3 * beat + 0.2 * (1 - warm))
     }
 }

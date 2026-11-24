@@ -97,15 +97,14 @@ import Observation
     }
 
     private func updateNames() {
-        var left = Set(failed)
+        var names = library.names(includingBuiltIn: cycler.options.builtIn, excluding: Set(failed))
         unmeasured = 0
         if cycler.options.reduceFlashing {
-            for entry in library.entries.values where measures?.isSafe(entry) != true {
-                left.insert(entry.name)
-                if measures?.measure(entry) == nil, !failed.contains(entry.name) { unmeasured += 1 }
-            }
+            let safe = names.filter { name in library.entries[name].flatMap { measures?.isSafe($0) } == true }
+            unmeasured = names.filter { name in library.entries[name].flatMap { measures?.measure($0) } == nil }.count
+            names = safe
         }
-        cycler.setNames(library.names(includingBuiltIn: cycler.options.builtIn, excluding: left))
+        cycler.setNames(names)
         presets = cycler.names
         entries = presets.compactMap { library.entries[$0] }
         prepare(cycler.upcoming)

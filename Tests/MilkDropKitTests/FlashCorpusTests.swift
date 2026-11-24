@@ -4,7 +4,7 @@ import Metal
 import Testing
 
 /// Measures all bundled presets and reports how many flash too much and how their looks spread. Slow (minutes):
-/// run it with MILKDROP_FLASH_CORPUS=1.
+/// run it with MILKDROP_FLASH_CORPUS=1; MILKDROP_FLASH_STRIDE=12 takes every 12th preset, MILKDROP_FLASH_LIMIT a count.
 @Suite(.enabled(if: ProcessInfo.processInfo.environment["MILKDROP_FLASH_CORPUS"] == "1"))
 struct FlashCorpusTests {
     @Test func reportsFlashingPresets() async throws {
@@ -12,7 +12,9 @@ struct FlashCorpusTests {
         let queue = try #require(device.makeCommandQueue())
         let noise = Noise.makeTextures(device: device, queue: queue)
         let limit = ProcessInfo.processInfo.environment["MILKDROP_FLASH_LIMIT"].flatMap(Int.init) ?? .max
-        let entries = Array(PresetLibrary(folders: []).entries.values.sorted { $0.name < $1.name }.prefix(limit))
+        let stride = ProcessInfo.processInfo.environment["MILKDROP_FLASH_STRIDE"].flatMap(Int.init) ?? 1  // every nth preset
+        let all = PresetLibrary(folders: []).entries.values.sorted { $0.name < $1.name }
+        let entries = Array(Swift.stride(from: 0, to: all.count, by: stride).map { all[$0] }.prefix(limit))
         var results: [(String, PresetMeasure)] = []
         await withTaskGroup(of: (String, PresetMeasure)?.self) { group in
             var next = entries.makeIterator()
@@ -24,7 +26,7 @@ struct FlashCorpusTests {
                     return (entry.name, measure)
                 }
             }
-            for _ in 0..<(ProcessInfo.processInfo.environment["MILKDROP_FLASH_WIDTH"].flatMap(Int.init) ?? 4) { add() }
+            for _ in 0..<(ProcessInfo.processInfo.environment["MILKDROP_FLASH_WIDTH"].flatMap(Int.init) ?? 2) { add() }
             for await result in group {
                 if let result { results.append(result) }
                 add()
