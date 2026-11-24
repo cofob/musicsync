@@ -43,6 +43,8 @@ import WebKit
 
     /// Why butterchurn got the last `render` wrong (a shader it cannot link or the converter broke), nil when it did not.
     private(set) var failure: String?
+    /// Of the last `render`: every such reason (`notes`) and the GLSL the converter made (`warp`, `comp`).
+    private(set) var notes: [String: String] = [:]
 
     /// RGBA bytes, rows top first, of the frames in `keep` (1-based).
     func render(_ milk: String, width: Int, height: Int, frames: Int, keep: [Int]) async throws -> [Int: [UInt8]] {
@@ -51,6 +53,7 @@ import WebKit
             arguments: ["milk": milk, "width": width, "height": height, "frames": frames, "keep": keep], contentWorld: .page)
         guard let urls = result as? [String: String] else { throw ParityError("no frames from butterchurn") }
         failure = urls["failure"]
+        notes = urls.filter { Int($0.key) == nil }
         var out: [Int: [UInt8]] = [:]
         for (key, url) in urls {
             guard let frame = Int(key), let comma = url.firstIndex(of: ","), let data = Data(base64Encoded: String(url[url.index(after: comma)...])),

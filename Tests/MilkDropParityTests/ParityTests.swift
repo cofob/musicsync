@@ -8,8 +8,8 @@ import UniformTypeIdentifiers
 /// Renders bundled presets with butterchurn and with MilkDropKit from the same input (audio bytes, 1/60 s steps,
 /// every random value 0.5) and compares the pictures. Images of both and a summary go to `report`.
 @MainActor @Suite(.serialized) struct ParityTests {
-    static let size = (w: 256, h: 192)
-    static let frames = [1, 10, 30]
+    nonisolated static let size = (w: 256, h: 192)
+    nonisolated static let frames = [1, 10, 30]
     /// `MILKDROP_PARITY_REPORT` sets it, so runs at the same time do not share it.
     static let report = ProcessInfo.processInfo.environment["MILKDROP_PARITY_REPORT"].map { URL(fileURLWithPath: $0, isDirectory: true) }
         ?? FileManager.default.temporaryDirectory.appendingPathComponent("MilkDropParity", isDirectory: true)
@@ -33,7 +33,7 @@ import UniformTypeIdentifiers
     }
 
     /// The test audio of frame `f`, as `audio(f)` in reference.html, as floats that give back the same bytes.
-    static func audio(_ f: Int) -> [Float] {
+    nonisolated static func audio(_ f: Int) -> [Float] {
         (0..<1024).map { i in
             let b = min(max((128 + 100 * sin(Double(f * 1024 + i) * 0.05)).rounded(.down), 0), 255)
             return Float((b - 128) / 128)
@@ -42,34 +42,44 @@ import UniformTypeIdentifiers
 
     /// RGBA bytes, rows top first, of the frames in `keep` rendered natively.
     static func native(_ preset: Preset, device: MTLDevice, keep: [Int]) async throws -> [Int: [UInt8]] {
-        let renderer = try #require(Renderer(device: device, random: { 0.5 }))
-        let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .rgba8Unorm, width: size.w, height: size.h, mipmapped: false)
+        try renderFrames(try await CompiledPreset.compile(preset, device: device, screenFormat: .rgba8Unorm), device: device, keep: keep).frames
+    }
+
+    /// RGBA bytes, rows top first, of the frames in `keep` of a preset compiled for `format` (.rgba8Unorm or
+    /// .bgra8Unorm), and the mean ms of a frame after the first (rendering and waiting for the GPU).
+    nonisolated static func renderFrames(_ compiled: CompiledPreset, device: MTLDevice, keep: [Int], format: MTLPixelFormat = .rgba8Unorm,
+                                   textures: [URL] = []) throws -> (frames: [Int: [UInt8]], ms: Double) {
+        let renderer = try #require(Renderer(device: device, textureFolders: textures, random: { 0.5 }))
+        let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: format, width: size.w, height: size.h, mipmapped: false)
         d.usage = [.renderTarget, .shaderRead]
         d.storageMode = .shared
         let screen = try #require(device.makeTexture(descriptor: d))
-        try renderer.show(try await CompiledPreset.compile(preset, device: device, screenFormat: .rgba8Unorm), blend: 0)
-        var out: [Int: [UInt8]] = [:]
+        try renderer.show(compiled, blend: 0)
+        var out: [Int: [UInt8]] = [:], time = 0.0
         for f in 0..<(keep.max() ?? 0) {
+            let start = Date()
             let buffer = try #require(renderer.queue.makeCommandBuffer())
             let a = audio(f)
             renderer.render(into: screen, buffer: buffer, size: SIMD2(size.w, size.h), left: a, right: a, sampleRate: 44100, now: Double(f) / 60)
             Self.finish(buffer)
+            if f > 0 { time += Date().timeIntervalSince(start) }
             if keep.contains(f + 1) {
                 var bytes = [UInt8](repeating: 0, count: size.w * size.h * 4)
                 screen.getBytes(&bytes, bytesPerRow: size.w * 4, from: MTLRegionMake2D(0, 0, size.w, size.h), mipmapLevel: 0)
+                if format == .bgra8Unorm { for i in stride(from: 0, to: bytes.count, by: 4) { bytes.swapAt(i, i + 2) } }
                 out[f + 1] = bytes
             }
         }
-        return out
+        return (out, time * 1000 / Double(max((keep.max() ?? 0) - 1, 1)))
     }
 
     /// Waits for the GPU; a plain call, as the async wait cannot take a command buffer across actors.
-    static func finish(_ buffer: MTLCommandBuffer) {
+    nonisolated static func finish(_ buffer: MTLCommandBuffer) {
         buffer.commit()
         buffer.waitUntilCompleted()
     }
 
-    static func savePNG(_ bytes: [UInt8], to url: URL) {
+    nonisolated static func savePNG(_ bytes: [UInt8], to url: URL) {
         let data = CFDataCreate(nil, bytes, bytes.count)!
         guard let provider = CGDataProvider(data: data),
               let image = CGImage(width: size.w, height: size.h, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: size.w * 4,

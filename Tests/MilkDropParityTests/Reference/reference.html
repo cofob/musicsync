@@ -101,6 +101,7 @@ window.renderPreset = async (milk, width, height, frames, keep) => {
     if (keep.includes(f + 1)) out[f + 1] = viz.toDataURL();
   }
   if (failures.length) out.failure = failures[0];
+  Object.assign(out, { notes: failures.join('\n'), warp: preset.warp || '', comp: preset.comp || '' });
   return out;
 };
 
