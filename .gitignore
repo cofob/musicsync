@@ -6,3 +6,4 @@ build/
 !iPad/MusicSync.xcodeproj/
 xcuserdata/
 .DS_Store
+.env
