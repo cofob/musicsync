@@ -39,13 +39,22 @@ public final class CompiledPreset: @unchecked Sendable {
     public private(set) var prebuilt = 0
 
     /// `hash`: the preset file's; it names the stage's compiled shader in `shaders` (`<hash>-warp.metallib`, and
-    /// `default-warp.metallib` for the default shader).
+    /// `default-warp.metallib` for the default shader), and what it binds (`<hash>-warp.json`). With both there, the
+    /// shader is not translated; a set made before the `.json` gets it written on first use.
     private static func stage(_ hlsl: String, _ stage: ShaderStage, _ hash: String?, _ shaders: URL?, device: MTLDevice, format: MTLPixelFormat)
         async throws -> (shader: TranslatedShader, pipeline: MTLRenderPipelineState, error: String?, prebuilt: Bool) {
         func make(_ shader: TranslatedShader, _ name: String?, _ error: String?) async throws
             -> (shader: TranslatedShader, pipeline: MTLRenderPipelineState, error: String?, prebuilt: Bool) {
             let library = name.flatMap { library($0, in: shaders, device: device) }
             return (shader, try await pipeline(shader, library, device: device, format: format), error, library != nil)
+        }
+        if !hlsl.isEmpty, let name = hash.map({ "\($0)-\(stage)" }), let library = library(name, in: shaders, device: device) {
+            let info = shaders.flatMap { try? JSONDecoder().decode(ShaderInfo.self, from: Data(contentsOf: $0.appendingPathComponent(name + ".json"))) }
+                ?? (try? HLSLTranslator.translate(hlsl, stage: stage).info).map { save($0, name, in: shaders); return $0 }
+            if let info {
+                let shader = TranslatedShader(source: "", userTextures: info.textures, blurLevel: info.blur)
+                return (shader, try await pipeline(shader, library, device: device, format: format), nil, true)
+            }
         }
         if !hlsl.isEmpty {
             do {
@@ -55,6 +64,13 @@ public final class CompiledPreset: @unchecked Sendable {
             }
         }
         return try await make(HLSLTranslator.defaultShader(stage), "default-\(stage)", nil)
+    }
+
+    /// Writes what the compiled shader `name` binds next to it.
+    static func save(_ info: ShaderInfo, _ name: String, in folder: URL?) {
+        guard let folder, let data = try? JSONEncoder().encode(info) else { return }
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try? data.write(to: folder.appendingPathComponent(name + ".json"), options: .atomic)
     }
 
     /// The compiled shader `name` in `folder`; nil when it is not there or does not load.

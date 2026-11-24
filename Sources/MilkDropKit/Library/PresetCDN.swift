@@ -95,6 +95,7 @@ public struct PresetCDN: Sendable {
             add(entry.parts["thumb"], thumbnails.url(local))
             for (stage, kind) in stages where entry.parts[kind] != manifest.defaults[kind] {
                 add(entry.parts[kind], places.shaders.appendingPathComponent("\(entry.sha256)-\(stage).metallib"))
+                if let info = entry.shaders?[stage] { CompiledPreset.save(info, "\(entry.sha256)-\(stage)", in: places.shaders) }
             }
         }
         if targets.contains(where: \.entry.status.ok) {

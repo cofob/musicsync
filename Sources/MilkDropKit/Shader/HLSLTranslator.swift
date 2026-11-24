@@ -9,10 +9,11 @@ public enum HLSLTranslator {
     /// `ShowToUser_NoShaders`, which draws presets without a comp shader by fixed-function passes into the 8-bit
     /// back buffer: echo layers added `gammaAdj` times (at least once each with echo), then brighten, darken,
     /// solarize and invert as D3D blends of the clamped picture.
-    public static func defaultShader(_ stage: ShaderStage) -> TranslatedShader {
-        // The default sources are fixed and tested, so they always translate.
-        try! translate(stage == .warp ? defaultWarp : defaultComp, allowInternal: true)
-    }
+    public static func defaultShader(_ stage: ShaderStage) -> TranslatedShader { stage == .warp ? defaultWarpShader : defaultCompShader }
+
+    // The default sources are fixed and tested, so they always translate.
+    private static let defaultWarpShader = try! translate(defaultWarp, allowInternal: true)
+    private static let defaultCompShader = try! translate(defaultComp, allowInternal: true)
 
     private static func translate(_ hlsl: String, allowInternal: Bool) throws -> TranslatedShader {
         let generator = MSLGenerator(allowInternal: allowInternal)

@@ -155,9 +155,15 @@ import MilkDropKit
                     own["\(stage).\(platform)"] = defaultParts["\(stage).\(platform)"]
                 }
             }
+            let preset = try? PresetFile.load(source.url)
+            let shaders = Dictionary(uniqueKeysWithValues: zip(stages, [preset?.warp, preset?.comp]).compactMap { stage, hlsl -> (String, ShaderInfo)? in
+                guard own.contains(where: { $0.key.hasPrefix("\(stage).") && $0.value != defaultParts[$0.key] }), let hlsl, let shader = try? HLSLTranslator.translate(hlsl, stage: stage) else { return nil }
+                return ("\(stage)", shader.info)
+            })
             let mtime = ((try? fm.attributesOfItem(atPath: source.url.path))?[.modificationDate] as? Date)?.timeIntervalSince1970.rounded(.down) ?? 0
             return PresetCacheManifest.Entry(name: source.name, pack: source.pack, category: source.category, sha256: hashes[i], size: files[i].count,
-                                             mtime: mtime, status: results[i].status, look: results[i].look, flash: results[i].flash, parts: own)
+                                             mtime: mtime, status: results[i].status, look: results[i].look, flash: results[i].flash, parts: own,
+                                             shaders: shaders.isEmpty ? nil : shaders)
         }
         let manifest = PresetCacheManifest(presets: entries, defaults: defaultParts, textures: textures, chunks: packed.chunks)
         let encoder = JSONEncoder()

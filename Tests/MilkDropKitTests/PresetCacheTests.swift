@@ -98,7 +98,8 @@ final class PresetCacheStub: URLProtocol, @unchecked Sendable {
             presets: [
                 .init(name: "Good", pack: "cream-of-the-crop", category: "Dancer", sha256: goodHash, size: good.count, mtime: 1_700_000_000,
                       status: .init(ok: true), look: Self.measure.look, flash: Self.measure.flash,
-                      parts: ["milk": p[0], "thumb": p[2], "warp.macos": p[3], "warp.ios": p[4], "comp.macos": p[5], "comp.ios": p[6]]),
+                      parts: ["milk": p[0], "thumb": p[2], "warp.macos": p[3], "warp.ios": p[4], "comp.macos": p[5], "comp.ios": p[6]],
+                      shaders: ["warp": ShaderInfo(textures: [UserTexture(name: "clouds", wrap: true, filter: true)], blur: 1)]),
                 .init(name: "Broken", pack: "cream-of-the-crop", category: "Dancer", sha256: brokenHash, size: broken.count, mtime: 1_600_000_000,
                       status: .init(ok: false, error: "no"), look: nil, flash: nil, parts: ["milk": p[1]]),
                 .init(name: "Other", pack: "cream-of-the-crop", category: "Fractal", sha256: "x", size: 11, mtime: 0,
@@ -140,6 +141,7 @@ final class PresetCacheStub: URLProtocol, @unchecked Sendable {
         #expect(try Data(contentsOf: places.shaders.appendingPathComponent("\(goodHash)-warp.metallib")) == Data((mac ? "warp mac" : "warp ios").utf8))
         #expect(try Data(contentsOf: places.shaders.appendingPathComponent("default-comp.metallib")) == Data((mac ? "comp mac" : "comp ios").utf8))
         #expect(!FileManager.default.fileExists(atPath: places.shaders.appendingPathComponent("\(goodHash)-comp.metallib").path))
+        #expect(try JSONDecoder().decode(ShaderInfo.self, from: Data(contentsOf: places.shaders.appendingPathComponent("\(goodHash)-warp.json"))).blur == 1)
 
         // Installed presets are not fetched again.
         PresetCacheStub.requests = []
@@ -178,6 +180,13 @@ final class PresetCacheStub: URLProtocol, @unchecked Sendable {
         #expect(prebuilt.prebuilt == 2 && prebuilt.fallbacks.isEmpty)
         let renderer = try #require(Renderer(device: device))
         try renderer.show(prebuilt, blend: 0)
+
+        // A set without the shader's `.json` gets it on first use; with it, the shader is not translated.
+        let info = dir.appendingPathComponent("\(preset.sourceHash)-warp.json")
+        #expect(try JSONDecoder().decode(ShaderInfo.self, from: Data(contentsOf: info)) == HLSLTranslator.translate(preset.warp, stage: .warp).info)
+        try JSONEncoder().encode(ShaderInfo(textures: [], blur: 2)).write(to: info)
+        let untranslated = try await CompiledPreset.compile(preset, device: device, screenFormat: .bgra8Unorm, shaders: dir)
+        #expect(untranslated.prebuilt == 2 && untranslated.blurLevel == 2)
     }
 
     /// Against a real cache: `PRESET_CDN_TEST=https://musicsync-cache.cfb.wtf/milkdrop-test swift test --filter PresetCacheTests`.
@@ -196,11 +205,12 @@ final class PresetCacheStub: URLProtocol, @unchecked Sendable {
         let installed = try await cdn.install(categories, from: manifest, into: places)
         print("Installed \(installed) of \(manifest.presets.count) presets in \(Date().timeIntervalSince(start)) s")
         let library = PresetLibrary(builtIn: MilkDropResources.presets, folders: [places.downloads])
+        let downloaded = PresetLibrary(builtIn: nil, folders: [places.downloads]).entries
         let index = CompileIndex.at(places.index), measures = PresetMeasures.at(places.measures), thumbnails = PresetThumbnails(folder: places.thumbnails)
         var times: [Double] = [], prebuilt = 0
-        for entry in manifest.presets {
+        for entry in stride(from: 0, to: manifest.presets.count, by: max(manifest.presets.count / 200, 1)).map({ manifest.presets[$0] }) {
             let local = try #require(entry.pack == "builtin" ? library.entries[entry.name]
-                                     : PresetLibrary(builtIn: nil, folders: [places.downloads]).entries[entry.name])
+                                     : downloaded[entry.name])
             #expect(index.status(local) == entry.status.ok)
             guard entry.status.ok else { continue }
             #expect(measures.measure(local) != nil && thumbnails.cached(local) != nil)

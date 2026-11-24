@@ -2,7 +2,7 @@
 public enum ShaderStage: Sendable { case warp, comp }
 
 /// A preset texture a shader samples, as named by its `sampler_<prefix_>name` declaration.
-public struct UserTexture: Sendable, Hashable {
+public struct UserTexture: Codable, Sendable, Hashable {
     /// Texture name without the `sampler_` and `fw_`/`fc_`/`pw_`/`pc_` prefixes (`clouds`, `rand00_smalltiled`).
     public var name: String
     /// Repeat (true) or clamp to edge (false).
@@ -25,6 +25,17 @@ public struct TranslatedShader: Sendable {
     public var userTextures: [UserTexture]
     /// 0...3: highest blur texture the shader samples.
     public var blurLevel: Int
+
+    /// What the renderer binds, without the source.
+    public var info: ShaderInfo { ShaderInfo(textures: userTextures, blur: blurLevel) }
+}
+
+/// What the renderer binds for a compiled shader: kept with it in the preset cache, so the shader is not translated again.
+public struct ShaderInfo: Codable, Hashable, Sendable {
+    public var textures: [UserTexture]
+    public var blur: Int
+
+    public init(textures: [UserTexture], blur: Int) { (self.textures, self.blur) = (textures, blur) }
 }
 
 /// A shader the translator cannot handle, with the source line when known.

@@ -63,11 +63,13 @@ public struct PresetCacheManifest: Codable, Equatable, Sendable {
         /// "milk", "thumb", "warp.macos", "comp.macos", "warp.ios", "comp.ios". A stage on the default shader has the
         /// part of `defaults`.
         public var parts: [String: Part]
+        /// "warp", "comp": what the preset's own compiled shaders bind. Sets made before it lack it.
+        public var shaders: [String: ShaderInfo]?
 
         public init(name: String, pack: String, category: String, sha256: String, size: Int, mtime: Double, status: Status,
-                    look: PresetLook?, flash: FlashReport?, parts: [String: Part]) {
+                    look: PresetLook?, flash: FlashReport?, parts: [String: Part], shaders: [String: ShaderInfo]? = nil) {
             (self.name, self.pack, self.category, self.sha256, self.size, self.mtime) = (name, pack, category, sha256, size, mtime)
-            (self.status, self.look, self.flash, self.parts) = (status, look, flash, parts)
+            (self.status, self.look, self.flash, self.parts, self.shaders) = (status, look, flash, parts, shaders)
         }
     }
 
