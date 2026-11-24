@@ -14,7 +14,7 @@ public final class AudioLevels {
     public private(set) var bass: Float = 0, mid: Float = 0, treb: Float = 0
     public private(set) var bassAtt: Float = 1, midAtt: Float = 1, trebAtt: Float = 1
 
-    private let dft = vDSP.DFT(count: sampleCount, direction: .forward, transformType: .complexComplex, ofType: Float.self)
+    private let dft = try? vDSP.DiscreteFourierTransform(count: sampleCount, direction: .forward, transformType: .complexComplex, ofType: Float.self)
     private let equalize = (0..<512).map { Float(-0.02 * log(Double(512 - $0) / 512)) }
     private let zeros = [Float](repeating: 0, count: sampleCount)
     private var avg: [Float] = [1, 1, 1], longAvg: [Float] = [1, 1, 1]
@@ -45,7 +45,7 @@ public final class AudioLevels {
 
     private func magnitudes(_ samples: [Float]) -> [Float] {
         guard let dft else { return [Float](repeating: 0, count: 512) }
-        let (re, im) = dft.transform(inputReal: samples, inputImaginary: zeros)
+        let (re, im) = dft.transform(real: samples, imaginary: zeros)
         return (0..<512).map { equalize[$0] * (re[$0] * re[$0] + im[$0] * im[$0]).squareRoot() }
     }
 

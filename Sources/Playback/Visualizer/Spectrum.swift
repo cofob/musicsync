@@ -7,7 +7,7 @@ public struct Spectrum {
     public static let floor: Float = -70
     public static let range: ClosedRange<Double> = 40...16000
 
-    private let dft = vDSP.DFT(count: Spectrum.size, direction: .forward, transformType: .complexComplex, ofType: Float.self)
+    private let dft = try? vDSP.DiscreteFourierTransform(count: Spectrum.size, direction: .forward, transformType: .complexComplex, ofType: Float.self)
     private let window = vDSP.window(ofType: Float.self, usingSequence: .hanningDenormalized, count: Spectrum.size, isHalfWindow: false)
     private let zeros = [Float](repeating: 0, count: Spectrum.size)
 
@@ -18,7 +18,7 @@ public struct Spectrum {
         guard let dft, count > 0, sampleRate > 0 else { return [] }
         let n = Self.size
         let input = Array(samples.suffix(n)) + [Float](repeating: 0, count: max(n - samples.count, 0))
-        let (re, im) = dft.transform(inputReal: vDSP.multiply(input, window), inputImaginary: zeros)
+        let (re, im) = dft.transform(real: vDSP.multiply(input, window), imaginary: zeros)
         // A full-scale sine peaks at n / 4 after the Hann window.
         let scale = 4 / Float(n)
         let magnitude = (0..<n / 2).map { scale * (re[$0] * re[$0] + im[$0] * im[$0]).squareRoot() }

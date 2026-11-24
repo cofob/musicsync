@@ -19,7 +19,7 @@ struct MoodFrames {
     init(_ samples: [Float], sampleRate: Double) {
         let n = Self.size, count = samples.count / n
         step = Double(n) / sampleRate
-        guard count > 0, let dft = vDSP.DFT(count: n, direction: .forward, transformType: .complexComplex, ofType: Float.self) else {
+        guard count > 0, let dft = try? vDSP.DiscreteFourierTransform(count: n, direction: .forward, transformType: .complexComplex, ofType: Float.self) else {
             (db, centroid, chroma) = ([], [], [])
             return
         }
@@ -30,7 +30,7 @@ struct MoodFrames {
         for f in 0..<count {
             let frame = Array(samples[f * n..<(f + 1) * n])
             db.append(10 * log10(max(Double(vDSP.meanSquare(frame)), 1e-12)))
-            let (re, im) = dft.transform(inputReal: vDSP.multiply(frame, hann), inputImaginary: zeros)
+            let (re, im) = dft.transform(real: vDSP.multiply(frame, hann), imaginary: zeros)
             var weight = 0.0, total = 0.0, pitch = [Double](repeating: 0, count: 12)
             for k in 1..<n / 2 {
                 let magnitude = Double((re[k] * re[k] + im[k] * im[k]).squareRoot()), hz = Double(k) * width

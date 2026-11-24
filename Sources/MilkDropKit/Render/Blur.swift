@@ -43,7 +43,7 @@ final class Blur {
     private struct HorizontalParams { var texsize: SIMD4<Float>; var scale: Float; var bias: Float }
     private struct VerticalParams { var texsize: SIMD4<Float>; var ed1: Float; var ed2: Float }
 
-    private func pass<P>(_ buffer: MTLCommandBuffer, _ pipeline: MTLRenderPipelineState, from: MTLTexture, to: MTLTexture, _ params: inout P) {
+    private func pass<P: BitwiseCopyable>(_ buffer: MTLCommandBuffer, _ pipeline: MTLRenderPipelineState, from: MTLTexture, to: MTLTexture, _ params: inout P) {
         let pass = MTLRenderPassDescriptor()
         pass.colorAttachments[0].texture = to
         pass.colorAttachments[0].loadAction = .dontCare

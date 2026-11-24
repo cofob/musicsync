@@ -22,7 +22,7 @@ import AVFoundation
         }
 
         /// A fresh item of the same asset.
-        mutating func renew() {
+        @MainActor mutating func renew() {
             let new = AVPlayerItem(asset: item.asset)
             new.audioTimePitchAlgorithm = item.audioTimePitchAlgorithm
             item = new
