@@ -15,9 +15,12 @@ import MetalKit
     private var frame = 0
     private let start = ContinuousClock.now
 
+    private let textureFolders: [URL]
+
     static let renderSize = SIMD2(960, 540)
 
-    public init() {}
+    /// `textureFolders`: image folders besides the bundled one, as the visualizer has them.
+    public init(textureFolders: [URL] = []) { self.textureFolders = textureFolders }
 
     /// Starts showing `entry` once it has compiled (at once when the shader cache has it); nil stops.
     public func show(_ entry: PresetLibrary.Entry?) {
@@ -38,7 +41,7 @@ import MetalKit
         guard let device = view.device, let compiled else { return }
         if fresh {
             if noise == nil, let queue = device.makeCommandQueue() { noise = Noise.makeTextures(device: device, queue: queue) }
-            renderer = Renderer(device: device, noise: noise)
+            renderer = Renderer(device: device, textureFolders: textureFolders, noise: noise)
             try? renderer?.show(compiled, blend: 0)
             fresh = false
             frame = 0

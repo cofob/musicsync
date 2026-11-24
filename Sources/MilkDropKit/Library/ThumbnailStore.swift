@@ -12,8 +12,8 @@ public final class ThumbnailStore: Sendable {
     private let limiter = AsyncLimiter(2)
     private let gpuState = Mutex<(MTLDevice, Noise.Textures)?>(nil)
 
-    public init(folder: URL, index: URL?) {
-        thumbnails = PresetThumbnails(folder: folder)
+    public init(folder: URL, index: URL?, textureFolders: [URL] = []) {
+        thumbnails = PresetThumbnails(folder: folder, textureFolders: textureFolders)
         self.index = index.map(CompileIndex.at)
     }
 

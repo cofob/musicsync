@@ -9,10 +9,10 @@ struct PresetBrowser: View {
     @State private var category = PresetBrowser.all
     @State private var search = ""
     @State var hovered: String?
-    @State private var preview = PresetPreview()
+    @State private var preview = PresetPreview(textureFolders: [MilkDrop.userFolder])
 
     static let all = "All Presets"
-    static let store = ThumbnailStore(folder: MilkDrop.thumbnailFolder, index: MilkDrop.compileIndex)
+    static let store = ThumbnailStore(folder: MilkDrop.thumbnailFolder, index: MilkDrop.compileIndex, textureFolders: [MilkDrop.userFolder])
 
     var body: some View {
         let entries = milkDrop.entries

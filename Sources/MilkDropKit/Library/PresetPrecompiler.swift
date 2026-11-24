@@ -15,10 +15,10 @@ import Observation
     @ObservationIgnored private let thumbnails: PresetThumbnails?
 
     /// `thumbnails`: where to keep a picture of each preset on the demo track, made as it compiles.
-    public init(folders: [URL], index: URL, thumbnails: URL? = nil) {
+    public init(folders: [URL], index: URL, thumbnails: URL? = nil, textureFolders: [URL] = []) {
         self.folders = folders
         self.index = CompileIndex.at(index)
-        self.thumbnails = thumbnails.map(PresetThumbnails.init)
+        self.thumbnails = thumbnails.map { PresetThumbnails(folder: $0, textureFolders: textureFolders) }
     }
 
     /// Compiles every preset of the folders and the bundle not compiled yet, or only those named in `only`.

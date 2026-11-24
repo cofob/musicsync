@@ -30,8 +30,13 @@ public final class PresetThumbnails: Sendable {
     static let renderSize = SIMD2(960, 540)
     static let frames = 120
     private let folder: URL
+    /// Image folders besides the bundled one, as the visualizer has them.
+    private let textureFolders: [URL]
 
-    public init(folder: URL) { self.folder = folder }
+    public init(folder: URL, textureFolders: [URL] = []) {
+        self.folder = folder
+        self.textureFolders = textureFolders
+    }
 
     func url(_ entry: PresetLibrary.Entry) -> URL {
         let safe = entry.name.map { "/:\\".contains($0) ? "_" : $0 }
@@ -47,7 +52,7 @@ public final class PresetThumbnails: Sendable {
     /// Renders `compiled` for two seconds of the demo track and saves the last frame. Blocks the calling thread.
     @discardableResult
     func make(_ compiled: CompiledPreset, entry: PresetLibrary.Entry, device: MTLDevice, noise: Noise.Textures?) throws -> CGImage {
-        guard let renderer = Renderer(device: device, noise: noise) else { throw CocoaError(.featureUnsupported) }
+        guard let renderer = Renderer(device: device, textureFolders: textureFolders, noise: noise) else { throw CocoaError(.featureUnsupported) }
         let (w, h) = (Self.renderSize.x, Self.renderSize.y)
         let d = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: MilkDropController.screenFormat, width: w, height: h, mipmapped: false)
         d.usage = [.renderTarget, .shaderRead]
