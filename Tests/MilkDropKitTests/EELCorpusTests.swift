@@ -65,3 +65,29 @@ func bundledPresets() throws -> [(name: String, text: String)] {
         #expect(programs.count > 100)
     }
 }
+
+/// Compiles every equation block of every .milk under `MILKDROP_PACK_DIR` (the downloaded pack) and lists the failures.
+@Suite(.enabled(if: ProcessInfo.processInfo.environment["MILKDROP_PACK_DIR"] != nil))
+struct EELPackTests {
+    @Test func everyPackPresetCompiles() throws {
+        let root = URL(fileURLWithPath: ProcessInfo.processInfo.environment["MILKDROP_PACK_DIR"]!)
+        let files = (FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)?.allObjects as? [URL] ?? [])
+            .filter { $0.pathExtension == "milk" }
+        var failures: [String] = []
+        for file in files {
+            let preset = try PresetFile.load(file)
+            let blocks = [preset.initCode, preset.frameCode, preset.pixelCode]
+                + preset.waves.flatMap { [$0.initCode, $0.frameCode, $0.pointCode] } + preset.shapes.flatMap { [$0.initCode, $0.frameCode] }
+            let scope = EELScope(memory: EELMemory(), globals: EELGlobals())
+            for code in blocks {
+                do { _ = try scope.compile(code) } catch {
+                    failures.append("\(file.path.dropFirst(root.path.count))\t\(error)")
+                    break
+                }
+            }
+        }
+        print("EEL pack: \(files.count - failures.count)/\(files.count) presets compile")
+        failures.sorted().forEach { print("  \($0)") }
+        #expect(files.count > 0)
+    }
+}
