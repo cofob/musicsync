@@ -15,6 +15,8 @@ import MetalKit
     private var frame = 0
     private let start = ContinuousClock.now
 
+    static let renderSize = SIMD2(960, 540)
+
     public init() {}
 
     /// Starts showing `entry` once it has compiled (at once when the shader cache has it); nil stops.
@@ -45,7 +47,9 @@ import MetalKit
         frame += 1
         let demo = DemoTrack.samples(frame: frame)
         let audio = samples?() ?? (left: demo, right: demo, rate: DemoTrack.rate)
-        let size = SIMD2(max(Int(view.drawableSize.width), 16), max(Int(view.drawableSize.height), 16))
+        // At the size the visualizer renders, not the card's: presets move by fractions of a pixel per frame and
+        // look different, and step, on a small target. The comp pass scales it down into the card.
+        let size = Self.renderSize
         let d = ContinuousClock.now - start
         renderer.render(into: drawable.texture, buffer: buffer, size: size, left: audio.left, right: audio.right, sampleRate: audio.rate,
                         now: Double(d.components.seconds) + Double(d.components.attoseconds) * 1e-18)

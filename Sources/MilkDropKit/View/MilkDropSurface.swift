@@ -27,8 +27,17 @@ public struct MilkDropSurface {
 
     @MainActor public final class Coordinator: NSObject, MTKViewDelegate {
         var drawing: MilkDropDrawing
+        private var last: ContinuousClock.Instant?
         init(_ drawing: MilkDropDrawing) { self.drawing = drawing }
-        public func draw(in view: MTKView) { drawing.draw(in: view) }
+
+        /// At most 60 frames a second: presets move a fixed step per frame, and ProMotion screens call at 120 Hz
+        /// whatever `preferredFramesPerSecond` says, which made them run twice as fast, in jerks.
+        public func draw(in view: MTKView) {
+            let now = ContinuousClock.now
+            if let last, now - last < .milliseconds(13) { return }
+            last = now
+            drawing.draw(in: view)
+        }
         public func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) { drawing.sizeChanged(size, in: view) }
     }
 }
