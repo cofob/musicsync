@@ -10,7 +10,7 @@ import Testing
     }
 
     /// A folder with presets A…L, and a controller that sees only them.
-    private func setUp(_ body: (MilkDropController, [PresetLibrary.Entry], PresetMeasures) throws -> Void) throws {
+    private func setUp(_ body: (MilkDropController, [PresetLibrary.Entry], PresetMeasures) async throws -> Void) async throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: dir) }
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -24,11 +24,12 @@ import Testing
         var options = PresetCycler.Options()
         options.builtIn = false
         controller.configure(options)
-        try body(controller, entries, measures)
+        await controller.listed()
+        try await body(controller, entries, measures)
     }
 
-    @Test func leavesOutPresetsThatFlashOrAreNotMeasured() throws {
-        try setUp { controller, entries, measures in
+    @Test func leavesOutPresetsThatFlashOrAreNotMeasured() async throws {
+        try await setUp { controller, entries, measures in
             measures.record(entries[0], measure(general: 0))
             measures.record(entries[1], measure(general: 5))
             var options = PresetCycler.Options()
@@ -36,21 +37,24 @@ import Testing
             #expect(controller.presets.count == 12)
             options.reduceFlashing = true
             controller.configure(options)
+            await controller.listed()
             #expect(controller.presets == ["A"])
             #expect(controller.unmeasured == 10)
             #expect(controller.flashes(entries[1]) == true && controller.flashes(entries[0]) == false && controller.flashes(entries[2]) == nil)
             options.reduceFlashing = false
             controller.configure(options)
+            await controller.listed()
             #expect(controller.presets.count == 12)
         }
     }
 
-    @Test func matchingNeedsEnoughMoods() throws {
-        try setUp { controller, entries, measures in
+    @Test func matchingNeedsEnoughMoods() async throws {
+        try await setUp { controller, entries, measures in
             for entry in entries.prefix(3) { measures.record(entry, measure(general: 0)) }
             #expect(!controller.random(matching: Mood(arousal: 0.5, valence: 0.5, tension: 0.5)))
             for entry in entries { measures.record(entry, measure(general: 0)) }
             controller.reload()
+            await controller.listed()
             #expect(controller.random(matching: Mood(arousal: 0.5, valence: 0.5, tension: 0.5)))
         }
     }

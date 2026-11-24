@@ -31,8 +31,15 @@ import Observation
     @ObservationIgnored private var pendingTitle: (String, Double)?
     @ObservationIgnored private let folders: [URL]
     @ObservationIgnored private let textureFolders: [URL]
-    @ObservationIgnored private let index: CompileIndex?
-    @ObservationIgnored private let measures: PresetMeasures?
+    /// Opened (read from disk) first by `reload`, off the main thread; shared after that.
+    @ObservationIgnored private let indexURL: URL?
+    @ObservationIgnored private let measuresURL: URL?
+    private var index: CompileIndex? { indexURL.map(CompileIndex.at) }
+    private var measures: PresetMeasures? { measuresURL.map(PresetMeasures.at) }
+    /// `reload` reading the folders.
+    @ObservationIgnored private var listing: Task<Void, Never>?
+    /// Moods of the presets that have one, read by `reload`.
+    @ObservationIgnored private var moods: [String: Mood] = [:]
     /// The last presets that a mood picked, so they do not come again soon.
     @ObservationIgnored private var recent: [String] = []
     @ObservationIgnored private let clock = ContinuousClock()
@@ -44,20 +51,17 @@ import Observation
     public init(folders: [URL] = [], textureFolders: [URL] = [], index: URL? = nil, measures: URL? = nil) {
         self.folders = folders
         self.textureFolders = textureFolders
-        self.index = index.map(CompileIndex.at)
-        self.measures = measures.map(PresetMeasures.at)
-        library = PresetLibrary(folders: folders)
-        reload()
+        indexURL = index
+        measuresURL = measures
+        library = PresetLibrary(builtIn: nil, folders: [])  // filled by `reload`, at the first `configure`
     }
 
     private var now: Double { let d = clock.now - start; return Double(d.components.seconds) + Double(d.components.attoseconds) * 1e-18 }
 
     public func configure(_ options: PresetCycler.Options) {
         let lists = options.builtIn != cycler.options.builtIn || options.reduceFlashing != cycler.options.reduceFlashing
-        let flashing = options.reduceFlashing && !cycler.options.reduceFlashing
         cycler.setOptions(options)
-        if lists { updateNames() }
-        if flashing, let current, !cycler.names.contains(current) { random() }  // it may flash
+        if lists || listing == nil { reload() }
     }
 
     /// Whether the preset flashes too much (`FlashReport`); nil when not measured.
@@ -66,7 +70,7 @@ import Observation
     /// Shows a preset whose mood is close to `target` and was not shown by a mood lately; one of the closest few, at
     /// random. False (and nothing changes) when too few presets have a mood.
     @discardableResult public func random(matching target: Mood) -> Bool {
-        let known = entries.compactMap { entry in measures?.mood(entry).map { (name: entry.name, mood: $0) } }
+        let known = entries.compactMap { entry in moods[entry.name].map { (name: entry.name, mood: $0) } }
         guard known.count >= Self.fewestMoods,
               let name = MoodMatcher.pick(known, near: target, avoiding: Set(recent + [current].compactMap { $0 }), random: .random(in: 0..<1))
         else { return false }
@@ -78,12 +82,32 @@ import Observation
     /// Fewest presets with a mood for matching to make sense.
     static let fewestMoods = 8
 
-    /// Reads the folders again (new or removed presets).
+    /// Reads the folders again (new or removed presets) off the main thread: thousands of presets take half a second.
+    /// A newer call replaces one still running; `listed()` waits for it.
     public func reload() {
-        library = PresetLibrary(folders: folders)
-        if let index { failed = Array(Set(failed).union(index.failed(in: library))).sorted() }
-        updateNames()
+        let folders = folders, indexURL = indexURL, measuresURL = measuresURL, options = cycler.options, known = Set(failed)
+        listing?.cancel()
+        listing = Task {
+            let found = await Task.detached(priority: .userInitiated) {
+                let library = PresetLibrary(folders: folders)
+                let failed = known.union(indexURL.map { CompileIndex.at($0).failed(in: library) } ?? [])
+                return (library, failed, Self.names(library, options, failed: failed, measures: measuresURL.map(PresetMeasures.at)))
+            }.value
+            guard !Task.isCancelled else { return }
+            library = found.0
+            failed = Array(Set(failed).union(found.1)).sorted()
+            let failedNow = Set(failed)
+            unmeasured = found.2.unmeasured
+            moods = found.2.moods
+            cycler.setNames(found.2.names.filter { !failedNow.contains($0) })
+            presets = cycler.names
+            entries = presets.compactMap { library.entries[$0] }
+            prepare(cycler.upcoming)
+            if cycler.options.reduceFlashing, let current, !cycler.names.contains(current) { random() }  // it may flash
+        }
     }
+
+    public func listed() async { await listing?.value }
 
     public func step(_ by: Int) { apply(cycler.step(by, now: now)) }
     public func random() { apply(cycler.random(now: now)) }
@@ -96,18 +120,14 @@ import Observation
         loop.queue.async { loop.renderer?.showTitle(text, seconds: seconds) }
     }
 
-    private func updateNames() {
-        var names = library.names(includingBuiltIn: cycler.options.builtIn, excluding: Set(failed))
-        unmeasured = 0
-        if cycler.options.reduceFlashing {
-            let safe = names.filter { name in library.entries[name].flatMap { measures?.isSafe($0) } == true }
-            unmeasured = names.filter { name in library.entries[name].flatMap { measures?.measure($0) } == nil }.count
-            names = safe
-        }
-        cycler.setNames(names)
-        presets = cycler.names
-        entries = presets.compactMap { library.entries[$0] }
-        prepare(cycler.upcoming)
+    /// Names to show, how many were left out as not measured, and the moods of the measured.
+    nonisolated private static func names(_ library: PresetLibrary, _ options: PresetCycler.Options, failed: Set<String>,
+                                          measures: PresetMeasures?) -> (names: [String], unmeasured: Int, moods: [String: Mood]) {
+        let names = library.names(includingBuiltIn: options.builtIn, excluding: failed)
+        let measured = names.map { name in library.entries[name].flatMap { measures?.measure($0) } }
+        let moods = Dictionary(uniqueKeysWithValues: zip(names, measured).compactMap { name, m in m.map { (name, $0.mood) } })
+        guard options.reduceFlashing else { return (names, 0, moods) }
+        return (zip(names, measured).filter { $0.1?.flash.isSafe == true }.map(\.0), measured.filter { $0 == nil }.count, moods)
     }
 
     // MARK: Changes
@@ -149,7 +169,7 @@ import Observation
         compiling.remove(name)
         if let entry = library.entries[name], let index {
             index.record(entry, ok: result != nil)
-            index.save()
+            Task.detached(priority: .utility) { index.save() }  // all records as JSON: ~40 ms with thousands
         }
         guard let result else { return fail(name) }
         compiled[name] = result

@@ -36,6 +36,8 @@ import Testing
         let entry = try #require(PresetLibrary(folders: [dir]).entries["Broken2"])
         index.record(entry, ok: false)
         let controller = MilkDropController(folders: [dir], index: indexURL)
+        controller.reload()
+        await controller.listed()
         #expect(controller.failed.contains("Broken2") && !controller.presets.contains("Broken2"))
     }
 

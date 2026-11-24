@@ -225,6 +225,8 @@ import SwiftUI
             open(EqualizerView(), "Equalizer", model)
         case "visualizer-presets", "visualizer-presets-hover":
             let milkDrop = MilkDrop.app()
+            milkDrop.reload()
+            await milkDrop.listed()
             let hovered = scene.hasSuffix("hover") ? milkDrop.entries.dropFirst(4).first?.name : nil
             open(PresetBrowser(milkDrop: milkDrop, player: model.player, hovered: hovered), "Presets", model)
         case "visualizer", "visualizer-scope", "visualizer-milkdrop", "miniplayer-visualizer":
