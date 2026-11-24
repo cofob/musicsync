@@ -68,6 +68,16 @@ open /Applications/MusicSync.app
 
 If you download `MusicSync.zip` from [Releases](https://github.com/cofob/musicsync/releases) in a browser and macOS blocks it, run `xattr -dr com.apple.quarantine /Applications/MusicSync.app`.
 
+### iPad
+
+The iPad app needs iPadOS 26. `MusicSync-iPad.ipa` on [Releases](https://github.com/cofob/musicsync/releases) is not signed: sign and install it with your own Apple ID in a sideloading tool such as [AltStore](https://altstore.io), [SideStore](https://sidestore.io) or [Sideloadly](https://sideloadly.io).
+
+1. Download `MusicSync-iPad.ipa` from the latest release.
+2. Open it in the tool and install it on the iPad with your Apple ID.
+3. On the iPad, in Settings > Privacy & Security, turn on Developer Mode; in Settings > General > VPN & Device Management, trust your Apple ID.
+
+With a free Apple ID, the app works for 7 days; refresh it in the tool before then. With a paid developer account, you can instead build and run it from Xcode (see Build).
+
 Open Settings, enter your server address, user name and password, and click Save. The password is kept in the Keychain.
 
 ## License
