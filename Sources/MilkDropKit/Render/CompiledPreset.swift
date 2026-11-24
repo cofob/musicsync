@@ -1,3 +1,4 @@
+import Foundation
 import Metal
 
 /// A preset with its warp and comp shaders translated and compiled, ready to show. Compiling takes 50–300 ms,
@@ -19,35 +20,52 @@ public final class CompiledPreset: @unchecked Sendable {
 
     /// A shader that does not translate or compile is replaced by the default one of its stage, as MilkDrop does when
     /// D3D rejects it; `fallbacks` says which and why. Throws only when even the default fails (no GPU).
-    public static func compile(_ preset: Preset, device: MTLDevice, screenFormat: MTLPixelFormat) async throws -> CompiledPreset {
-        async let w = stage(preset.warp, .warp, device: device, format: Targets.format)
-        async let c = stage(preset.comp, .comp, device: device, format: screenFormat)
+    /// `shaders`: compiled shaders from the preset cache (`PresetCDN`), used instead of compiling when there.
+    public static func compile(_ preset: Preset, device: MTLDevice, screenFormat: MTLPixelFormat,
+                               shaders: URL? = PresetCDN.shaderFolder) async throws -> CompiledPreset {
+        let hash = preset.sourceHash.isEmpty ? nil : preset.sourceHash
+        async let w = stage(preset.warp, .warp, hash, shaders, device: device, format: Targets.format)
+        async let c = stage(preset.comp, .comp, hash, shaders, device: device, format: screenFormat)
         let (warp, comp) = try await (w, c)
         let result = CompiledPreset(preset, warp.shader, comp.shader, warp.pipeline, comp.pipeline)
         result.fallbacks = [warp.error, comp.error].compactMap { $0 }
+        result.prebuilt = [warp, comp].filter(\.prebuilt).count
         return result
     }
 
     /// Why a stage runs on the default shader ("warp: line 3: …"); empty when both are the preset's own.
     public private(set) var fallbacks: [String] = []
+    /// How many stages came compiled from the preset cache.
+    public private(set) var prebuilt = 0
 
-    private static func stage(_ hlsl: String, _ stage: ShaderStage, device: MTLDevice, format: MTLPixelFormat) async throws
-        -> (shader: TranslatedShader, pipeline: MTLRenderPipelineState, error: String?) {
+    /// `hash`: the preset file's; it names the stage's compiled shader in `shaders` (`<hash>-warp.metallib`, and
+    /// `default-warp.metallib` for the default shader).
+    private static func stage(_ hlsl: String, _ stage: ShaderStage, _ hash: String?, _ shaders: URL?, device: MTLDevice, format: MTLPixelFormat)
+        async throws -> (shader: TranslatedShader, pipeline: MTLRenderPipelineState, error: String?, prebuilt: Bool) {
+        func make(_ shader: TranslatedShader, _ name: String?, _ error: String?) async throws
+            -> (shader: TranslatedShader, pipeline: MTLRenderPipelineState, error: String?, prebuilt: Bool) {
+            let library = name.flatMap { library($0, in: shaders, device: device) }
+            return (shader, try await pipeline(shader, library, device: device, format: format), error, library != nil)
+        }
         if !hlsl.isEmpty {
             do {
-                let shader = try HLSLTranslator.translate(hlsl, stage: stage)
-                return (shader, try await pipeline(shader, device: device, format: format), nil)
+                return try await make(try HLSLTranslator.translate(hlsl, stage: stage), hash.map { "\($0)-\(stage)" }, nil)
             } catch {
-                let fallback = HLSLTranslator.defaultShader(stage)
-                return (fallback, try await pipeline(fallback, device: device, format: format), "\(stage): \(error)")
+                return try await make(HLSLTranslator.defaultShader(stage), "default-\(stage)", "\(stage): \(error)")
             }
         }
-        let shader = HLSLTranslator.defaultShader(stage)
-        return (shader, try await pipeline(shader, device: device, format: format), nil)
+        return try await make(HLSLTranslator.defaultShader(stage), "default-\(stage)", nil)
     }
 
-    private static func pipeline(_ shader: TranslatedShader, device: MTLDevice, format: MTLPixelFormat) async throws -> MTLRenderPipelineState {
-        let library = try await device.makeLibrary(source: shader.source, options: nil)
+    /// The compiled shader `name` in `folder`; nil when it is not there or does not load.
+    private static func library(_ name: String, in folder: URL?, device: MTLDevice) -> MTLLibrary? {
+        guard let url = folder?.appendingPathComponent(name + ".metallib"), FileManager.default.fileExists(atPath: url.path),
+              let library = try? device.makeLibrary(URL: url), library.functionNames.contains("md_fragment") else { return nil }
+        return library
+    }
+
+    private static func pipeline(_ shader: TranslatedShader, _ prebuilt: MTLLibrary?, device: MTLDevice, format: MTLPixelFormat) async throws -> MTLRenderPipelineState {
+        let library = if let prebuilt { prebuilt } else { try await device.makeLibrary(source: shader.source, options: nil) }
         let d = MTLRenderPipelineDescriptor()
         d.vertexFunction = library.makeFunction(name: "md_vertex")
         d.fragmentFunction = library.makeFunction(name: "md_fragment")

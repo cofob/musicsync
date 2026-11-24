@@ -9,6 +9,8 @@ public enum PresetPack {
     public struct Category: Sendable, Hashable, Identifiable {
         public var name: String
         public var count: Int
+        /// Download size, when known (`PresetCDN`).
+        public var bytes: Int?
         public var id: String { name }
     }
 

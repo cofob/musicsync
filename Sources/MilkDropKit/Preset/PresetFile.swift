@@ -6,7 +6,9 @@ public enum PresetFile {
     public static func load(_ url: URL) throws -> Preset {
         let data = try Data(contentsOf: url)
         let text = String(data: data, encoding: .utf8) ?? String(decoding: data, as: UTF8.self)
-        return parse(text, name: url.deletingPathExtension().lastPathComponent)
+        var preset = parse(text, name: url.deletingPathExtension().lastPathComponent)
+        preset.sourceHash = PresetCacheManifest.sha256(data)
+        return preset
     }
 
     public static func parse(_ text: String, name: String) -> Preset {

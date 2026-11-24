@@ -10,6 +10,8 @@ public struct Preset: Sendable {
     public var shapes: [Shape] = []
     /// HLSL of the warp and comp shaders, or empty for the default shader.
     public var warp = "", comp = ""
+    /// SHA-256 of the file (hex), which names its compiled shaders in the preset cache; empty when not from a file.
+    public var sourceHash = ""
 
     public struct Wave: Sendable {
         public var values: [String: Double]

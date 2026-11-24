@@ -31,6 +31,16 @@ final class TarGzip {
     /// Ends the stream; the gzip trailer after the deflate data is ignored.
     func finish() throws { try filter?.finalize() }
 
+    /// The contents of a whole `.gz` file.
+    static func gunzip(_ data: Data) throws -> Data {
+        guard let start = try deflateStart(data) else { throw CocoaError(.fileReadCorruptFile) }
+        var out = Data()
+        let filter = try OutputFilter(.decompress, using: .zlib) { chunk in chunk.map { out.append($0) } }
+        try filter.write(data.dropFirst(start))
+        try filter.finalize()
+        return out
+    }
+
     /// Offset of the deflate data after the gzip header, nil until the header is complete (RFC 1952).
     static func deflateStart(_ d: Data) throws -> Int? {
         let b = [UInt8](d.prefix(4096))
