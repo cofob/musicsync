@@ -72,6 +72,25 @@ enum EELLexer {
             }
         }
         tokens.append(EELToken(kind: .end, line: line))
-        return tokens
+        return withoutStraySemicolons(tokens)
+    }
+
+    /// MilkDrop's NS-EEL2 keeps a `;` inside parentheses only before a name, number, `(` or `!`; it reads any other as
+    /// a space, so `(a;;*b)` is `(a*b)`.
+    private static func withoutStraySemicolons(_ tokens: [EELToken]) -> [EELToken] {
+        var depth = 0
+        return tokens.indices.compactMap { k in
+            switch tokens[k].symbol {
+            case "(": depth += 1
+            case ")": depth = max(depth - 1, 0)
+            case ";" where depth > 0:
+                switch tokens[k + 1].kind {
+                case .name, .number, .symbol("("), .symbol("!"): break
+                default: return nil
+                }
+            default: break
+            }
+            return tokens[k]
+        }
     }
 }
