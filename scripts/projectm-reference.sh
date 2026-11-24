@@ -19,11 +19,6 @@ tool_src="$repo/Tests/MilkDropParityTests/ProjectM/projectm-render.c"
 mkdir -p "$cache"
 cache="$(cd "$cache" && pwd)"
 
-if ! command -v cmake >/dev/null || ! command -v ninja >/dev/null; then
-    [ -x "$cache/venv/bin/ninja" ] || { python3 -m venv "$cache/venv" && "$cache/venv/bin/pip" install -q cmake ninja; } >&2
-    export PATH="$cache/venv/bin:$PATH"
-fi
-
 src="$cache/src/libprojectM-$version"
 if [ ! -f "$src/.patched" ]; then
     tarball="$cache/libprojectM-$version.tar.gz"
@@ -49,6 +44,10 @@ if [ ! -f "$src/.patched" ]; then
 fi
 
 if [ ! -f "$cache/install/lib/libprojectM-4.a" ]; then
+    if ! command -v cmake >/dev/null || ! command -v ninja >/dev/null; then
+        [ -x "$cache/venv/bin/ninja" ] || { python3 -m venv "$cache/venv" && "$cache/venv/bin/pip" install -q cmake ninja; } >&2
+        export PATH="$cache/venv/bin:$PATH"
+    fi
     cmake -S "$src" -B "$cache/build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
         -DENABLE_PLAYLIST=OFF -DENABLE_SYSTEM_PROJECTM_EVAL=OFF -DCMAKE_INSTALL_PREFIX="$cache/install" >&2
     cmake --build "$cache/build" >&2

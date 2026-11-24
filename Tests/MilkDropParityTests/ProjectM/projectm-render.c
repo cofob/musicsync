@@ -1,6 +1,6 @@
 // Renders a .milk preset with libprojectM 4 offscreen (CGL, OpenGL 4.1 core, FBO) at 256×192, with the audio of
 // ParityTests.audio(f) on both channels, and writes the asked frames as <outdir>/<frame>.png (rows top first).
-// Usage: projectm-render <preset.milk> <outdir> <frame,frame,...> [texture folder]
+// Usage: projectm-render <preset.milk> <outdir> <frame,frame,...> [texture folder...]
 // Build with scripts/projectm-reference.sh, which also patches projectM for fixed time steps and random values.
 #include <CoreGraphics/CoreGraphics.h>
 #include <ImageIO/ImageIO.h>
@@ -44,11 +44,11 @@ static int savePNG(const unsigned char* rgba, const char* path) {
 
 int main(int argc, char** argv) {
     if (argc < 4) {
-        fprintf(stderr, "usage: %s <preset.milk> <outdir> <frame,frame,...> [texture folder]\n", argv[0]);
+        fprintf(stderr, "usage: %s <preset.milk> <outdir> <frame,frame,...> [texture folder...]\n", argv[0]);
         return 1;
     }
-    int keep[64], count = 0, last = 0;
-    for (char* s = strtok(argv[3], ","); s && count < 64; s = strtok(NULL, ",")) {
+    int keep[1024], count = 0, last = 0;
+    for (char* s = strtok(argv[3], ","); s && count < 1024; s = strtok(NULL, ",")) {
         keep[count] = atoi(s);
         if (keep[count] > last) last = keep[count];
         count++;
@@ -82,10 +82,7 @@ int main(int argc, char** argv) {
         fprintf(stderr, "projectm_create failed\n");
         return 3;
     }
-    if (argc > 4) {
-        const char* paths[] = {argv[4]};
-        projectm_set_texture_search_paths(pm, paths, 1);
-    }
+    if (argc > 4) projectm_set_texture_search_paths(pm, (const char**)argv + 4, (size_t)(argc - 4));
     projectm_set_window_size(pm, W, H);
     projectm_set_mesh_size(pm, 48, 36);
     projectm_set_fps(pm, 60);
