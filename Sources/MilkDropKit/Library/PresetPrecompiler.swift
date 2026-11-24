@@ -13,23 +13,28 @@ import Observation
     @ObservationIgnored private let folders: [URL]
     @ObservationIgnored private let index: CompileIndex
     @ObservationIgnored private let thumbnails: PresetThumbnails?
+    @ObservationIgnored private let measures: PresetMeasures?
 
     /// `thumbnails`: where to keep a picture of each preset on the demo track, made as it compiles.
-    public init(folders: [URL], index: URL, thumbnails: URL? = nil, textureFolders: [URL] = []) {
+    /// `measures`: where to keep what the demo track shows of its look, mood and flashes (`PresetMeasures`).
+    public init(folders: [URL], index: URL, thumbnails: URL? = nil, textureFolders: [URL] = [], measures: URL? = nil) {
         self.folders = folders
         self.index = CompileIndex.at(index)
         self.thumbnails = thumbnails.map { PresetThumbnails(folder: $0, textureFolders: textureFolders) }
+        self.measures = measures.map(PresetMeasures.at)
     }
 
     /// Compiles every preset of the folders and the bundle not compiled yet, or only those named in `only`.
-    /// `finished` runs on the main actor when it ends (also when cancelled).
-    public func compileAll(only: Set<String>? = nil, finished: @escaping @MainActor () -> Void = {}) {
+    /// `finished` runs on the main actor when it ends (also when cancelled), `progress` after every 50 presets.
+    public func compileAll(only: Set<String>? = nil, finished: @escaping @MainActor () -> Void = {},
+                           progress: @escaping @MainActor () -> Void = {}) {
         guard task == nil, let device = MTLCreateSystemDefaultDevice(), let queue = device.makeCommandQueue() else { return }
-        let noise = Noise.makeTextures(device: device, queue: queue), thumbnails = self.thumbnails
+        let noise = Noise.makeTextures(device: device, queue: queue), thumbnails = self.thumbnails, measures = self.measures
         let library = PresetLibrary(folders: folders)
         let index = self.index
         let entries = library.entries.values.filter { entry in
-            (only?.contains(entry.name) ?? true) && (index.status(entry) == nil || (index.status(entry) == true && thumbnails?.cached(entry) == nil))
+            (only?.contains(entry.name) ?? true) && (index.status(entry) == nil || (index.status(entry) == true
+                && (thumbnails?.cached(entry) == nil || (measures != nil && measures?.measure(entry) == nil))))
         }
         (done, total, failed, isRunning) = (0, entries.count, 0, true)
         task = Task {
@@ -39,7 +44,7 @@ import Observation
                 var next = entries.makeIterator()
                 func add() -> Bool {
                     guard let entry = next.next() else { return false }
-                    group.addTask(priority: .utility) { await Self.compile(entry, device: device, index: index, thumbnails: thumbnails, noise: noise) }
+                    group.addTask(priority: .utility) { await Self.compile(entry, device: device, index: index, thumbnails: thumbnails, measures: measures, noise: noise) }
                     return true
                 }
                 for _ in 0..<width where add() {}
@@ -47,11 +52,13 @@ import Observation
                     done += 1
                     if !ok { failed += 1 }
                     if done % 200 == 0 { index.save() }
+                    if done % 50 == 0 { measures?.save(); progress() }
                     if Task.isCancelled { group.cancelAll(); break }
                     _ = add()
                 }
             }
             index.save()
+            measures?.save()
             isRunning = false
             task = nil
             finished()
@@ -61,7 +68,8 @@ import Observation
     public func cancel() { task?.cancel() }
 
     private nonisolated static func compile(_ entry: PresetLibrary.Entry, device: MTLDevice, index: CompileIndex,
-                                            thumbnails: PresetThumbnails?, noise: Noise.Textures?) async -> Bool {
+                                            thumbnails: PresetThumbnails?, measures: PresetMeasures?,
+                                            noise: Noise.Textures?) async -> Bool {
         do {
             let preset = try PresetFile.load(entry.url)
             // Equations too: a preset whose code does not compile cannot show either.
@@ -70,6 +78,9 @@ import Observation
             let compiled = try await CompiledPreset.compile(preset, device: device, screenFormat: MilkDropController.screenFormat)
             index.record(entry, ok: true)
             if let thumbnails, thumbnails.cached(entry) == nil { try thumbnails.make(compiled, entry: entry, device: device, noise: noise) }
+            if let measures, measures.measure(entry) == nil {
+                measures.record(entry, try PresetMeasurer.measure(compiled, device: device, noise: noise))
+            }
             return true
         } catch {
             index.record(entry, ok: false, error: String(describing: error).prefix(600).description)

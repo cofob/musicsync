@@ -1,5 +1,6 @@
 import Foundation
 import MetalKit
+import Support
 import Observation
 
 /// Runs the visualizer for a view: which preset shows, timed and random changes, the next preset compiled ahead,
@@ -10,6 +11,8 @@ import Observation
     public private(set) var entries: [PresetLibrary.Entry] = []
     public private(set) var current: String?
     public private(set) var failed: [String] = []
+    /// Presets left out for now because they are not measured for flashes yet (only with `reduceFlashing`).
+    public private(set) var unmeasured = 0
     /// The samples that play now and their rate; silence when nil.
     @ObservationIgnored public var samples: (() -> (left: [Float], right: [Float], rate: Double))?
 
@@ -29,15 +32,20 @@ import Observation
     @ObservationIgnored private let folders: [URL]
     @ObservationIgnored private let textureFolders: [URL]
     @ObservationIgnored private let index: CompileIndex?
+    @ObservationIgnored private let measures: PresetMeasures?
+    /// The last presets that a mood picked, so they do not come again soon.
+    @ObservationIgnored private var recent: [String] = []
     @ObservationIgnored private let clock = ContinuousClock()
     @ObservationIgnored private let start = ContinuousClock.now
 
     /// `folders`: preset folders besides the bundled ones (searched one level deep), later ones win on equal names.
     /// `index`: where to keep which presets compile (`CompileIndex`), so broken ones stay out from the start.
-    public init(folders: [URL] = [], textureFolders: [URL] = [], index: URL? = nil) {
+    /// `measures`: what the demo track showed of each preset (`PresetMeasures`), for flashes and moods.
+    public init(folders: [URL] = [], textureFolders: [URL] = [], index: URL? = nil, measures: URL? = nil) {
         self.folders = folders
         self.textureFolders = textureFolders
         self.index = index.map(CompileIndex.at)
+        self.measures = measures.map(PresetMeasures.at)
         library = PresetLibrary(folders: folders)
         reload()
     }
@@ -45,10 +53,30 @@ import Observation
     private var now: Double { let d = clock.now - start; return Double(d.components.seconds) + Double(d.components.attoseconds) * 1e-18 }
 
     public func configure(_ options: PresetCycler.Options) {
-        let lists = options.builtIn != cycler.options.builtIn
+        let lists = options.builtIn != cycler.options.builtIn || options.reduceFlashing != cycler.options.reduceFlashing
+        let flashing = options.reduceFlashing && !cycler.options.reduceFlashing
         cycler.setOptions(options)
         if lists { updateNames() }
+        if flashing, let current, !cycler.names.contains(current) { random() }  // it may flash
     }
+
+    /// Whether the preset flashes too much (`FlashReport`); nil when not measured.
+    public func flashes(_ entry: PresetLibrary.Entry) -> Bool? { measures?.isSafe(entry).map { !$0 } }
+
+    /// Shows a preset whose mood is close to `target` and was not shown by a mood lately; one of the closest few, at
+    /// random. False (and nothing changes) when too few presets have a mood.
+    @discardableResult public func random(matching target: Mood) -> Bool {
+        let known = entries.compactMap { entry in measures?.mood(entry).map { (name: entry.name, mood: $0) } }
+        guard known.count >= Self.fewestMoods,
+              let name = MoodMatcher.pick(known, near: target, avoiding: Set(recent + [current].compactMap { $0 }), random: .random(in: 0..<1))
+        else { return false }
+        recent = Array((recent + [name]).suffix(Self.fewestMoods / 2))
+        select(name)
+        return true
+    }
+
+    /// Fewest presets with a mood for matching to make sense.
+    static let fewestMoods = 8
 
     /// Reads the folders again (new or removed presets).
     public func reload() {
@@ -69,7 +97,15 @@ import Observation
     }
 
     private func updateNames() {
-        cycler.setNames(library.names(includingBuiltIn: cycler.options.builtIn, excluding: Set(failed)))
+        var left = Set(failed)
+        unmeasured = 0
+        if cycler.options.reduceFlashing {
+            for entry in library.entries.values where measures?.isSafe(entry) != true {
+                left.insert(entry.name)
+                if measures?.measure(entry) == nil, !failed.contains(entry.name) { unmeasured += 1 }
+            }
+        }
+        cycler.setNames(library.names(includingBuiltIn: cycler.options.builtIn, excluding: left))
         presets = cycler.names
         entries = presets.compactMap { library.entries[$0] }
         prepare(cycler.upcoming)
