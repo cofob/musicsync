@@ -48,6 +48,8 @@ struct NowPlayingView: View {
                     VisualizerView(backdrop: true)
                         .overlay { Rectangle().fill(.ultraThinMaterial) }
                         .overlay(Color.black.opacity(0.55))
+                        .overlay(Color.black.opacity(player.isPlaying ? 0 : 1))  // paused: plain black
+                        .animation(.easeInOut(duration: 0.8), value: player.isPlaying)
                         .allowsHitTesting(false)
                 } else {
                     ArtworkBackground(image: background == .plain ? nil : player.artwork, animated: background == .animated)
