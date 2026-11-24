@@ -9,6 +9,10 @@ enum VisualizerSettings {
     static let announce = "visualizerAnnounce"
     /// Change with the parts of the song (analyzed); off by default.
     static let sections = "visualizerSections"
+    /// With song parts, pick presets whose mood matches the part's (`Mood`); off by default.
+    static let mood = "visualizerMood"
+    /// Leave out presets that flash too much; unset follows the system's Reduce Motion.
+    static let reduceFlashing = "visualizerReduceFlashing"
     static let cycle = "visualizerCycle"
     static let cycleSeconds = "visualizerCycleSeconds"
     static let blend = "visualizerBlend"
@@ -18,6 +22,18 @@ enum VisualizerSettings {
     static let peaks = "visualizerPeaks"
     static let segmented = "visualizerSegmented"
     static let falloff = "visualizerFalloff"
+
+    /// Reduce Motion in the system's accessibility settings.
+    @MainActor static var systemReducesMotion: Bool {
+        #if os(macOS)
+        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        #else
+        UIAccessibility.isReduceMotionEnabled
+        #endif
+    }
+
+    /// The setting, or the system's Reduce Motion while the user has not chosen.
+    @MainActor static var reducesFlashing: Bool { UserDefaults.app.object(forKey: reduceFlashing) as? Bool ?? systemReducesMotion }
 
     static let presetTypes = [UTType(filenameExtension: "milk") ?? .data]
     /// Posted when presets were imported, downloaded or removed, so an open visualizer reads its folders again.
@@ -67,8 +83,9 @@ extension View {
 
 /// When the visualizer changes on its own: MilkDrop shows another preset; with song parts the spectrum and the
 /// oscilloscope also take new colors. One choice, so a timer and song parts cannot both seem to be on.
+/// With the mood MilkDrop picks the preset that looks like the part sounds.
 enum VisualizerChange: String, CaseIterable, Identifiable {
-    case never, timer, parts
+    case never, timer, parts, mood
     var id: Self { self }
 
     func title(every seconds: Double) -> String {
@@ -76,6 +93,7 @@ enum VisualizerChange: String, CaseIterable, Identifiable {
         case .never: "Never"
         case .timer: "Every \(Int(seconds)) Seconds"
         case .parts: "With Song Parts"
+        case .mood: "Match the Mood"
         }
     }
 
@@ -85,14 +103,15 @@ enum VisualizerChange: String, CaseIterable, Identifiable {
         case .never: "Never"
         case .timer: "On a timer"
         case .parts: "With song parts"
+        case .mood: "Match the mood"
         }
     }
 
-    /// Kept in the two older switches, so earlier settings keep their meaning. Song parts use the timer
-    /// while the song is not analyzed yet or has no clear parts.
-    static func binding(cycle: Binding<Bool>, parts: Binding<Bool>) -> Binding<VisualizerChange> {
-        Binding(get: { parts.wrappedValue ? .parts : cycle.wrappedValue ? .timer : .never },
-                set: { cycle.wrappedValue = $0 != .never; parts.wrappedValue = $0 == .parts })
+    /// Kept in the older switches, so earlier settings keep their meaning; the mood is song parts with a third one.
+    /// Song parts use the timer while the song is not analyzed yet or has no clear parts.
+    static func binding(cycle: Binding<Bool>, parts: Binding<Bool>, mood: Binding<Bool>) -> Binding<VisualizerChange> {
+        Binding(get: { parts.wrappedValue ? (mood.wrappedValue ? .mood : .parts) : cycle.wrappedValue ? .timer : .never },
+                set: { cycle.wrappedValue = $0 != .never; parts.wrappedValue = $0 == .parts || $0 == .mood; mood.wrappedValue = $0 == .mood })
     }
 }
 
@@ -102,6 +121,8 @@ struct VisualizerSettingsView: View {
     @AppStorage(VisualizerSettings.lyrics, store: .app) private var lyrics = true
     @AppStorage(VisualizerSettings.announce, store: .app) private var announce = true
     @AppStorage(VisualizerSettings.sections, store: .app) private var sections = false
+    @AppStorage(VisualizerSettings.mood, store: .app) private var mood = false
+    @AppStorage(VisualizerSettings.reduceFlashing, store: .app) private var reduceFlashing: Bool?
     @AppStorage(VisualizerSettings.cycle, store: .app) private var cycle = true
     @AppStorage(VisualizerSettings.cycleSeconds, store: .app) private var cycleSeconds = 20.0
     @AppStorage(VisualizerSettings.blend, store: .app) private var blend = 2.7
@@ -117,7 +138,7 @@ struct VisualizerSettingsView: View {
     @State private var packs = PresetPacks()
 
     var body: some View {
-        let change = VisualizerChange.binding(cycle: $cycle, parts: $sections)
+        let change = VisualizerChange.binding(cycle: $cycle, parts: $sections, mood: $mood)
         Form {
             Section {
                 Picker("Style", selection: $mode) { ForEach(VisualizerMode.allCases) { Text($0.title).tag($0) } }
@@ -132,14 +153,14 @@ struct VisualizerSettingsView: View {
                     ForEach(VisualizerChange.allCases) { Text($0.settingsTitle).tag($0) }
                 }
                 if change.wrappedValue != .never {
-                    Picker(change.wrappedValue == .parts ? "Until a song is analyzed, every" : "Every", selection: $cycleSeconds) {
+                    Picker([.parts, .mood].contains(change.wrappedValue) ? "Until a song is analyzed, every" : "Every", selection: $cycleSeconds) {
                         ForEach([10.0, 20, 30, 60, 120], id: \.self) { Text("\(Int($0)) seconds").tag($0) }
                     }
                 }
             } header: {
                 Text("Changes")
             } footer: {
-                SettingsFooter("MilkDrop shows another preset. With Song Parts each song is analyzed to find where its parts start (verse, chorus…); there MilkDrop changes the preset and the spectrum and oscilloscope their colors. Streamed songs are downloaded once more for this; the results are kept.")
+                SettingsFooter("MilkDrop shows another preset. With Song Parts each song is analyzed to find where its parts start (verse, chorus…); there MilkDrop changes the preset and the spectrum and oscilloscope their colors. Match the Mood also judges how each part sounds (energy, brightness, tension) and shows a preset that looks like that; presets get their mood when they are measured, in the background. Streamed songs are downloaded once more for this; the results are kept.")
             }
             Section("Spectrum") {
                 Toggle("Peak caps", isOn: $peaks)
@@ -168,6 +189,7 @@ struct VisualizerSettingsView: View {
                 SettingsFooter("Next Preset is used by the changes above and the Next button. Blend time is how long two presets mix when the preset changes. Retina quality renders every screen pixel and uses more GPU.")
             }
             Section {
+                Toggle("Reduce flashing", isOn: Binding(get: { reduceFlashing ?? VisualizerSettings.systemReducesMotion }, set: { reduceFlashing = $0 }))
                 Toggle("Include built-in presets", isOn: $builtIn)
                     .disabled(presets.isEmpty && packs.installed.isEmpty)
                 LabeledContent("Your presets", value: presets.isEmpty ? "None" : "\(presets.count)")
@@ -183,7 +205,7 @@ struct VisualizerSettingsView: View {
             } header: {
                 Text("Presets")
             } footer: {
-                SettingsFooter("MilkDrop (.milk) presets from Winamp. A preset whose shaders do not compile is skipped.")
+                SettingsFooter("MilkDrop (.milk) presets from Winamp. A preset whose shaders do not compile is skipped. Reduce Flashing also skips presets that flash too much: each is rendered for four seconds and checked against the photosensitivity limits (three flashes a second over a quarter of the screen). It follows the system's Reduce Motion until you choose, and presets not checked yet show once they are.")
             }
             PresetPacksSection(packs: packs)
         }

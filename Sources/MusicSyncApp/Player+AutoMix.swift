@@ -34,8 +34,8 @@ extension Player {
     }
 
     private func updateSections() {
-        let new = wantsSections ? index.flatMap(analysis(at:))?.sections : nil
-        if new != sections { sections = new }
+        let new = wantsSections ? index.flatMap(analysis(at:)) : nil
+        if new != analysis { analysis = new }
     }
 
     /// Analyses of the current entry and entry `i`, when both are ready.

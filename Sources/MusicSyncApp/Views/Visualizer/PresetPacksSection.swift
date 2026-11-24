@@ -4,8 +4,7 @@ import SwiftUI
 /// Downloads of the "Cream of the Crop" preset pack, by category, into `MilkDrop.downloadedFolder`; new presets
 /// compile ahead in the background.
 @Observable @MainActor final class PresetPacks {
-    let compiler = PresetPrecompiler(folders: MilkDrop.presetFolders, index: MilkDrop.compileIndex, thumbnails: MilkDrop.thumbnailFolder,
-                                     textureFolders: [MilkDrop.userFolder])
+    let compiler = MilkDrop.precompiler
     private(set) var installed: [String: Int] = [:]
     /// Categories being downloaded and the download's progress (0…1).
     private(set) var loading: Set<String> = []

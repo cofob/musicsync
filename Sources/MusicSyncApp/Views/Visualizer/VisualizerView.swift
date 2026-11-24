@@ -1,5 +1,6 @@
 import MilkDropKit
 import Subsonic
+import Support
 import SwiftUI
 
 enum VisualizerMode: String, CaseIterable, Identifiable {
@@ -38,6 +39,8 @@ struct VisualizerView: View {
     @AppStorage(VisualizerSettings.builtIn, store: .app) private var builtIn = true
     @AppStorage(VisualizerSettings.quality, store: .app) private var quality = 1.0
     @AppStorage(VisualizerSettings.sections, store: .app) private var followsSections = false
+    @AppStorage(VisualizerSettings.mood, store: .app) private var matchesMoodSetting = false
+    @AppStorage(VisualizerSettings.reduceFlashing, store: .app) private var reduceFlashingSetting: Bool?
     /// Color scheme of the spectrum and the oscilloscope; the next one at each new part of the song.
     @State private var palette = 0
     @State private var lyrics: Lyrics?
@@ -68,6 +71,9 @@ struct VisualizerView: View {
             case .milkdrop: MilkDropView(player: player, milkDrop: milkDrop)
             }
             if mode != .milkdrop, let lyrics, let line { VisualizerLyrics(lyrics: lyrics, current: line) }
+            if reducesFlashing, mode == .milkdrop, milkDrop.presets.isEmpty, milkDrop.unmeasured > 0 {
+                Text("Checking presets for flashing…").font(.headline).foregroundStyle(.white.opacity(0.6))
+            }
             if model.jukebox.isActive, !compact {
                 Text("Playing on the server: there is no sound here to show.").font(.headline).foregroundStyle(.white.opacity(0.6))
             }
@@ -110,6 +116,12 @@ struct VisualizerView: View {
             if let old, let new, new == old + 1, player.isPlaying { partStarted() }
         }
         .onChange(of: followsSections) { player.analyzeUpcoming() }
+        // Presets get their flashes and mood by being rendered once; the visualizer reads them as they come.
+        .onChange(of: needsMeasures, initial: true) { if needsMeasures { measurePresets() } }
+        // The analysis came in during the song: its part gets a preset by mood (a song start, or the mode just on).
+        .onChange(of: player.analysis?.mood) { old, new in
+            if old == nil, new != nil, matchesMood, mode == .milkdrop { showMoodPreset() }
+        }
         .onChange(of: player.current?.id, initial: true) { old, _ in
             if followsSections, old != nil, old != player.current?.id { partStarted() }  // a new song is a new part too
             guard announces, let item = player.current else { return }
@@ -222,7 +234,7 @@ struct VisualizerView: View {
             Button("Browse Presets…") { browsing = true }
             Button("Random Preset") { milkDrop.random() }
             Divider()
-            Picker("Change Presets", selection: VisualizerChange.binding(cycle: $cycles, parts: $followsSections)) {
+            Picker("Change Presets", selection: VisualizerChange.binding(cycle: $cycles, parts: $followsSections, mood: $matchesMoodSetting)) {
                 ForEach(VisualizerChange.allCases) { Text($0.title(every: cycleSeconds)).tag($0) }
             }
             Toggle("Announce Songs", isOn: $announces)
@@ -255,12 +267,33 @@ struct VisualizerView: View {
         var options = PresetCycler.Options()
         (options.cycle, options.seconds, options.blend) = (cycles && !byParts, cycleSeconds, blend)
         (options.shuffle, options.builtIn, options.quality) = (shuffle, builtIn, quality)
+        options.reduceFlashing = reducesFlashing
         return options
     }
 
-    /// A new part of the song: MilkDrop shows the next preset (compiled ahead), the others their next colors.
+    private var reducesFlashing: Bool { reduceFlashingSetting ?? VisualizerSettings.systemReducesMotion }
+    private var matchesMood: Bool { followsSections && matchesMoodSetting }
+    private var needsMeasures: Bool { mode == .milkdrop && (reducesFlashing || matchesMood) }
+
+    private func measurePresets() {
+        let milkDrop = milkDrop
+        MilkDrop.precompiler.compileAll(finished: { milkDrop.reload() }, progress: { milkDrop.reload() })
+    }
+
+    /// A preset whose mood is close to that of the part playing and the whole song; false when not known.
+    @discardableResult private func showMoodPreset() -> Bool {
+        let player = model.player
+        guard let (part, song) = player.analysis?.moods(at: player.elapsed) else { return false }
+        return milkDrop.random(matching: part.mixed(with: song, 0.3))
+    }
+
+    /// A new part of the song: MilkDrop shows a preset of the part's mood, else the next one (compiled ahead); the
+    /// others their next colors.
     private func partStarted() {
-        if mode == .milkdrop { shuffle ? milkDrop.random() : milkDrop.step(1) } else { palette += 1 }
+        guard mode == .milkdrop else { palette += 1; return }
+        // A song not analyzed yet waits: its mood picks the preset when it comes (`onChange` of the analysis).
+        if matchesMood, showMoodPreset() || model.player.analysis?.mood == nil { return }
+        shuffle ? milkDrop.random() : milkDrop.step(1)
     }
 
     private func toggleFullScreen() {

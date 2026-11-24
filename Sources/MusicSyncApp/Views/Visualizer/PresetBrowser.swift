@@ -12,7 +12,8 @@ struct PresetBrowser: View {
     @State private var preview = PresetPreview(textureFolders: [MilkDrop.userFolder])
 
     static let all = "All Presets"
-    static let store = ThumbnailStore(folder: MilkDrop.thumbnailFolder, index: MilkDrop.compileIndex, textureFolders: [MilkDrop.userFolder])
+    static let store = ThumbnailStore(folder: MilkDrop.thumbnailFolder, index: MilkDrop.compileIndex, textureFolders: [MilkDrop.userFolder],
+                                      measures: MilkDrop.measuresFile)
 
     var body: some View {
         let entries = milkDrop.entries
@@ -62,7 +63,7 @@ struct PresetBrowser: View {
             ScrollView {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 12)], spacing: 14) {
                     ForEach(entries, id: \.name) { entry in
-                        PresetCard(entry: entry, isCurrent: entry.name == milkDrop.current, isHovered: hovered == entry.name, preview: preview)
+                        PresetCard(entry: entry, flashes: milkDrop.flashes, isCurrent: entry.name == milkDrop.current, isHovered: hovered == entry.name, preview: preview)
                             .id(entry.name)
                             .onHover { inside in
                                 if inside { hovered = entry.name; preview.show(entry) }
@@ -82,11 +83,14 @@ struct PresetBrowser: View {
 /// One preset: its picture (or, under the pointer, the preset live) and its name.
 private struct PresetCard: View {
     let entry: PresetLibrary.Entry
+    /// Whether a preset flashes too much, once measured (`MilkDropController.flashes`).
+    let flashes: (PresetLibrary.Entry) -> Bool?
     let isCurrent: Bool
     let isHovered: Bool
     let preview: PresetPreview
     @State private var image: CGImage?
     @State private var loaded = false
+    @State private var flashing = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
@@ -96,6 +100,13 @@ private struct PresetCard: View {
                 else if loaded { Text("Does not compile").font(.caption2).foregroundStyle(.secondary) }
                 else { ProgressView().controlSize(.small) }
                 if isHovered { MilkDropSurface(preview) }
+            }
+            .overlay(alignment: .topTrailing) {
+                if flashing {
+                    Image(systemName: "bolt.fill").font(.caption2).foregroundStyle(.orange)
+                        .padding(4).background(.black.opacity(0.6), in: Circle()).padding(5)
+                        .help("Flashes too much for people sensitive to flashing lights")
+                }
             }
             .aspectRatio(16 / 9, contentMode: .fit)
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
@@ -110,9 +121,10 @@ private struct PresetCard: View {
         .task(id: entry.url) {
             image = await PresetBrowser.store.thumbnail(entry)
             loaded = !Task.isCancelled
+            flashing = flashes(entry) == true
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(entry.name)
+        .accessibilityLabel(flashing ? "\(entry.name), flashes" : entry.name)
         .accessibilityAddTraits(isCurrent ? [.isButton, .isSelected] : .isButton)
     }
 }

@@ -16,11 +16,17 @@ extension MilkDropController {
     nonisolated static var thumbnailFolder: URL { Paths.caches("MilkDrop", "Thumbnails") }
     /// Which presets compile and which do not (`CompileIndex`).
     nonisolated static var compileIndex: URL { Paths.caches("MilkDrop").appendingPathComponent("compiled.json") }
+    /// What the demo track showed of each preset: look, mood and flashes (`PresetMeasures`).
+    nonisolated static var measuresFile: URL { Paths.caches("MilkDrop").appendingPathComponent("measures.json") }
     nonisolated static var presetFolders: [URL] { [downloadedFolder, userFolder] }
 
     static func app() -> MilkDropController {
-        MilkDropController(folders: presetFolders, textureFolders: [userFolder], index: compileIndex)
+        MilkDropController(folders: presetFolders, textureFolders: [userFolder], index: compileIndex, measures: measuresFile)
     }
+
+    /// Compiles and measures presets ahead in the background; one for the whole app.
+    @MainActor static let precompiler = PresetPrecompiler(folders: presetFolders, index: compileIndex,
+                                                          thumbnails: thumbnailFolder, textureFolders: [userFolder], measures: measuresFile)
 
     /// Reads the presets folders again. Butterchurn `.json` files that an earlier version converted from a `.milk`
     /// next to them are deleted: the native renderer reads the `.milk` itself.
