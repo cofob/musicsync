@@ -26,6 +26,6 @@ enum FixedShaders {
     """
 
     static func library(device: MTLDevice, extra: [String]) throws -> MTLLibrary {
-        try device.makeLibrary(source: ([common, Blur.source, TitleText.source, GeometryPipelines.source] + extra).joined(separator: "\n"), options: nil)
+        try device.makeLibrary(source: ([common, Blur.source, TitleText.source, GeometryPipelines.source, BrightnessLimiter.source] + extra).joined(separator: "\n"), options: nil)
     }
 }

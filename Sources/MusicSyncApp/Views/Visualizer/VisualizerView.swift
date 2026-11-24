@@ -47,6 +47,7 @@ struct VisualizerView: View {
     @AppStorage(VisualizerSettings.sections, store: .app) private var followsSections = false
     @AppStorage(VisualizerSettings.mood, store: .app) private var matchesMoodSetting = false
     @AppStorage(VisualizerSettings.reduceFlashing, store: .app) private var reduceFlashingSetting: Bool?
+    @AppStorage(VisualizerSettings.limitBrightness, store: .app) private var limitBrightnessSetting: Bool?
     @AppStorage(VisualizerSettings.source, store: .app) private var source = AudioCapture.Source.default
     /// UID of the microphone (`AudioCapture.microphones`); empty for the system's default input.
     @AppStorage(VisualizerSettings.microphone, store: .app) private var microphone = ""
@@ -76,7 +77,7 @@ struct VisualizerView: View {
         ZStack {
             Color.black
             switch mode {
-            case .spectrum: SpectrumVisualizer(input: input, palette: palette)
+            case .spectrum: SpectrumVisualizer(input: input, palette: palette, limitsBrightness: limitsBrightness)
             case .scope: ScopeVisualizer(input: input, palette: palette)
             case .milkdrop: MilkDropView(input: input, milkDrop: milkDrop)
             }
@@ -305,10 +306,12 @@ struct VisualizerView: View {
         (options.cycle, options.seconds, options.blend) = (cycles && !byParts, cycleSeconds, blend)
         (options.shuffle, options.builtIn, options.quality) = (shuffle, builtIn, backdrop ? min(quality, 0.5) : quality)
         options.reduceFlashing = reducesFlashing
+        options.limitBrightness = limitsBrightness
         return options
     }
 
     private var reducesFlashing: Bool { reduceFlashingSetting ?? VisualizerSettings.systemReducesMotion }
+    private var limitsBrightness: Bool { limitBrightnessSetting ?? VisualizerSettings.systemReducesMotion }
     private var matchesMood: Bool { followsSections && matchesMoodSetting }
     private var needsMeasures: Bool { mode == .milkdrop && (reducesFlashing || matchesMood) }
 

@@ -42,6 +42,8 @@ public struct Falloff {
     public var barFall: Float = 1.6
     public var peakFall: Float = 0.6
     public var peakHold: TimeInterval = 0.4
+    /// Levels per second a bar may rise; the default rises at once.
+    public var barRise: Float = .greatestFiniteMagnitude
     public private(set) var bars: [Float] = []
     public private(set) var peaks: [Float] = []
     private var held: [TimeInterval] = []
@@ -52,7 +54,7 @@ public struct Falloff {
         if bars.count != levels.count { bars = levels; peaks = levels; held = levels.map { _ in 0 }; return }
         let dt = Float(min(max(dt, 0), 0.25))
         for i in levels.indices {
-            bars[i] = max(levels[i], bars[i] - barFall * dt)
+            bars[i] = min(max(levels[i], bars[i] - barFall * dt), bars[i] + barRise * dt)
             if bars[i] >= peaks[i] { peaks[i] = bars[i]; held[i] = 0 }
             else {
                 held[i] += Double(dt)

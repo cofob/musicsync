@@ -211,12 +211,13 @@ import Observation
         let quality = min(cycler.options.quality, scale)
         let size = Self.capped(SIMD2(Int(Double(view.drawableSize.width) / scale * quality), Int(Double(view.drawableSize.height) / scale * quality)))
         let audio = samples?() ?? (left: [], right: [], rate: 44100)
-        let time = now, first = !hasFrame
+        let time = now, first = !hasFrame, limit = cycler.options.limitBrightness
         nonisolated(unsafe) let layer = metalLayer  // only `nextDrawable()`, which any thread may call
         rendering = true
         loop.queue.async {
             defer { Task { @MainActor in self.rendering = false } }
             guard let renderer = loop.renderer, let drawable = layer.nextDrawable(), let buffer = renderer.queue.makeCommandBuffer() else { return }
+            renderer.limitsBrightness = limit
             renderer.render(into: drawable.texture, buffer: buffer, size: size, left: audio.left, right: audio.right,
                             sampleRate: audio.rate, now: time)
             buffer.present(drawable)

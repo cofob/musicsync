@@ -14,6 +14,8 @@ public struct PresetCycler: Sendable {
         public var builtIn = true
         /// Leave out presets that flash too much or are not measured yet (`FlashReport`).
         public var reduceFlashing = false
+        /// Ease jumps of the picture's brightness (`BrightnessLimiter`).
+        public var limitBrightness = false
         /// Render scale: 0.5 low, 1 normal, 2 every screen pixel.
         public var quality = 1.0
 

@@ -15,6 +15,11 @@ public final class Renderer {
     private let textures: TextureLibrary
     private let title: TitleText
     private let copy: MTLRenderPipelineState
+    private let limiter: BrightnessLimiter?
+    /// Eases jumps of the picture's brightness (`BrightnessLimiter`).
+    public var limitsBrightness = false {
+        didSet { if limitsBrightness, !oldValue { limiter?.reset() } }
+    }
     /// Triangles of the warp mesh and of the comp grid, made once.
     private let warpIndices: MTLBuffer, compIndices: MTLBuffer
     private let geometry: FrameGeometry
@@ -68,6 +73,7 @@ public final class Renderer {
         self.noise = noise
         self.title = title
         self.copy = copy
+        limiter = BrightnessLimiter(device: device, library: library, format: MilkDropController.screenFormat)
         arenas = FrameArenas(device: device)
         guard let wi = Self.indexBuffer(device, Self.meshSize), let ci = Self.indexBuffer(device, Self.compSize) else { return nil }
         warpIndices = wi
@@ -107,6 +113,7 @@ public final class Renderer {
         resize(size, buffer)
         guard let current, var targets = self.targets else { return }
         arenas.begin(buffer)
+        let last = time
         advanceTime(now)
         audio.update(left: left, right: right, sampleRate: sampleRate, fps: fps, frame: frame)
         let g = frameGlobals
@@ -155,8 +162,9 @@ public final class Renderer {
             blit.endEncoding()
         }
 
-        // Comp to the screen.
-        if let encoder = pass(buffer, screen, clear: true) {
+        // Comp to the screen, or to the limiter that then shows it.
+        let limited = limitsBrightness ? limiter.flatMap { $0.frame(like: screen, device: device) } : nil
+        if let encoder = pass(buffer, limited ?? screen, clear: true) {
             if let old { drawComp(encoder, old, values: old.equations.values, blend: false, mins: mins, maxs: maxs) }
             drawComp(encoder, current, values: mixed, blend: old != nil, mins: mins, maxs: maxs)
             if let t = title.progress(at: time) {
@@ -165,6 +173,7 @@ public final class Renderer {
             }
             encoder.endEncoding()
         }
+        if limited != nil { limiter?.encode(buffer, into: screen, dt: time - last) }
     }
 
     // MARK: Passes

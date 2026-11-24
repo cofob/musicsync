@@ -13,6 +13,8 @@ enum VisualizerSettings {
     static let mood = "visualizerMood"
     /// Leave out presets that flash too much; unset follows the system's Reduce Motion.
     static let reduceFlashing = "visualizerReduceFlashing"
+    /// Ease sudden jumps of brightness in every style and place; unset follows the system's Reduce Motion.
+    static let limitBrightness = "visualizerLimitBrightness"
     static let cycle = "visualizerCycle"
     static let cycleSeconds = "visualizerCycleSeconds"
     static let blend = "visualizerBlend"
@@ -127,6 +129,7 @@ struct VisualizerSettingsView: View {
     @AppStorage(VisualizerSettings.sections, store: .app) private var sections = false
     @AppStorage(VisualizerSettings.mood, store: .app) private var mood = false
     @AppStorage(VisualizerSettings.reduceFlashing, store: .app) private var reduceFlashing: Bool?
+    @AppStorage(VisualizerSettings.limitBrightness, store: .app) private var limitBrightness: Bool?
     @AppStorage(VisualizerSettings.cycle, store: .app) private var cycle = true
     @AppStorage(VisualizerSettings.cycleSeconds, store: .app) private var cycleSeconds = 20.0
     @AppStorage(VisualizerSettings.blend, store: .app) private var blend = 2.7
@@ -148,10 +151,11 @@ struct VisualizerSettingsView: View {
                 Picker("Style", selection: $mode) { ForEach(VisualizerMode.allCases) { Text($0.title).tag($0) } }
                 Toggle("Show synced lyrics", isOn: $lyrics)
                 Toggle("Announce songs", isOn: $announce)
+                Toggle("Limit brightness changes", isOn: Binding(get: { limitBrightness ?? VisualizerSettings.systemReducesMotion }, set: { limitBrightness = $0 }))
                 Button("Show Visualizer") { openWindow(id: VisualizerView.windowID) }
                 Button("Show Standalone Visualizer") { openWindow(id: VisualizerView.standaloneID) }
             } footer: {
-                SettingsFooter("Window > Visualizer (⌘T), or the waveform button in Now Playing and the MiniPlayer. Announce Songs shows the artist and title when a song starts.")
+                SettingsFooter("Window > Visualizer (⌘T), or the waveform button in Now Playing and the MiniPlayer. Announce Songs shows the artist and title when a song starts. Limit Brightness Changes turns sudden flashes into short fades in every style, also in the blurred Now Playing background; it follows the system's Reduce Motion until you choose.")
             }
             Section {
                 Picker("Change", selection: change) {

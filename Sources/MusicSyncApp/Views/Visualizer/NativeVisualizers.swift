@@ -17,6 +17,8 @@ struct SpectrumVisualizer: View {
     let input: VisualizerInput
     /// Color scheme: 0 is Winamp's green to red; each next one turns the hues further.
     var palette = 0
+    /// Bars rise at most 4 levels a second, so a beat does not light half the screen at once.
+    var limitsBrightness = false
     @AppStorage(VisualizerSettings.peaks, store: .app) private var peaks = true
     @AppStorage(VisualizerSettings.segmented, store: .app) private var segmented = true
     @AppStorage(VisualizerSettings.falloff, store: .app) private var falloff = 1.6
@@ -41,6 +43,7 @@ struct SpectrumVisualizer: View {
                 state.last = timeline.date
                 let shift = state.hue.step(to: palette, dt: dt)
                 state.falloff.barFall = Float(falloff)
+                state.falloff.barRise = limitsBrightness ? 4 : .greatestFiniteMagnitude
                 state.falloff.update(state.spectrum.bands(mono, sampleRate: input.tap.sampleRate, count: count), dt: dt)
                 let height = max(size.height - 2 * pad, 1), bottom = size.height - pad
                 let x0 = (size.width - CGFloat(count) * (barWidth + gap) + gap) / 2

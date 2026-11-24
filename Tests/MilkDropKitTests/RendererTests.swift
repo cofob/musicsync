@@ -89,6 +89,17 @@ import Testing
         #expect(abs(try await level("fGammaAdj=0.5\nfVideoEchoAlpha=0.5\nfVideoEchoZoom=1", warp: 0.5) - 128) < 3)
     }
 
+    /// With the limit, a black-to-white cut shows one step brighter at first; the same picture then stays.
+    @Test func limitsBrightness() async throws {
+        guard let device = MTLCreateSystemDefaultDevice(), let screen = Self.screen(device) else { return }
+        let renderer = try #require(Renderer(device: device))
+        renderer.limitsBrightness = true
+        func preset(_ value: Double) -> Preset { PresetFile.parse("[preset00]\nfWaveAlpha=0\nmv_a=0\ncomp_1=`shader_body { ret = \(value); }", name: "T") }
+        #expect(try await Self.render(preset(0), frames: 1, renderer: renderer, screen: screen) < 1)
+        #expect(try await Self.render(preset(1), frames: 1, renderer: renderer, screen: screen) < 20)
+        #expect(try await Self.render(preset(1), frames: 120, renderer: renderer, screen: screen) > 250)
+    }
+
     /// A global without initializer is a uniform nothing sets, 0 as in D3D9 ("martin - organic light" reads `uv3` so).
     @Test func globalWithoutInitializerIsZero() async throws {
         guard let device = MTLCreateSystemDefaultDevice(), let screen = Self.screen(device) else { return }
