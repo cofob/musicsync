@@ -25,6 +25,7 @@ let package = Package(
         .target(name: "MilkDropKit", dependencies: ["Support"], resources: [.copy("Resources/Presets"), .copy("Resources/Textures"), .copy("Resources/LICENSE.txt")]),
         .target(name: "Sync", dependencies: ["Support", "Subsonic", "ITunesDB", "Artwork", "Transcode", "Device"]),
         .executableTarget(name: "MusicSyncApp", dependencies: ["Support", "Subsonic", "ITunesDB", "Artwork", "Transcode", "Device", "Sync", "Library", "Recommend", "Integration", "Remote", "Playback", "Preferences", "MilkDropKit"]),
+        .executableTarget(name: "PresetCacheTool", dependencies: ["MilkDropKit"]),
         .testTarget(name: "SupportTests", dependencies: ["Support"]),
         .testTarget(name: "SubsonicTests", dependencies: ["Subsonic"]),
         .testTarget(name: "ITunesDBTests", dependencies: ["ITunesDB"]),
