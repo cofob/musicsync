@@ -72,8 +72,13 @@ struct MilkDropView: View {
     let milkDrop: MilkDrop
 
     var body: some View {
-        MilkDropSurface(milkDrop)
-            .onAppear { milkDrop.samples = Self.samples(player) }
+        ZStack {
+            // Until the first frame: the renderer and the preset are still made; then the picture fades in.
+            MilkDropSurface(milkDrop).opacity(milkDrop.hasFrame ? 1 : 0)
+            if !milkDrop.hasFrame { ProgressView().controlSize(.large).tint(.white).transition(.opacity) }
+        }
+        .animation(.easeOut(duration: 0.6), value: milkDrop.hasFrame)
+        .onAppear { milkDrop.samples = Self.samples(player) }
     }
 
     /// The samples that play now, from the player's tap.

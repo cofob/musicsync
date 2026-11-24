@@ -10,6 +10,8 @@ import Observation
     /// The presets of `presets`, with their files and categories, for the preset browser.
     public private(set) var entries: [PresetLibrary.Entry] = []
     public private(set) var current: String?
+    /// A frame is on the screen: until then the view shows a placeholder.
+    public private(set) var hasFrame = false
     public private(set) var failed: [String] = []
     /// Presets left out for now because they are not measured for flashes yet (only with `reduceFlashing`).
     public private(set) var unmeasured = 0
@@ -209,7 +211,7 @@ import Observation
         let quality = min(cycler.options.quality, scale)
         let size = Self.capped(SIMD2(Int(Double(view.drawableSize.width) / scale * quality), Int(Double(view.drawableSize.height) / scale * quality)))
         let audio = samples?() ?? (left: [], right: [], rate: 44100)
-        let time = now
+        let time = now, first = !hasFrame
         nonisolated(unsafe) let layer = metalLayer  // only `nextDrawable()`, which any thread may call
         rendering = true
         loop.queue.async {
@@ -218,6 +220,7 @@ import Observation
             renderer.render(into: drawable.texture, buffer: buffer, size: size, left: audio.left, right: audio.right,
                             sampleRate: audio.rate, now: time)
             buffer.present(drawable)
+            if first { buffer.addCompletedHandler { _ in Task { @MainActor in self.hasFrame = true } } }
             buffer.commit()
         }
     }
