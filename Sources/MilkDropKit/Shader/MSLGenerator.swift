@@ -286,8 +286,9 @@ final class MSLGenerator {
         ] + globalInits + [
             "float2 uv = md_in.uv;",
             "float2 uv_orig = md_in.uv_orig;",
-            "float rad = md_in.rad;",
-            "float ang = md_in.ang;",
+            // Per pixel, as butterchurn: from the vertices, ang would smear across the atan2 seam (center to top).
+            "float rad = length(uv_orig - 0.5);",
+            "float ang = atan2(uv_orig.x - 0.5, uv_orig.y - 0.5);",
             "float3 hue_shader = md_in.color.rgb;",
             "float3 ret = float3(0);",
         ]

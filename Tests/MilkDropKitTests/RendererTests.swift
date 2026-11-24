@@ -77,3 +77,20 @@ import Testing
         }
     }
 }
+
+@Suite struct AngleSeamTests {
+    /// `ang` jumps from π to −π on the line from the center up; from the vertices it smeared there into a streak.
+    @Test func angleIsPerPixel() async throws {
+        guard let device = MTLCreateSystemDefaultDevice(), let screen = RendererTests.screen(device, 320, 200) else { return }
+        let renderer = try #require(Renderer(device: device, random: { 0.5 }))
+        let preset = PresetFile.parse("[preset00]\nPSVERSION_COMP=2\ncomp_1=`shader_body { ret = abs(ang) / 3.1416; }\n", name: "seam")
+        try renderer.show(try await CompiledPreset.compile(preset, device: device, screenFormat: .bgra8Unorm), blend: 0)
+        let buffer = try #require(renderer.queue.makeCommandBuffer())
+        renderer.render(into: screen, buffer: buffer, size: SIMD2(320, 200), left: [], right: [], sampleRate: 44100, now: 0)
+        buffer.commit()
+        await buffer.completed()
+        var px = [UInt8](repeating: 0, count: 4)
+        screen.getBytes(&px, bytesPerRow: 320 * 4, from: MTLRegionMake2D(155, 50, 1, 1), mipmapLevel: 0)  // just left of the seam
+        #expect(px[1] > 230, "\(px)")
+    }
+}
