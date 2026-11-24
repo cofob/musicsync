@@ -36,6 +36,8 @@ enum MSLPreamble {
 
     inline float4x3 md_rot(float4x4 m) { return float4x3(m[0].xyz, m[1].xyz, m[2].xyz, m[3].xyz); }
     template <int C, int R> inline matrix<float, C, R> md_mul_cw(matrix<float, C, R> a, matrix<float, C, R> b) { for (int i = 0; i < C; i++) a[i] *= b[i]; return a; }
+    // D3D9's pow takes the base's absolute value (ps_2_0 `pow dst, abs(src0), src1`), so MilkDrop shows |x|^y, not NaN.
+    template <typename T> inline T md_pow(T x, T y) { return pow(abs(x), y); }
     template <int C, int R> inline matrix<float, C, R> md_div_cw(matrix<float, C, R> a, matrix<float, C, R> b) { for (int i = 0; i < C; i++) a[i] /= b[i]; return a; }
 
     vertex MDVaryings md_vertex(device const MDVertex* md_v [[buffer(0)]], uint md_vid [[vertex_id]]) {

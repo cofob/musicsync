@@ -218,4 +218,10 @@ private func msl(_ body: String, globals: String = "") throws -> String {
         // Users cannot reach the default comp's own values.
         #expect(throws: HLSLError.self) { try HLSLTranslator.translate("shader_body { ret = echo_zoom; }", stage: .comp) }
     }
+
+    /// As D3D9: pow of a negative base uses its absolute value, so pictures do not go black on NaN.
+    @Test func powTakesTheAbsoluteBase() throws {
+        let shader = try HLSLTranslator.translate("shader_body { ret = pow(float3(-0.5, 2, 1), 2); }", stage: .comp)
+        #expect(shader.source.contains("md_pow("))
+    }
 }

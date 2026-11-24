@@ -10,7 +10,7 @@ extension MSLGenerator {
 
     /// Per-component functions of several arguments of one common type, HLSL name → MSL name.
     private static let componentwise: [String: (args: Int, msl: String)] = [
-        "pow": (2, "pow"), "atan2": (2, "atan2"), "fmod": (2, "fmod"), "step": (2, "step"), "min": (2, "min"), "max": (2, "max"),
+        "pow": (2, "md_pow"), "atan2": (2, "atan2"), "fmod": (2, "fmod"), "step": (2, "step"), "min": (2, "min"), "max": (2, "max"),
         "lerp": (3, "mix"), "clamp": (3, "clamp"), "smoothstep": (3, "smoothstep"),
     ]
 
@@ -18,7 +18,7 @@ extension MSLGenerator {
     /// MSL does not, so such variables get renamed.
     static let mslFunctions = Set(unaryFloat.values).union(componentwise.values.map(\.msl)).union([
         "dot", "cross", "length", "normalize", "distance", "reflect", "refract", "all", "any", "isnan", "isinf", "isfinite",
-        "transpose", "determinant", "modf", "frexp", "ldexp",
+        "transpose", "determinant", "modf", "frexp", "ldexp", "pow",
     ])
 
     func call(_ name: String, _ args: [Expr], _ line: Int) throws -> Value {
