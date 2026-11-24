@@ -228,7 +228,7 @@ import SwiftUI
             milkDrop.reload()
             await milkDrop.listed()
             let hovered = scene.hasSuffix("hover") ? milkDrop.entries.dropFirst(4).first?.name : nil
-            open(PresetBrowser(milkDrop: milkDrop, player: model.player, hovered: hovered), "Presets", model)
+            open(PresetBrowser(milkDrop: milkDrop, input: model.player.visualizerInput, hovered: hovered), "Presets", model)
         case "visualizer", "visualizer-scope", "visualizer-milkdrop", "miniplayer-visualizer":
             // Plays (muted) so the tap has samples.
             let mode = scene == "visualizer" ? VisualizerMode.spectrum : scene == "visualizer-scope" ? .scope : .milkdrop

@@ -63,14 +63,17 @@ private struct ToolPresenter: ViewModifier {
                 EqualizerView().environment(model).tint(Color.musicAccent)
                     .padding(.top, 8).presentationSizing(.fitted).presentationDragIndicator(.visible)
             }
-            .fullScreenCover(isPresented: shown(VisualizerView.windowID, id)) {
-                VisualizerView().environment(model).tint(Color.musicAccent)
-                    .overlay(alignment: .topLeading) {
-                        Button("Close", systemImage: "xmark") { tools.id = nil }
-                            .labelStyle(.iconOnly).font(.system(size: 17, weight: .semibold)).foregroundStyle(.white)
-                            .frame(width: 44, height: 44).glass(in: Circle(), interactive: true)
-                            .padding(16).keyboardShortcut(.cancelAction)
-                    }
+            .fullScreenCover(isPresented: shown(VisualizerView.windowID, id)) { visualizer(VisualizerView()) }
+            .fullScreenCover(isPresented: shown(VisualizerView.standaloneID, id)) { visualizer(VisualizerView(standalone: true)) }
+    }
+
+    private func visualizer(_ view: VisualizerView) -> some View {
+        view.environment(model).tint(Color.musicAccent)
+            .overlay(alignment: .topLeading) {
+                Button("Close", systemImage: "xmark") { tools.id = nil }
+                    .labelStyle(.iconOnly).font(.system(size: 17, weight: .semibold)).foregroundStyle(.white)
+                    .frame(width: 44, height: 44).glass(in: Circle(), interactive: true)
+                    .padding(16).keyboardShortcut(.cancelAction)
             }
     }
 

@@ -5,7 +5,7 @@ import SwiftUI
 /// picture plays the preset live on the music; clicking shows it.
 struct PresetBrowser: View {
     let milkDrop: MilkDrop
-    let player: Player
+    let input: VisualizerInput
     @State private var category = PresetBrowser.all
     @State private var search = ""
     @State var hovered: String?
@@ -37,7 +37,7 @@ struct PresetBrowser: View {
         }
         .frame(width: 780, height: 520)
         .onAppear {
-            preview.samples = MilkDropView.samples(player)
+            preview.samples = MilkDropView.samples(input)
             preview.show(entries.first { $0.name == hovered })  // a hover set from outside (screenshots)
             Task { await MilkDrop.fetchBuiltIn() }
         }

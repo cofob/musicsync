@@ -1,9 +1,20 @@
 import Playback
 import SwiftUI
 
+/// Where a visualizer reads its samples: the player's tap at the playing time, or the newest ones of a capture.
+struct VisualizerInput {
+    let tap: SampleTap
+    var time: () -> TimeInterval = { .infinity }
+    func latest(_ count: Int) -> (left: [Float], right: [Float]) { tap.latest(count, at: time()) }
+}
+
+extension Player {
+    var visualizerInput: VisualizerInput { VisualizerInput(tap: mixer.equalizer.samples) { [mixer] in mixer.time } }
+}
+
 /// Winamp's classic spectrum analyzer: segmented bars from green to red with falling peak caps.
 struct SpectrumVisualizer: View {
-    let player: Player
+    let input: VisualizerInput
     /// Color scheme: 0 is Winamp's green to red; each next one turns the hues further.
     var palette = 0
     @AppStorage(VisualizerSettings.peaks, store: .app) private var peaks = true
@@ -24,13 +35,13 @@ struct SpectrumVisualizer: View {
                 let small = size.width < 400
                 let barWidth: CGFloat = small ? 6 : 12, gap: CGFloat = small ? 2 : 3, pad: CGFloat = small ? 8 : 20
                 let count = max(Int((size.width - 2 * pad + gap) / (barWidth + gap)), 1)
-                let samples = player.mixer.equalizer.samples.latest(Spectrum.size, at: player.mixer.time)
+                let samples = input.latest(Spectrum.size)
                 let mono = zip(samples.left, samples.right).map { ($0 + $1) / 2 }
                 let dt = state.last.map { timeline.date.timeIntervalSince($0) } ?? 0
                 state.last = timeline.date
                 let shift = state.hue.step(to: palette, dt: dt)
                 state.falloff.barFall = Float(falloff)
-                state.falloff.update(state.spectrum.bands(mono, sampleRate: player.mixer.equalizer.samples.sampleRate, count: count), dt: dt)
+                state.falloff.update(state.spectrum.bands(mono, sampleRate: input.tap.sampleRate, count: count), dt: dt)
                 let height = max(size.height - 2 * pad, 1), bottom = size.height - pad
                 let x0 = (size.width - CGFloat(count) * (barWidth + gap) + gap) / 2
                 // One gradient over the full height, so a bar turns from green to red as it grows.
@@ -64,7 +75,7 @@ struct SpectrumVisualizer: View {
 
 /// AIMP-style oscilloscope: the left and right channels as glowing lines that leave a short trail.
 struct ScopeVisualizer: View {
-    let player: Player
+    let input: VisualizerInput
     var palette = 0
     @State private var state = State()
 
@@ -81,7 +92,7 @@ struct ScopeVisualizer: View {
                 let dt = state.last.map { timeline.date.timeIntervalSince($0) } ?? 0
                 state.last = timeline.date
                 let shift = state.hue.step(to: palette, dt: dt)
-                let frame = player.mixer.equalizer.samples.latest(1024, at: player.mixer.time)
+                let frame = input.latest(1024)
                 state.trail = Array((state.trail + [frame]).suffix(3))
                 for (age, frame) in state.trail.reversed().enumerated() {
                     let opacity = 1 - Double(age) / 3

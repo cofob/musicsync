@@ -68,7 +68,7 @@ extension MilkDropController {
 }
 
 struct MilkDropView: View {
-    let player: Player
+    let input: VisualizerInput
     let milkDrop: MilkDrop
 
     var body: some View {
@@ -78,15 +78,14 @@ struct MilkDropView: View {
             if !milkDrop.hasFrame { ProgressView().controlSize(.large).tint(.white).transition(.opacity) }
         }
         .animation(.easeOut(duration: 0.6), value: milkDrop.hasFrame)
-        .onAppear { milkDrop.samples = Self.samples(player) }
+        .onAppear { milkDrop.samples = Self.samples(input) }
     }
 
-    /// The samples that play now, from the player's tap.
-    static func samples(_ player: Player) -> () -> (left: [Float], right: [Float], rate: Double) {
-        { [player] in
-            let tap = player.mixer.equalizer.samples
-            let s = tap.latest(AudioLevels.sampleCount, at: player.mixer.time)
-            return (s.left, s.right, tap.sampleRate)
+    /// The samples that play now, from the player's tap or a capture.
+    static func samples(_ input: VisualizerInput) -> () -> (left: [Float], right: [Float], rate: Double) {
+        {
+            let s = input.latest(AudioLevels.sampleCount)
+            return (s.left, s.right, input.tap.sampleRate)
         }
     }
 }

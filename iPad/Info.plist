@@ -7,6 +7,7 @@
 	<dict><key>UIApplicationSupportsMultipleScenes</key><true/></dict>
 	<key>NSAppTransportSecurity</key>
 	<dict><key>NSAllowsArbitraryLoads</key><true/></dict>
+	<key>NSMicrophoneUsageDescription</key><string>The standalone visualizer shows the sound of the microphone.</string>
 	<key>NSLocalNetworkUsageDescription</key><string>MusicSync connects to your Navidrome server on the local network and lets your iPhone control playback.</string>
 	<key>NSBonjourServices</key><array><string>_musicsync._tcp</string><string>_http._tcp</string></array>
 	<key>CFBundleURLTypes</key>

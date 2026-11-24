@@ -22,6 +22,10 @@ enum VisualizerSettings {
     static let peaks = "visualizerPeaks"
     static let segmented = "visualizerSegmented"
     static let falloff = "visualizerFalloff"
+    /// Sound of the standalone visualizer (`AudioCapture.Source`).
+    static let source = "visualizerSource"
+    /// UID of the standalone visualizer's microphone; empty for the system's default input.
+    static let microphone = "visualizerMicrophone"
 
     /// Reduce Motion in the system's accessibility settings.
     @MainActor static var systemReducesMotion: Bool {
@@ -145,6 +149,7 @@ struct VisualizerSettingsView: View {
                 Toggle("Show synced lyrics", isOn: $lyrics)
                 Toggle("Announce songs", isOn: $announce)
                 Button("Show Visualizer") { openWindow(id: VisualizerView.windowID) }
+                Button("Show Standalone Visualizer") { openWindow(id: VisualizerView.standaloneID) }
             } footer: {
                 SettingsFooter("Window > Visualizer (⌘T), or the waveform button in Now Playing and the MiniPlayer. Announce Songs shows the artist and title when a song starts.")
             }

@@ -25,6 +25,8 @@
 	</dict></array>
 	<key>NSUserActivityTypes</key>
 	<array><string>dev.cofob.musicsync.browse</string></array>
+	<key>NSMicrophoneUsageDescription</key><string>The standalone visualizer shows the sound of the microphone.</string>
+	<key>NSAudioCaptureUsageDescription</key><string>The standalone visualizer shows the sound of other apps.</string>
 	<key>NSRemovableVolumesUsageDescription</key><string>MusicSync reads and writes music on your iPod.</string>
 </dict>
 </plist>

@@ -1,4 +1,5 @@
 import MilkDropKit
+import Playback
 import Subsonic
 import Support
 import SwiftUI
@@ -20,7 +21,10 @@ enum VisualizerMode: String, CaseIterable, Identifiable {
 /// `compact` (the MiniPlayer) has its own controls instead. Settings > Visualizer has all options.
 struct VisualizerView: View {
     static let windowID = "visualizer"
+    static let standaloneID = "visualizer-standalone"
     var compact = false
+    /// Shows the sound of other apps or the microphone (`AudioCapture`), not the player.
+    var standalone = false
     /// Inside Now Playing: its buttons hide and stay with this view's controls (`AppModel.visualizerIdle`, `visualizerHold`).
     var inNowPlaying = false
     /// Off while Now Playing shows the lyrics in its panel: they would show twice.
@@ -41,6 +45,10 @@ struct VisualizerView: View {
     @AppStorage(VisualizerSettings.sections, store: .app) private var followsSections = false
     @AppStorage(VisualizerSettings.mood, store: .app) private var matchesMoodSetting = false
     @AppStorage(VisualizerSettings.reduceFlashing, store: .app) private var reduceFlashingSetting: Bool?
+    @AppStorage(VisualizerSettings.source, store: .app) private var source = AudioCapture.Source.default
+    /// UID of the microphone (`AudioCapture.microphones`); empty for the system's default input.
+    @AppStorage(VisualizerSettings.microphone, store: .app) private var microphone = ""
+    @State private var capture = AudioCapture()
     /// Color scheme of the spectrum and the oscilloscope; the next one at each new part of the song.
     @State private var palette = 0
     @State private var lyrics: Lyrics?
@@ -60,21 +68,24 @@ struct VisualizerView: View {
     var body: some View {
         let player = model.player
         let song: Song? = if case .server(let s)? = player.current { s } else { nil }
-        let line = showsLyrics && showsOverlayLyrics ? lyrics?.line(at: player.elapsed) : nil
+        let line = showsLyrics && showsOverlayLyrics && !standalone ? lyrics?.line(at: player.elapsed) : nil
         // The part of the song playing now: −1 before the first boundary, nil while not followed or not analyzed.
-        let section = followsSections ? player.sections.map { s in s.lastIndex { $0 <= player.elapsed } ?? -1 } : nil
+        let section = followsSections && !standalone ? player.sections.map { s in s.lastIndex { $0 <= player.elapsed } ?? -1 } : nil
         ZStack {
             Color.black
             switch mode {
-            case .spectrum: SpectrumVisualizer(player: player, palette: palette)
-            case .scope: ScopeVisualizer(player: player, palette: palette)
-            case .milkdrop: MilkDropView(player: player, milkDrop: milkDrop)
+            case .spectrum: SpectrumVisualizer(input: input, palette: palette)
+            case .scope: ScopeVisualizer(input: input, palette: palette)
+            case .milkdrop: MilkDropView(input: input, milkDrop: milkDrop)
+            }
+            if standalone, let error = capture.error {
+                Text(error).font(.headline).foregroundStyle(.white.opacity(0.6)).multilineTextAlignment(.center).padding()
             }
             if mode != .milkdrop, let lyrics, let line { VisualizerLyrics(lyrics: lyrics, current: line) }
             if reducesFlashing, mode == .milkdrop, milkDrop.presets.isEmpty, milkDrop.unmeasured > 0 {
                 Text("Checking presets for flashing…").font(.headline).foregroundStyle(.white.opacity(0.6))
             }
-            if model.jukebox.isActive, !compact {
+            if model.jukebox.isActive, !compact, !standalone {
                 Text("Playing on the server: there is no sound here to show.").font(.headline).foregroundStyle(.white.opacity(0.6))
             }
             // Takes the mouse from the web view: hover, double-click and keys stay here.
@@ -98,12 +109,13 @@ struct VisualizerView: View {
         .onKeyPress(.leftArrow) { milkDrop.step(-1); return mode == .milkdrop ? .handled : .ignored }
         .onKeyPress(.rightArrow) { milkDrop.step(1); return mode == .milkdrop ? .handled : .ignored }
         .onKeyPress("f") { toggleFullScreen(); return .handled }
-        .onAppear { player.visualizers += 1 }
+        .onAppear { if !standalone { player.visualizers += 1 } }
+        .task(id: standalone ? "\(source.rawValue) \(microphone)" : nil) { if standalone { await capture.start(source, microphone: microphone) } }
         .onChange(of: hovering) { if inNowPlaying { model.visualizerIdle = !hovering } }
         .onChange(of: model.visualizerHold) { if inNowPlaying { show() } }
         .onDisappear {
             if inNowPlaying { model.visualizerIdle = false; model.visualizerHold = false }
-            player.visualizers -= 1
+            if standalone { capture.stop() } else { player.visualizers -= 1 }
             #if os(macOS)
             if let window = fullScreenWindow, window.styleMask.contains(.fullScreen) { window.toggleFullScreen(nil) }
             #endif
@@ -124,7 +136,7 @@ struct VisualizerView: View {
         }
         .onChange(of: player.current?.id, initial: true) { old, _ in
             if followsSections, old != nil, old != player.current?.id { partStarted() }  // a new song is a new part too
-            guard announces, let item = player.current else { return }
+            guard announces, !standalone, let item = player.current else { return }
             milkDrop.title([item.artist, item.title].compactMap { $0 }.joined(separator: " - "))
         }
         .onChange(of: line) {
@@ -145,20 +157,39 @@ struct VisualizerView: View {
     private var controls: some View {
         let player = model.player
         return VStack(spacing: 10) {
-            HStack(spacing: 8) {
-                favoriteButton
-                VStack(spacing: 1) {
-                    Text(player.current?.title ?? "Not Playing").font(.headline)
-                    Text([player.isMixing ? "AutoMix" : nil, player.current?.artist, mode == .milkdrop ? milkDrop.current : nil]
-                        .compactMap { $0 }.joined(separator: " · "))
-                        .font(.caption).foregroundStyle(.white.opacity(0.65))
+            if standalone {
+                HStack {
+                    if AudioCapture.Source.allCases.count > 1 {
+                        Picker("Source", selection: $source) { ForEach(AudioCapture.Source.allCases) { Text($0.title).tag($0) } }
+                            .pickerStyle(.segmented).labelsHidden().fixedSize()
+                    }
+                    #if os(macOS)
+                    if source == .microphone {
+                        Picker("Microphone", selection: $microphone) {
+                            Text("System Default").tag("")
+                            ForEach(AudioCapture.microphones()) { Text($0.name).tag($0.id) }
+                        }
+                        .pickerStyle(.menu).labelsHidden().fixedSize()
+                    }
+                    #endif
                 }
-                .lineLimit(1).frame(maxWidth: .infinity)
-                songMenu
+                .controlSize(.small)
+            } else {
+                HStack(spacing: 8) {
+                    favoriteButton
+                    VStack(spacing: 1) {
+                        Text(player.current?.title ?? "Not Playing").font(.headline)
+                        Text([player.isMixing ? "AutoMix" : nil, player.current?.artist, mode == .milkdrop ? milkDrop.current : nil]
+                            .compactMap { $0 }.joined(separator: " · "))
+                            .font(.caption).foregroundStyle(.white.opacity(0.65))
+                    }
+                    .lineLimit(1).frame(maxWidth: .infinity)
+                    songMenu
+                }
+                .labelStyle(.iconOnly).buttonStyle(VisualizerButtonStyle()).font(.system(size: 13, weight: .semibold))
+                ScrubBar(tint: .white)
+                TransportControls(scale: 0.9, spacing: 14)
             }
-            .labelStyle(.iconOnly).buttonStyle(VisualizerButtonStyle()).font(.system(size: 13, weight: .semibold))
-            ScrubBar(tint: .white)
-            TransportControls(scale: 0.9, spacing: 14)
             // Narrow: the modes become a menu, then Lyrics only an icon.
             ViewThatFits(in: .horizontal) {
                 visualizerButtons(menuModes: false, lyricsTitle: true)
@@ -214,13 +245,15 @@ struct VisualizerView: View {
                 presetsMenu
                 Button("Next Preset", systemImage: "chevron.right") { milkDrop.step(1) }.help("Next preset")
             }
-            Button { showsLyrics.toggle() } label: {
-                if lyricsTitle { Label("Lyrics", systemImage: "quote.bubble").labelStyle(.titleAndIcon) } else { Label("Lyrics", systemImage: "quote.bubble") }
+            if !standalone {
+                Button { showsLyrics.toggle() } label: {
+                    if lyricsTitle { Label("Lyrics", systemImage: "quote.bubble").labelStyle(.titleAndIcon) } else { Label("Lyrics", systemImage: "quote.bubble") }
+                }
+                    .buttonStyle(VisualizerButtonStyle(isOn: showsLyrics && showsOverlayLyrics, wide: lyricsTitle))
+                    .disabled(!showsOverlayLyrics)
+                    .help(showsOverlayLyrics ? "Show synced lyrics over the visualizer" : "The lyrics show in the panel")
+                    .accessibilityValue(showsLyrics ? "On" : "Off")
             }
-                .buttonStyle(VisualizerButtonStyle(isOn: showsLyrics && showsOverlayLyrics, wide: lyricsTitle))
-                .disabled(!showsOverlayLyrics)
-                .help(showsOverlayLyrics ? "Show synced lyrics over the visualizer" : "The lyrics show in the panel")
-                .accessibilityValue(showsLyrics ? "On" : "Off")
             Button("Full Screen", systemImage: "arrow.up.left.and.arrow.down.right") { toggleFullScreen() }.help("Full screen")
         }
         .labelStyle(.iconOnly)
@@ -256,9 +289,11 @@ struct VisualizerView: View {
         #endif
         .buttonStyle(VisualizerButtonStyle(wide: true))
         .help("Preset options; import MilkDrop .milk files here")
-        .popover(isPresented: $browsing, arrowEdge: .top) { PresetBrowser(milkDrop: milkDrop, player: model.player) }
+        .popover(isPresented: $browsing, arrowEdge: .top) { PresetBrowser(milkDrop: milkDrop, input: input) }
         .onChange(of: browsing) { if !browsing { show() } }
     }
+
+    private var input: VisualizerInput { standalone ? VisualizerInput(tap: capture.samples) : model.player.visualizerInput }
 
     /// Options of the MilkDrop presets.
     private var config: PresetCycler.Options {
@@ -303,6 +338,8 @@ struct VisualizerView: View {
         #if os(macOS)
         guard let window = NSApp.keyWindow else { return }
         fullScreenWindow = window.styleMask.contains(.fullScreen) ? nil : window
+        window.collectionBehavior.insert(.fullScreenPrimary)  // `Window` scenes (Window > Visualizer) do not allow it on their own
+        window.collectionBehavior.remove(.fullScreenNone)
         window.toggleFullScreen(nil)
         #endif
     }
@@ -329,6 +366,8 @@ struct VisualizerMenuItem: View {
     var body: some View {
         Button("Visualizer") { openWindow(id: VisualizerView.windowID) }
             .keyboardShortcut("t")
+        Button("Standalone Visualizer") { openWindow(id: VisualizerView.standaloneID) }
+            .keyboardShortcut("t", modifiers: [.command, .shift])
     }
 }
 

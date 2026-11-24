@@ -164,6 +164,13 @@ struct MusicSyncApp: App {
         .defaultSize(width: 800, height: 480)
         .commandsRemoved()  // `VisualizerMenuItem` has the shortcut
 
+        Window("Standalone Visualizer", id: VisualizerView.standaloneID) {
+            VisualizerView(standalone: true).environment(model).tint(Color.musicAccent)
+        }
+        .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 800, height: 480)
+        .commandsRemoved()
+
         Settings {
             SettingsView().environment(model).tint(Color.musicAccent)
         }
