@@ -22,7 +22,7 @@ let package = Package(
         .target(name: "Remote"),
         .target(name: "Playback", dependencies: ["Support", "Subsonic"]),
         .target(name: "Preferences", dependencies: ["Support"]),
-        .target(name: "MilkDropKit", resources: [.copy("Resources/Presets"), .copy("Resources/Textures"), .copy("Resources/LICENSE.txt")]),
+        .target(name: "MilkDropKit", dependencies: ["Support"], resources: [.copy("Resources/Presets"), .copy("Resources/Textures"), .copy("Resources/LICENSE.txt")]),
         .target(name: "Sync", dependencies: ["Support", "Subsonic", "ITunesDB", "Artwork", "Transcode", "Device"]),
         .executableTarget(name: "MusicSyncApp", dependencies: ["Support", "Subsonic", "ITunesDB", "Artwork", "Transcode", "Device", "Sync", "Library", "Recommend", "Integration", "Remote", "Playback", "Preferences", "MilkDropKit"]),
         .testTarget(name: "SupportTests", dependencies: ["Support"]),

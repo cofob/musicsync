@@ -12,9 +12,12 @@ struct Beat {
     var bpm = 120.0
     var downbeat: TimeInterval = 0
     var strength = 0.0
+    /// The onset strength per hop, kept for the mood.
+    var onsets: [Float] = []
 
     init(_ samples: [Float], sampleRate: Double, soundStart: TimeInterval) {
         let onsets = Self.onsets(samples)
+        self.onsets = onsets
         let step = Double(Self.hop) / sampleRate
         guard onsets.count > 512, let rough = Self.roughTempo(onsets, step: step) else { return }
         let grid = stride(from: rough * 0.96, through: rough * 1.04, by: 0.05).map { Self.fold(onsets, step: step, bpm: $0) }

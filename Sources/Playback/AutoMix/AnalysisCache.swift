@@ -23,7 +23,8 @@ public struct AnalysisCache: Sendable {
         // A damaged file may hold values the analysis never makes; with those a mix plan could loop for ever.
         let a = entry.analysis
         guard Beat.tempos.contains(a.bpm), 0 <= a.soundStart, a.soundStart <= a.soundEnd, a.soundEnd <= a.duration + 1,
-              a.sections == a.sections.sorted(), a.sections.allSatisfy({ 0...a.duration + 1 ~= $0 }) else { return nil }
+              a.sections == a.sections.sorted(), a.sections.allSatisfy({ 0...a.duration + 1 ~= $0 }),
+              a.partMoods.isEmpty || a.partMoods.count == a.sections.count + 1 else { return nil }
         return a
     }
 
