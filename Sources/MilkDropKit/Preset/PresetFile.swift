@@ -29,6 +29,8 @@ public enum PresetFile {
                 values[PresetKeys.names[key] ?? key] = n
             }
         }
+        // As MilkDrop's `CState::Import`: without `mv_a`, motion vectors show only with `bMotionVectorsOn`.
+        if values["mv_a"] == nil { values["mv_a"] = (values["bmotionvectorson"] ?? 0) != 0 ? 1 : 0 }
         /// Equation lines join with nothing between them, as MilkDrop does: old editors wrapped lines inside names.
         func code(_ block: String, shader: Bool = false) -> String {
             let lines = (blocks[block] ?? []).sorted { $0.0 < $1.0 }.map(\.1)

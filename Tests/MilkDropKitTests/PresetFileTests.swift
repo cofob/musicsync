@@ -45,6 +45,13 @@ import Testing
         #expect(p.comp.isEmpty)
     }
 
+    /// As MilkDrop: `mv_a` comes from `bMotionVectorsOn` (off when missing) unless the file has `mv_a`.
+    @Test func motionVectorAlpha() {
+        #expect(PresetFile.parse("[preset00]", name: "T").values["mv_a"] == 0)
+        #expect(PresetFile.parse("bMotionVectorsOn=1", name: "T").values["mv_a"] == 1)
+        #expect(PresetFile.parse("bMotionVectorsOn=0\nmv_a=0.5", name: "T").values["mv_a"] == 0.5)
+    }
+
     @Test func numbersLikeParseFloat() {
         #expect(PresetFile.number("1.5f") == 1.5)
         #expect(PresetFile.number(" -2 ") == -2)
