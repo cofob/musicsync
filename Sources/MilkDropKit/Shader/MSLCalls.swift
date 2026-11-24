@@ -14,6 +14,13 @@ extension MSLGenerator {
         "lerp": (3, "mix"), "clamp": (3, "clamp"), "smoothstep": (3, "smoothstep"),
     ]
 
+    /// MSL functions the generated code calls. HLSL lets a variable share a function's name (`float3 max = max(a, b)`);
+    /// MSL does not, so such variables get renamed.
+    static let mslFunctions = Set(unaryFloat.values).union(componentwise.values.map(\.msl)).union([
+        "dot", "cross", "length", "normalize", "distance", "reflect", "refract", "all", "any", "isnan", "isinf", "isfinite",
+        "transpose", "determinant", "modf", "frexp", "ldexp",
+    ])
+
     func call(_ name: String, _ args: [Expr], _ line: Int) throws -> Value {
         let values = try args.map { try expr($0) }
         do {
@@ -154,6 +161,12 @@ extension MSLGenerator {
             guard v[1].lvalue, v[2].lvalue else { throw HLSLError("sincos needs variables") }
             let x = try convert(v[0], to: v[1].type).code
             return Value(code: "(\(v[1].code) = sin(\(x)), \(v[2].code) = cos(\(x)))", type: .void)
+        case "modf":
+            // Integer part (toward zero) to `ip`, signed fraction as the value.
+            try need(2)
+            guard v[1].lvalue, v[1].type.kind == .float else { throw HLSLError("modf needs a float variable") }
+            let x = try convert(v[0], to: v[1].type).code
+            return Value(code: "(\(v[1].code) = trunc(\(x)), \(x) - \(v[1].code))", type: v[1].type)
         default:
             throw HLSLError("unknown function")
         }

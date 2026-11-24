@@ -130,7 +130,13 @@ struct HLSLParser {
                 try expect("]")
             }
             try skipSemantic()
-            if accept("=") { d.initializer = current.text == "{" ? try list() : try assignment() }
+            if current.text == "=", peek(1).text == "sampler_state" { // effect state: MilkDrop picks it from the name
+                pos += 2
+                try expect("{")
+                while !accept("}") { if advance().kind == .eof { throw error("expected '}'") } }
+            } else if accept("=") {
+                d.initializer = current.text == "{" ? try list() : try assignment()
+            }
             decls.append(d)
             guard accept(",") else { break }
             line = current.line

@@ -176,6 +176,24 @@ private func msl(_ body: String, globals: String = "") throws -> String {
         #expect(code.contains("return float4(ret, md_in.color.a);"))
     }
 
+    @Test func matrixTimesIntLiteral() throws {
+        #expect(try msl("float2x2 m = float2x2(texsize.z, 0, 0, texsize.w) * 4; ret.xy = mul(uv, m);").contains(" * 4.0)"))
+    }
+
+    @Test func variablesNamedLikeFunctionsAreRenamed() throws {
+        let code = try msl("float3 max = max(ret, max(ret, 1)); float dot = dot(uv, uv); float2 pow = pow(uv, 2); ret = max * dot + pow.x;")
+        for name in ["max_", "dot_", "pow_"] { #expect(code.contains("\(name) = ")) }
+    }
+
+    @Test func samplerStateIsSkipped() throws {
+        let shader = try translated("ret = tex2D(sampler_grad, uv).xyz;", globals: "sampler sampler_grad = sampler_state { AddressU = WRAP; AddressV = WRAP; };")
+        #expect(shader.userTextures == [UserTexture(name: "grad", wrap: true, filter: true)])
+    }
+
+    @Test func modfSplitsTowardZero() throws {
+        #expect(try msl("float i; float f = modf(rad * 3, i); ret = f + i;").contains("(i = trunc((rad * 3.0)), (rad * 3.0) - i)"))
+    }
+
     @Test func errorsHaveLines() {
         #expect(throws: HLSLError.self) { try HLSLTranslator.translate("shader_body {\n ret = nothing;\n}", stage: .warp) }
         do {

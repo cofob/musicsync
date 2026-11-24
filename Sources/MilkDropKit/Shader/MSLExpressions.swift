@@ -205,7 +205,7 @@ extension MSLGenerator {
             guard a.type == b.type else { throw HLSLError("'\(op)' on \(a.type.msl) and \(b.type.msl)") }
         } else {
             guard (a.type.isMatrix ? b : a).type.size == 1 else { throw HLSLError("'\(op)' on a matrix and a vector") }
-            if op == "*" { return Value(code: "(\(a.code) * \(b.code))", type: m.type) }
+            if op == "*" { return Value(code: "(\(cast(a, .float).code) * \(cast(b, .float).code))", type: m.type) }
         }
         let (x, y) = (try convert(a, to: m.type), try convert(b, to: m.type))
         switch op {

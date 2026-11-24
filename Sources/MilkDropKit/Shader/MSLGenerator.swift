@@ -53,7 +53,7 @@ final class MSLGenerator {
     // MARK: Names
 
     func mslName(_ name: String) -> String {
-        MSLPreamble.reserved.contains(name) || name.hasPrefix("md_") || name == "_c" ? name + "_" : name
+        MSLPreamble.reserved.contains(name) || Self.mslFunctions.contains(name) || name.hasPrefix("md_") || name == "_c" ? name + "_" : name
     }
 
     func lookup(_ name: String, line: Int) throws -> Value {
