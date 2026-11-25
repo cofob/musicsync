@@ -62,8 +62,11 @@ public struct SubsonicClient: Sendable {
 
     /// `format` "raw" streams the original file. `maxBitRate` is in kbps. `timeOffset` (seconds) starts a converted
     /// stream later; it needs the OpenSubsonic `transcodeOffset` extension.
-    public func streamURL(id: String, format: String? = nil, maxBitRate: Int? = nil, timeOffset: Int? = nil) -> URL {
+    /// `estimateContentLength` asks the server for a length of a converted stream, which the audio tap's loader needs.
+    public func streamURL(id: String, format: String? = nil, maxBitRate: Int? = nil, timeOffset: Int? = nil,
+                          estimateContentLength: Bool = false) -> URL {
         url("stream", [("id", id)]
+            + (estimateContentLength ? [("estimateContentLength", "true")] : [])
             + (format.map { [("format", $0)] } ?? [])
             + (maxBitRate.map { [("maxBitRate", String($0))] } ?? [])
             + (timeOffset.map { [("timeOffset", String($0))] } ?? []), json: false)

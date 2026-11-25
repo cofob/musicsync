@@ -4,8 +4,8 @@ import UniformTypeIdentifiers
 
 /// Streams a song to AVFoundation through a resource loader instead of letting it fetch the URL itself: audio taps
 /// (the equalizer and the visualizer) never run on assets AVFoundation streams on its own (measured: 0 frames), and run
-/// on loader assets. Each loading request is one HTTP range request. For servers that send a length and serve ranges
-/// (Subsonic raw streams); converted streams have neither.
+/// on loader assets. Each loading request is one HTTP range request. Converted streams serve no ranges and send an
+/// estimated length or none: AVFoundation plays them to their end anyway (`convertedStreamPlays`).
 public final class StreamLoader: NSObject, AVAssetResourceLoaderDelegate, URLSessionDataDelegate, @unchecked Sendable {
     static let prefix = "musicsync-"
     nonisolated(unsafe) private static var key: UInt8 = 0
@@ -88,7 +88,8 @@ public final class StreamLoader: NSObject, AVAssetResourceLoaderDelegate, URLSes
         if let info = entry.loading.contentInformationRequest {
             let mime = contentType ?? http.mimeType
             info.contentType = mime.flatMap { UTType(mimeType: $0)?.identifier } ?? UTType.audio.identifier
-            info.contentLength = Self.totalLength(http) ?? response.expectedContentLength
+            // Without a length AVFoundation never starts; a too large one still ends where the data ends.
+            info.contentLength = Self.totalLength(http) ?? (response.expectedContentLength > 0 ? response.expectedContentLength : 1 << 40)
             // Ranges always work: without server support the loader skips to the offset itself.
             info.isByteRangeAccessSupported = true
         }

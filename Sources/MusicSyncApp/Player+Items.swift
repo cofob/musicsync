@@ -23,9 +23,10 @@ extension Player {
     /// as converted streams cannot seek themselves.
     private static func streamCue(_ id: String, _ stream: StreamRequest, _ client: SubsonicClient, gain: Float, from: Int,
                                   seeksOnServer: Bool) -> Mixer.Cue {
-        let url = client.streamURL(id: id, format: stream.format, maxBitRate: stream.maxBitRate, timeOffset: from > 0 ? from : nil)
-        // Originals go through `StreamLoader`, so the equalizer and the visualizer get their audio.
-        let asset = stream.isConverted ? nil : StreamLoader.asset(url, contentType: stream.contentType)
+        let url = client.streamURL(id: id, format: stream.format, maxBitRate: stream.maxBitRate, timeOffset: from > 0 ? from : nil,
+                                 estimateContentLength: stream.isConverted)
+        // Through `StreamLoader`, so the equalizer and the visualizer get their audio.
+        let asset = StreamLoader.asset(url, contentType: stream.contentType)
         var cue = cue(url, gain: gain, contentType: stream.contentType, asset: asset)
         cue.offset = TimeInterval(from)
         if seeksOnServer { cue.reload = { streamCue(id, stream, client, gain: gain, from: Int($0), seeksOnServer: true) } }
