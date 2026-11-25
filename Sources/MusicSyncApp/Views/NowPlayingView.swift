@@ -17,13 +17,21 @@ struct NowPlayingView: View {
     @State private var lyrics: Lyrics?
     /// False when the song has no lyrics: the player moves to the middle.
     @State private var showLyrics = false
+    /// The song's video for the background; nil when there is none or the background is not the video.
+    @State private var video: MusicVideo?
 
     var body: some View {
         let player = model.player
         let song: Song? = if case .server(let s)? = player.current { s } else { nil }
         let panel = model.nowPlayingPanel == .lyrics && !showLyrics ? .none : model.nowPlayingPanel
         ZStack {
-            if model.nowPlayingVisualizer {
+            if let shown = model.shownVideo {
+                // The video with its own sound in place of the cover and player; clear of the corner buttons.
+                Color.black
+                MusicVideoView(video: shown).id(shown)
+                    .padding(.top, 56 + Self.barInset).padding(.bottom, 64)
+                    .transition(.opacity)
+            } else if model.nowPlayingVisualizer {
                 // The visualizer has the player itself: no cover, background or player column under it.
                 // Its player keeps clear of the panel, else (centered) of the buttons in the bottom right corner.
                 VisualizerView(inNowPlaying: true, showsOverlayLyrics: panel != .lyrics,
@@ -51,8 +59,19 @@ struct NowPlayingView: View {
                         .overlay(Color.black.opacity(player.isPlaying ? 0 : 1))  // paused: plain black
                         .animation(.easeInOut(duration: 0.8), value: player.isPlaying)
                         .allowsHitTesting(false)
+                } else if background == .video, let video {
+                    MusicVideoView(video: video, follow: (player.isPlaying, player.elapsed)) { failed in
+                        withAnimation(.smooth(duration: 0.8)) { self.video = nil }
+                        if failed, let song { model.noVideo(song) }
+                    }
+                    // Muted: the song plays in MusicSync. `.blur` does not reach the web view: a material over it blurs it.
+                    .overlay { Rectangle().fill(.ultraThinMaterial) }
+                    .overlay(Color.black.opacity(player.isPlaying ? 0.45 : 1))  // paused: plain black
+                    .animation(.easeInOut(duration: 0.8), value: player.isPlaying)
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
                 } else {
-                    ArtworkBackground(image: background == .plain ? nil : player.artwork, animated: background == .animated)
+                    ArtworkBackground(image: background == .plain ? nil : player.artwork, animated: background == .animated || background == .video)
                 }
                 HStack(spacing: 40) {
                     PlayerColumn().frame(maxWidth: 440)
@@ -83,6 +102,17 @@ struct NowPlayingView: View {
             HStack(spacing: 4) {
                 panelToggle("Lyrics", "quote.bubble", .lyrics)
                 panelToggle("Queue", "list.bullet", .queue)
+                if let song {
+                    let on = model.shownVideo != nil
+                    Button("Music Video", systemImage: "play.rectangle") {
+                        if on { model.shownVideo = nil } else { Task { await model.openVideo(for: song) } }
+                    }
+                    .labelStyle(.iconOnly).buttonStyle(HitAreaButtonStyle(width: 34, height: 30)).font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(on ? Color.black : .white)
+                    .background(on ? Color.white.opacity(0.9) : .clear, in: Capsule())
+                    .help("Music Video")
+                    .accessibilityValue(on ? "On" : "Off")
+                }
                 Button("Visualizer", systemImage: "waveform") {
                     model.nowPlayingVisualizer.toggle()
                     if model.nowPlayingVisualizer { model.nowPlayingPanel = .none }  // its own lyrics show over it
@@ -103,6 +133,11 @@ struct NowPlayingView: View {
         .environment(\.colorScheme, .dark)
         .animation(.smooth, value: model.nowPlayingPanel)
         .animation(.smooth, value: model.nowPlayingVisualizer)
+        .animation(.smooth, value: model.shownVideo)
+        .task(id: "\(song?.id ?? "")|\(AppPreferences.shared.appearance.nowPlayingBackground)") {  // also when the menu changes it
+            video = nil
+            if let song, AppPreferences.shared.appearance.nowPlayingBackground == .video { video = await model.musicVideo(for: song) }
+        }
         .task(id: song?.id) {
             // The panel stays while the next song's lyrics load; it goes away only when there are none.
             lyrics = nil

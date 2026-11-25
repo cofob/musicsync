@@ -42,6 +42,13 @@
 			<key>DenyConsequences</key><string>If you deny these connections, artists without a photo on your server show their initials.</string>
 		</dict>
 		<dict>
+			<key>Host</key><string>fastsi.de, www.youtube-nocookie.com, *.googlevideo.com, i.ytimg.com</string>
+			<key>NetworkProtocol</key><string>TCP</string>
+			<key>Port</key><string>443</string>
+			<key>Purpose</key><string>Finds and plays the music video of a song. Asks fastsi.de for an Invidious or Piped instance, sends the title and artist of the song to it (any host) to search YouTube, and plays the video from YouTube, only after you allow it in the app.</string>
+			<key>DenyConsequences</key><string>If you deny these connections, only the videos of your server are shown.</string>
+		</dict>
+		<dict>
 			<key>Host</key><string>local-net</string>
 			<key>IsIncoming</key><true/>
 			<key>NetworkProtocol</key><string>TCP</string>

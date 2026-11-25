@@ -27,6 +27,7 @@ struct AppearanceSettingsView: View {
                     Text("Static Cover Colors").tag(AppearanceSettings.NowPlayingBackground.artwork)
                     Text("Plain").tag(AppearanceSettings.NowPlayingBackground.plain)
                     Text("Blurred Visualizer").tag(AppearanceSettings.NowPlayingBackground.visualizer)
+                    Text("Music Video").tag(AppearanceSettings.NowPlayingBackground.video)
                 }
             } footer: {
                 SettingsFooter("The full-window player takes its colors from the cover, stays dark gray, or shows the visualizer blurred and dark. With Reduce Motion the colors stay still.")

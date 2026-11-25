@@ -11,6 +11,9 @@ struct SongsMenuItems: View {
         Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") { model.playNext(songs) }
         Button("Add to Queue", systemImage: "text.line.last.and.arrowtriangle.forward") { model.addToQueue(songs) }
         AddToPlaylistMenu(songs: songs)
+        if let song = songs.first, songs.count == 1 {
+            Button("Music Video", systemImage: "play.rectangle") { Task { await model.openVideo(for: song) } }
+        }
         Divider()
         let starred = songs.allSatisfy(model.isStarred)
         Button(starred ? "Undo Favorite" : "Favorite", systemImage: starred ? "star.slash" : "star") { model.toggleStar(songs) }

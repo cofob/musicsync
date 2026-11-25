@@ -3,7 +3,7 @@ import Foundation
 /// Hosts other than the user's server. The app connects to one only after the user allows it (`ExternalAccess`).
 /// `Resources/InternetAccessPolicy.plist` lists the same hosts for Little Snitch.
 public enum ExternalService: String, CaseIterable, Sendable {
-    case presetCache, presetArchive, lrclib, artistPhotos, radio
+    case presetCache, presetArchive, lrclib, artistPhotos, radio, musicVideos
 
     public var title: String {
         switch self {
@@ -12,6 +12,7 @@ public enum ExternalService: String, CaseIterable, Sendable {
         case .lrclib: "LRCLIB Lyrics"
         case .artistPhotos: "Artist Photos"
         case .radio: "Internet Radio"
+        case .musicVideos: "Music Videos"
         }
     }
 
@@ -23,6 +24,7 @@ public enum ExternalService: String, CaseIterable, Sendable {
         case .lrclib: "Sends the title, artist, album and length of the song in Now Playing to find lyrics the server does not have."
         case .artistPhotos: "Loads the artist photos that your server links to on other hosts (Last.fm, Spotify, Deezer)."
         case .radio: "Plays internet radio streams directly from the station hosts that you added on the server."
+        case .musicVideos: "Sends the title and artist of the song to an Invidious or Piped instance that fastsi.de picks, to find its video on YouTube, and plays the video from YouTube with its ads blocked."
         }
     }
 
@@ -34,6 +36,7 @@ public enum ExternalService: String, CaseIterable, Sendable {
         case .lrclib: "Without it, only the lyrics of your server are shown."
         case .artistPhotos: "Without it, artists without a photo on your server show their initials."
         case .radio: "Without it, internet radio stations do not play."
+        case .musicVideos: "Without it, only the videos of your server are shown."
         }
     }
 
@@ -45,6 +48,7 @@ public enum ExternalService: String, CaseIterable, Sendable {
         case .lrclib: ["lrclib.net"]
         case .artistPhotos: ["lastfm.freetls.fastly.net", "i.scdn.co", "*.dzcdn.net"]
         case .radio: []
+        case .musicVideos: ["fastsi.de", "www.youtube-nocookie.com", "*.googlevideo.com", "i.ytimg.com"]
         }
     }
 }

@@ -123,6 +123,7 @@ struct RootView: View {
         .fullScreenCover(isPresented: .constant(model.config == nil)) { PadOnboarding().environment(model) }
         #endif
         .sheet(isPresented: $sync.showSheet) { SyncSheet() }
+        .modifier(MusicVideoPresenter())
         .alert("Already on This iPod", isPresented: Binding(get: { model.sync.foreignAlbum != nil },
                                                             set: { if !$0 { model.sync.foreignAlbum = nil } })) {
             Button("Select Anyway") { if let album = model.sync.foreignAlbum { model.sync.toggle(album, confirmed: true) } }

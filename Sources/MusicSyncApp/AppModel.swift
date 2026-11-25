@@ -50,6 +50,12 @@ final class AppModel {
         }
     }
     @ObservationIgnored var statusTask: Task<Void, Never>?
+    /// The server's videos, listed once (empty on Navidrome).
+    @ObservationIgnored var serverVideos: [Song]?
+    /// The video that Now Playing shows with its own sound, in place of the player; nil = none.
+    var shownVideo: MusicVideo?
+    /// The Music Video button found none.
+    var noVideoAlert = false
 
     private(set) var artists: [Artist] = []
     private(set) var albums: [Album] = []

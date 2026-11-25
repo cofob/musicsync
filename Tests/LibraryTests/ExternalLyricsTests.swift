@@ -29,4 +29,14 @@ import Subsonic
         try await reopened.storeExternalLyrics(songId: "s1", source: "LRCLIB", lyrics: nil)
         #expect(await reopened.externalLyrics(songId: "s1", source: "LRCLIB") == .some(nil))
     }
+
+    @Test func storesVideos() async throws {
+        let dir = TempDir()
+        let db = dir.database()
+        #expect(await db.externalVideo(songId: "s1") == nil)
+        try await db.storeExternalVideo(songId: "s1", video: .youtube(id: "abcdefghijk"))
+        try await db.storeExternalVideo(songId: "s2", video: nil)
+        #expect(await db.externalVideo(songId: "s1") == .some(.youtube(id: "abcdefghijk")))
+        #expect(await db.externalVideo(songId: "s2") == .some(nil))
+    }
 }

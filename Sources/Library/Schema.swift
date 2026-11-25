@@ -73,6 +73,11 @@ enum Schema {
           songId TEXT NOT NULL, source TEXT NOT NULL, json TEXT, fetchedAt REAL NOT NULL,
           PRIMARY KEY(songId, source)) WITHOUT ROWID
         """,
+        // external_videos: music videos found on other hosts (json NULL = none found).
+        """
+        CREATE TABLE IF NOT EXISTS external_videos(
+          songId TEXT PRIMARY KEY, json TEXT, fetchedAt REAL NOT NULL) WITHOUT ROWID
+        """,
     ]
 
     /// External-content FTS5 index kept in sync by triggers. Upserts must use `ON CONFLICT DO UPDATE`

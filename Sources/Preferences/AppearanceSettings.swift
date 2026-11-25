@@ -93,6 +93,8 @@ public struct AppearanceSettings: StoredSettings {
         case plain
         /// The visualizer (its mode from Settings > Visualizer), blurred and dark.
         case visualizer
+        /// The song's music video, muted and dark; cover colors when there is none.
+        case video
     }
 
     /// Page the main window opens with.
