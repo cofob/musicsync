@@ -14,6 +14,7 @@ final class AppPreferences {
     var home = HomeSettings.load() { didSet { if home != oldValue { home.save() } } }
     var listening = ListeningSettings.load() { didSet { if listening != oldValue { listening.save() } } }
     var advanced = AdvancedSettings.load() { didSet { if advanced != oldValue { advanced.save() } } }
+    var access = ExternalAccess.load() { didSet { if access != oldValue { access.save() } } }
 
     /// The page the main window opens with.
     var startPage: SidebarItem {
@@ -31,6 +32,7 @@ final class AppPreferences {
         home = HomeSettings()
         listening = ListeningSettings()
         advanced = AdvancedSettings()
+        access = ExternalAccess()
     }
 }
 

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>DeveloperName</key><string>cofob</string>
+	<key>Website</key><string>https://github.com/cofob/musicsync</string>
+	<key>ApplicationDescription</key><string>MusicSync plays and syncs music from your Subsonic server to an iPod. It connects only to your server. It connects to the other hosts below only after you allow it in the app.</string>
+	<key>Connections</key>
+	<array>
+		<dict>
+			<key>Host</key><string>*</string>
+			<key>Relevance</key><string>Essential</string>
+			<key>Purpose</key><string>Connects to the Subsonic server that you set in Settings, to browse, stream, download and sync your music. Internet radio streams go to the station hosts, only after you allow Internet Radio in the app.</string>
+			<key>DenyConsequences</key><string>If you deny these connections, MusicSync cannot reach your music server.</string>
+		</dict>
+		<dict>
+			<key>Host</key><string>musicsync-cache.cfb.wtf</string>
+			<key>NetworkProtocol</key><string>TCP</string>
+			<key>Port</key><string>443</string>
+			<key>Purpose</key><string>Downloads visualizer presets with their pictures and compiled shaders, only after you allow it in the app. Nothing about you or your music is sent.</string>
+			<key>DenyConsequences</key><string>If you deny these connections, presets are compiled and measured on this Mac, which is slower.</string>
+		</dict>
+		<dict>
+			<key>Host</key><string>codeload.github.com</string>
+			<key>NetworkProtocol</key><string>TCP</string>
+			<key>Port</key><string>443</string>
+			<key>Purpose</key><string>Downloads the Cream of the Crop visualizer preset pack, only after you allow it in the app.</string>
+			<key>DenyConsequences</key><string>If you deny these connections, the preset pack cannot be downloaded.</string>
+		</dict>
+		<dict>
+			<key>Host</key><string>lrclib.net</string>
+			<key>NetworkProtocol</key><string>TCP</string>
+			<key>Port</key><string>443</string>
+			<key>Purpose</key><string>Finds lyrics that your server does not have. Sends the title, artist, album and length of the song in Now Playing, only after you allow it in the app.</string>
+			<key>DenyConsequences</key><string>If you deny these connections, only the lyrics of your server are shown.</string>
+		</dict>
+		<dict>
+			<key>Host</key><string>lastfm.freetls.fastly.net, i.scdn.co, *.dzcdn.net</string>
+			<key>NetworkProtocol</key><string>TCP</string>
+			<key>Port</key><string>443</string>
+			<key>Purpose</key><string>Loads the artist photos that your server links to, only after you allow it in the app.</string>
+			<key>DenyConsequences</key><string>If you deny these connections, artists without a photo on your server show their initials.</string>
+		</dict>
+		<dict>
+			<key>Host</key><string>local-net</string>
+			<key>IsIncoming</key><true/>
+			<key>NetworkProtocol</key><string>TCP</string>
+			<key>Purpose</key><string>Lets the MusicSync app on your iPhone or iPad on the same network control playback.</string>
+			<key>DenyConsequences</key><string>If you deny these connections, remote control from other devices does not work.</string>
+		</dict>
+	</array>
+	<key>Services</key>
+	<array>
+		<dict>
+			<key>Name</key><string>Bonjour</string>
+			<key>Purpose</key><string>Finds your server and MusicSync remotes on the local network.</string>
+		</dict>
+	</array>
+</dict>
+</plist>

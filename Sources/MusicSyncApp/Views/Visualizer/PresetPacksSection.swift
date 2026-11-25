@@ -29,9 +29,9 @@ import SwiftUI
         task = Task {
             do {
                 let progress: @Sendable (Double) -> Void = { value in Task { @MainActor in self.progress = value } }
-                if let manifest = await MilkDrop.cachedPresets() {
+                if let manifest = await MilkDrop.cachedPresets(ask: true) {
                     try await PresetCDN().install(categories, from: manifest, into: MilkDrop.cachePlaces, progress: progress)
-                } else {
+                } else if await NetworkConsent.request(.presetArchive) {
                     _ = try await PresetPack.download(categories, to: MilkDrop.downloadedFolder, progress: progress)
                 }
             } catch is CancellationError {

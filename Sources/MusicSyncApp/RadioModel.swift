@@ -39,7 +39,10 @@ final class RadioModel {
 
     func play(_ station: RadioStation) {
         guard let url = URL(string: station.streamUrl) else { return }
-        app.player.play([.file(url, title: station.name, artist: "Internet Radio", album: nil)])
+        Task {
+            if let host = url.host, host != app.config?.baseURL.host, !(await NetworkConsent.request(.radio, hosts: [host])) { return }
+            app.player.play([.file(url, title: station.name, artist: "Internet Radio", album: nil)])
+        }
     }
 
     /// Adds a station (`id` nil) or changes one.

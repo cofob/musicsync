@@ -21,6 +21,25 @@ struct AdvancedSettingsView: View {
                 SettingsFooter("How long a server request may wait for data. A new value applies after Save on the Server page or at the next launch.")
             }
             Section {
+                ForEach(ExternalService.allCases, id: \.self) { service in
+                    Picker(selection: Binding(get: { prefs.access[service] }, set: {
+                        prefs.access[service] = $0
+                        if service == .lrclib, $0 != true { prefs.listening.lrclibLyrics = false }
+                    })) {
+                        Text("Ask").tag(Bool?.none)
+                        Text("Allow").tag(Bool?.some(true))
+                        Text("Deny").tag(Bool?.some(false))
+                    } label: {
+                        Text(service.title)
+                        Text(service.hosts.isEmpty ? "Station hosts" : service.hosts.joined(separator: ", "))
+                    }
+                }
+            } header: {
+                Text("External Services")
+            } footer: {
+                SettingsFooter("MusicSync connects only to your server. Other hosts get a request only after you allow it.")
+            }
+            Section {
                 Picker("Limit", selection: $prefs.advanced.coverCacheMB) {
                     ForEach(AdvancedSettings.coverCacheSizes, id: \.self) { mb in
                         Text(mb == 0 ? "No Limit" : formatBytes(Int64(mb) * 1_000_000)).tag(mb)

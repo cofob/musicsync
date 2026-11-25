@@ -36,8 +36,9 @@ extension MilkDropController {
     @MainActor private static var builtInFetch: Task<Void, Never>?
 
     /// The preset cache's set for this build (`PresetCDN`), fetched once per launch; nil when there is none or it
-    /// cannot be reached.
-    @MainActor static func cachedPresets() async -> PresetCacheManifest? {
+    /// cannot be reached. Without the user's consent: nil, and `ask` asks for it.
+    @MainActor static func cachedPresets(ask: Bool = false) async -> PresetCacheManifest? {
+        guard ask ? await NetworkConsent.request(.presetCache) : NetworkConsent.allowed(.presetCache) else { return nil }
         let task = cacheManifest ?? Task { try? await PresetCDN().manifest() }
         cacheManifest = task
         return await task.value

@@ -48,7 +48,10 @@ struct HomeAndListeningSections: View {
         }
         Section {
             Toggle("Find missing lyrics on LRCLIB", isOn: $prefs.listening.lrclibLyrics)
-                .onChange(of: prefs.listening.lrclibLyrics) { model.lyricsCache = [:] }
+                .onChange(of: prefs.listening.lrclibLyrics) { _, on in
+                    model.lyricsCache = [:]
+                    if on { Task { prefs.listening.lrclibLyrics = await NetworkConsent.request(.lrclib) } }
+                }
         } header: {
             Text("Lyrics")
         } footer: {

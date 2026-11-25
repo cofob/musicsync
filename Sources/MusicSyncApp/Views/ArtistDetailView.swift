@@ -111,13 +111,19 @@ struct ArtistPortrait: View {
             .aspectRatio(1, contentMode: .fit)
             .task(id: [artist.coverArt, imageURL?.absoluteString]) {
                 if let id = artist.coverArt, let found = await model.covers?.image(id: id, size: size) { image = found; return }
-                if let imageURL, let found = await Self.download(imageURL) { image = found; return }
+                if let imageURL, await allowed(imageURL), let found = await Self.download(imageURL) { image = found; return }
                 if !Task.isCancelled { failed = true }
             }
     }
 
     private var initials: String {
         String(artist.name.split(separator: " ").prefix(2).compactMap(\.first)).uppercased()
+    }
+
+    /// Photos on other hosts than the server need the user's consent.
+    private func allowed(_ url: URL) async -> Bool {
+        guard let host = url.host, host != model.config?.baseURL.host else { return true }
+        return await NetworkConsent.allows(.artistPhotos, hosts: [host])
     }
 
     /// Fetches and decodes the image off the main thread.

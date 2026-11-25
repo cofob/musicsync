@@ -6,7 +6,7 @@ extension AppModel {
 
     /// LRCLIB lyrics for the song in Now Playing, when Settings allows it. Replies (also "none") are kept in the library.
     func lrclibLyrics(_ song: Song) async throws -> Lyrics? {
-        guard AppPreferences.shared.listening.lrclibLyrics, !downloads.isOffline, let artist = song.artist else { return nil }
+        guard AppPreferences.shared.listening.lrclibLyrics, NetworkConsent.allowed(.lrclib), !downloads.isOffline, let artist = song.artist else { return nil }
         let database = library?.database
         let found: StructuredLyrics?
         if let stored = await database?.externalLyrics(songId: song.id, source: LRCLIBClient.source) {

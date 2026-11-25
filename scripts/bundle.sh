@@ -13,7 +13,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN/MusicSyncApp" "$APP/Contents/MacOS/"
 cp Resources/Info.plist "$APP/Contents/"
-cp Resources/AppIcon.icns "$APP/Contents/Resources/"
+cp Resources/AppIcon.icns Resources/InternetAccessPolicy.plist "$APP/Contents/Resources/"
 for b in "$BIN"/*.bundle; do [ -e "$b" ] && cp -R "$b" "$APP/Contents/Resources/"; done
 # App Intents metadata, as Xcode makes it: compiler const values of the app module, then the metadata processor.
 META="$(mktemp -d)"
