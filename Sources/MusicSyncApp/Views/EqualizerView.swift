@@ -76,12 +76,25 @@ private struct EqualizerSlider: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Slider(value: $value, in: EqualizerGains.range)
-                .frame(width: 150)
-                .rotationEffect(.degrees(-90))
-                .frame(width: 30, height: 150)
-                .accessibilityLabel(label == "Preamp" ? label : "\(label) Hz")
-                .accessibilityValue("\(Int(value.rounded())) dB")
+            GeometryReader { geo in
+                let r = EqualizerGains.range, h = geo.size.height
+                let y = h * (r.upperBound - value) / (r.upperBound - r.lowerBound)
+                ZStack(alignment: .top) {
+                    Capsule().fill(.quaternary).frame(width: 4)
+                    Capsule().fill(.tint).frame(width: 4, height: h - y).offset(y: y)
+                    Circle().fill(.white).shadow(radius: 1).frame(width: 16, height: 16).offset(y: y - 8)
+                }
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+                .gesture(DragGesture(minimumDistance: 0).onChanged { g in
+                    value = r.upperBound - min(max(g.location.y / h, 0), 1) * (r.upperBound - r.lowerBound)
+                })
+            }
+            .frame(width: 30, height: 150)
+            .accessibilityElement()
+            .accessibilityLabel(label == "Preamp" ? label : "\(label) Hz")
+            .accessibilityValue("\(Int(value.rounded())) dB")
+            .accessibilityAdjustableAction { value = min(max(value + ($0 == .increment ? 1 : -1), -12), 12) }
             Text(label).font(.caption2).foregroundStyle(.secondary).fixedSize()
         }
         .frame(width: 34)
