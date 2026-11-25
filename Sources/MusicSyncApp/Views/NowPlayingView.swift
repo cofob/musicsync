@@ -98,6 +98,13 @@ struct NowPlayingView: View {
                 .holdsVisualizerControls(model)
                 .idleHidden(model.visualizerIdle)
         }
+        .overlay(alignment: .bottomLeading) {
+            NowPlayingQuickSettings()
+                .padding(4).glass(in: Capsule())
+                .holdsVisualizerControls(model)
+                .padding(16)
+                .idleHidden(model.visualizerIdle)
+        }
         .overlay(alignment: .bottomTrailing) {
             HStack(spacing: 4) {
                 panelToggle("Lyrics", "quote.bubble", .lyrics)
